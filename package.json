@@ -1,0 +1,19 @@
+{
+  "name": "copilot-cli-mobile",
+  "version": "1.0.0",
+  "description": "Access GitHub Copilot CLI from your smartphone browser",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": ["copilot", "cli", "mobile", "terminal", "web"],
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0"
+  }
+}

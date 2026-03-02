@@ -1,0 +1,11 @@
+name: copilot-cli-mobile
+metadata:
+  template: copilot-cli-mobile@0.0.1
+
+services:
+  web:
+    project: .
+    host: containerapp
+    language: ts
+    docker:
+      path: ./Dockerfile

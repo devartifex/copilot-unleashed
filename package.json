@@ -1,0 +1,51 @@
+{
+  "name": "copilot-cli-mobile",
+  "version": "2.0.0",
+  "description": "Copilot CLI Mobile — GitHub OAuth + Copilot SDK",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "docker compose up --build",
+    "dev:local": "tsx watch src/index.ts",
+    "dev:down": "docker compose down",
+    "lint": "tsc --noEmit",
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui",
+    "clean": "rm -rf dist",
+    "postinstall": "node scripts/patch-sdk.mjs"
+  },
+  "keywords": [
+    "copilot",
+    "cli",
+    "mobile",
+    "github",
+    "oauth"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^0.1.32",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.5.0",
+    "express-session": "^1.18.0",
+    "helmet": "^8.0.0",
+    "session-file-store": "^1.5.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/express": "^4.17.21",
+    "@types/express-session": "^1.18.0",
+    "@types/node": "^20.17.0",
+    "@types/session-file-store": "^1.2.6",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

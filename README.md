@@ -10,7 +10,20 @@ Accedi alla GitHub Copilot CLI (e a qualsiasi terminale) dal browser del tuo sma
 - **Zero build step** — `npm install && npm start`
 - **Fallback automatico** — usa `node-pty` se disponibile, altrimenti `child_process`
 
-## 🚀 Quick Start
+## ☁️ GitHub Codespaces (recommended)
+
+Run the app in the cloud — always on, no local PC needed, accessible from any device.
+
+1. **Set the password secret** — in your GitHub repository go to **Settings → Secrets and variables → Codespaces** and add a secret named `COPILOT_CLI_PASSWORD`.
+2. **Open a Codespace** — click the green **Code** button → **Codespaces** → **Create codespace on main** (or use the badge below).
+3. The server starts automatically. GitHub will forward **port 3000** and show a public URL — open that URL on your phone.
+4. To follow server logs inside the Codespace terminal, run: `tail -f /tmp/server.log`
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/g-mercuri/copilot-cli-mobile)
+
+> **Note:** The forwarded port URL uses HTTPS by default in Codespaces, so no extra reverse proxy is needed.
+
+## 🚀 Quick Start (local)
 
 ```bash
 # Clona il repo
@@ -55,7 +68,7 @@ La barra inferiore offre accesso rapido a:
 ## 🏗️ Architettura
 
 ```
-Browser (smartphone)          Server (PC)
+Browser (smartphone)          Server (PC or Codespace)
 ┌─────────────┐              ┌──────────────┐
 │  xterm.js   │◄──WebSocket──►│  Express     │
 │  + UI       │              │  + node-pty  │

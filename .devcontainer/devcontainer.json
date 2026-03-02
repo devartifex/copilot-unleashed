@@ -1,0 +1,36 @@
+{
+  "name": "Copilot CLI Mobile",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  // Forward port 3000 and make it publicly accessible so phones can connect
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Copilot CLI Mobile",
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
+    }
+  },
+
+  // Install dependencies once when the container is first created
+  "postCreateCommand": "npm install",
+
+  // Start the server automatically every time the Codespace starts.
+  // Logs are written to /tmp/server.log — run `tail -f /tmp/server.log` to follow them.
+  // COPILOT_CLI_PASSWORD is read from the Codespace user secret of the same name
+  // (Settings → Secrets and variables → Codespaces in your repository).
+  "postStartCommand": "nohup npm start > /tmp/server.log 2>&1 &",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
+      ]
+    }
+  }
+}

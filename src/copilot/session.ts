@@ -1,11 +1,17 @@
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 
+// Optional: if a GitHub MCP server package is installed locally, use it to give Copilot
+// GitHub API tools (list repos, read files, create PRs, etc.).
+// The official GitHub MCP server (https://github.com/github/github-mcp-server) is a Go
+// binary and not yet available as an npm package. As a drop-in alternative you can install:
+//   npm install @modelcontextprotocol/server-github
+// Note: that package is deprecated — use it at your own risk until GitHub ships an npm release.
 function resolveGitHubMcpServer(): { command: string; args: string[] } | null {
   try {
     const main = require.resolve('@modelcontextprotocol/server-github');
     return { command: 'node', args: [main] };
   } catch {
-    return null;
+    return null; // Package not installed — Copilot runs without GitHub API tools
   }
 }
 

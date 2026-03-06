@@ -174,13 +174,23 @@ Two workflows are included:
 | `PORT` | ❌ | `3000` | HTTP server port |
 | `NODE_ENV` | ❌ | `development` | Set to `production` for secure cookies + trust proxy |
 
-## GitHub MCP Tools
+## GitHub MCP Tools (Optional)
 
-When a user connects GitHub, the app automatically configures the [GitHub MCP Server](https://github.com/modelcontextprotocol/servers/tree/main/src/github) as a tool provider for Copilot. This gives Copilot access to your repositories during the conversation:
+The Copilot CLI does not include GitHub API tools by default — the GitHub token is used only for Copilot authentication. To give Copilot tools like "read file from repo", "create PR", etc., you need a GitHub MCP server.
+
+The app is wired to automatically pick up a GitHub MCP server if one is installed. GitHub's [official MCP server](https://github.com/github/github-mcp-server) is a Go binary (not an npm package). As a Node.js-based alternative you can install the community package:
+
+```bash
+npm install @modelcontextprotocol/server-github
+```
+
+> ⚠️ That package is currently deprecated. Use it at your own risk — or wait for GitHub to ship a stable npm release.
+
+Once installed, the app detects it automatically and passes the user's token to it. Copilot then gains these tools:
 
 | Tool | What Copilot can do |
 |------|---------------------|
-| `list_repositories` | List your repos (personal or org) |
+| `list_repositories` | List repos (personal or org) |
 | `get_file_contents` | Read any file from a repo |
 | `search_code` | Search code across repos |
 | `list_issues` / `create_issue` | View and create GitHub issues |
@@ -188,7 +198,7 @@ When a user connects GitHub, the app automatically configures the [GitHub MCP Se
 | `get_pull_request` / `merge_pull_request` | Inspect and merge PRs |
 | `push_files` | Commit and push file changes |
 
-> **Personal vs Work**: the tools automatically scope to the authenticated user's account. Log in with your personal GitHub account for personal repos; log in with your work/org account for company repos with SSO.
+> The tools automatically scope to the authenticated user's account — personal repos for personal login, org repos for work/SSO login.
 
 ## Security
 

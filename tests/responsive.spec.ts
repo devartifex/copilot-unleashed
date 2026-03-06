@@ -92,7 +92,7 @@ test.describe('Responsive — Chat screen', () => {
 
     await expect(page.locator('#message-input')).toBeVisible();
     await expect(page.locator('#banner')).toBeVisible();
-    await expect(page.locator('.input-footer')).toBeVisible();
+    await expect(page.locator('.status-bar')).toBeVisible();
 
     // No horizontal overflow
     const bodyWidth = await page.locator('body').evaluate((el) => el.scrollWidth);
@@ -105,7 +105,7 @@ test.describe('Responsive — Chat screen', () => {
     const { page, context } = await openAuthenticatedPage(browser, { width: 375, height: 667 });
 
     await expect(page.locator('#message-input')).toBeVisible();
-    await expect(page.locator('#mode-select')).toBeVisible();
+    await expect(page.locator('#mode-toggle')).toBeVisible();
     await expect(page.locator('#model-select')).toBeVisible();
 
     await context.close();
@@ -137,7 +137,7 @@ test.describe('Responsive — Chat screen', () => {
   test('input footer controls remain accessible at 380px width', async ({ browser }) => {
     const { page, context } = await openAuthenticatedPage(browser, { width: 380, height: 667 });
 
-    await expect(page.locator('#mode-select')).toBeAttached();
+    await expect(page.locator('#mode-toggle')).toBeAttached();
     await expect(page.locator('#model-select')).toBeAttached();
     await expect(page.locator('#new-chat-btn')).toBeAttached();
     await expect(page.locator('#logout-btn')).toBeAttached();

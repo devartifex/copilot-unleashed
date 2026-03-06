@@ -136,7 +136,12 @@ function initChat(status) {
 
   document.getElementById('model-select').addEventListener('change', () => Chat.newChat());
 
-  document.getElementById('mode-select').addEventListener('change', (e) => {
-    Chat.setMode(e.target.value);
+  // Mode toggle — button group replaces select
+  document.getElementById('mode-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('.mode-opt');
+    if (!btn || btn.classList.contains('active')) return;
+    document.querySelectorAll('#mode-toggle .mode-opt').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    Chat.setMode(btn.dataset.mode);
   });
 }

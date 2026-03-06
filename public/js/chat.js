@@ -81,6 +81,8 @@ const Chat = {
 
       case 'reasoning_done':
         if (this.currentReasoningEl) {
+          const icon = this.currentReasoningEl.querySelector('.reasoning-icon');
+          if (icon) icon.classList.remove('thinking');
           this.currentReasoningEl.classList.add('collapsed');
           this.currentReasoningEl = null;
           this.currentReasoningContent = '';
@@ -216,10 +218,10 @@ const Chat = {
   },
 
   syncModeSelect(mode) {
-    const select = document.getElementById('mode-select');
-    if (select && [...select.options].some((o) => o.value === mode)) {
-      select.value = mode;
-    }
+    const btns = document.querySelectorAll('#mode-toggle .mode-opt');
+    btns.forEach((b) => {
+      b.classList.toggle('active', b.dataset.mode === mode);
+    });
   },
 
   newChat() {
@@ -308,7 +310,7 @@ const Chat = {
 
     const header = document.createElement('div');
     header.className = 'reasoning-header';
-    header.innerHTML = '<span class="reasoning-chevron">▼</span> <span class="reasoning-icon">◐</span> <span class="reasoning-label">Thinking…</span>';
+    header.innerHTML = '<span class="reasoning-chevron">▼</span> <span class="reasoning-icon thinking">◐</span> <span class="reasoning-label">Thinking…</span>';
     header.addEventListener('click', () => {
       el.classList.toggle('collapsed');
     });

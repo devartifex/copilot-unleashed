@@ -68,7 +68,7 @@ test.describe('Chat screen', () => {
     await openChatScreen(page);
     const input = page.locator('#message-input');
     await expect(input).toBeVisible();
-    await expect(input).toHaveAttribute('placeholder', /Type/);
+    await expect(input).toHaveAttribute('placeholder', /Ask Copilot/);
   });
 
   test('shows status indicator prompt', async ({ page }) => {
@@ -78,16 +78,16 @@ test.describe('Chat screen', () => {
     await expect(indicator).toHaveText('❯');
   });
 
-  test('shows mode selector with options', async ({ page }) => {
+  test('shows mode toggle with options', async ({ page }) => {
     await openChatScreen(page);
-    const modeSelect = page.locator('#mode-select');
-    await expect(modeSelect).toBeVisible();
+    const modeToggle = page.locator('#mode-toggle');
+    await expect(modeToggle).toBeVisible();
 
-    const options = modeSelect.locator('option');
-    await expect(options).toHaveCount(3);
-    await expect(options.nth(0)).toHaveAttribute('value', 'interactive');
-    await expect(options.nth(1)).toHaveAttribute('value', 'plan');
-    await expect(options.nth(2)).toHaveAttribute('value', 'autopilot');
+    const buttons = modeToggle.locator('.mode-opt');
+    await expect(buttons).toHaveCount(3);
+    await expect(buttons.nth(0)).toHaveAttribute('data-mode', 'interactive');
+    await expect(buttons.nth(1)).toHaveAttribute('data-mode', 'plan');
+    await expect(buttons.nth(2)).toHaveAttribute('data-mode', 'autopilot');
   });
 
   test('shows model selector', async ({ page }) => {
@@ -100,14 +100,14 @@ test.describe('Chat screen', () => {
     await openChatScreen(page);
     const newChatBtn = page.locator('#new-chat-btn');
     await expect(newChatBtn).toBeVisible();
-    await expect(newChatBtn).toHaveText('/new');
+    await expect(newChatBtn).toHaveText('new');
   });
 
   test('shows logout button', async ({ page }) => {
     await openChatScreen(page);
     const logoutBtn = page.locator('#logout-btn');
     await expect(logoutBtn).toBeVisible();
-    await expect(logoutBtn).toHaveText('/quit');
+    await expect(logoutBtn).toHaveText('quit');
   });
 
   test('messages container is initially empty', async ({ page }) => {
@@ -117,17 +117,17 @@ test.describe('Chat screen', () => {
     await expect(messages).toBeEmpty();
   });
 
-  test('input area contains footer with status and controls', async ({ page }) => {
+  test('input area contains status bar with controls', async ({ page }) => {
     await openChatScreen(page);
-    const footer = page.locator('.input-footer');
-    await expect(footer).toBeVisible();
-    await expect(footer.locator('.input-footer-left')).toBeVisible();
-    await expect(footer.locator('.input-footer-right')).toBeVisible();
+    const statusBar = page.locator('.status-bar');
+    await expect(statusBar).toBeVisible();
+    await expect(statusBar.locator('.status-left')).toBeVisible();
+    await expect(statusBar.locator('.status-right')).toBeVisible();
   });
 
   test('banner shows tip and warning', async ({ page }) => {
     await openChatScreen(page);
-    await expect(page.locator('#banner .banner-tip')).toContainText('/model');
-    await expect(page.locator('#banner .banner-warn')).toContainText('always check for mistakes');
+    await expect(page.locator('#banner .banner-tip')).toContainText('mode selector');
+    await expect(page.locator('#banner .banner-warn')).toContainText('Always verify');
   });
 });

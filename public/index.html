@@ -6,28 +6,29 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0d1117">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Copilot CLI</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
 </head>
 <body>
 
-  <!-- GITHUB DEVICE FLOW SCREEN -->
+  <!-- LOGIN SCREEN -->
   <div id="github-screen" class="screen">
     <div class="terminal">
       <div class="term-line">
         <span class="term-prompt">❯</span>
-        <span class="term-cmd">copilot --banner</span>
+        <span class="term-cmd">copilot --login</span>
       </div>
       <div class="banner-box">
         <div class="banner-inner">
           <div class="banner-logo">○ ○</div>
-          <div class="banner-title"><span class="c-purple">GitHub Copilot</span></div>
-          <div class="banner-sub">Authenticate to get started.</div>
+          <div class="banner-title"><span class="c-purple">GitHub Copilot</span> <span class="c-dim">CLI</span></div>
+          <div class="banner-sub">Authenticate with GitHub to get started.</div>
         </div>
       </div>
       <div class="term-line term-info">
-        <span class="c-yellow">●</span> Enter this code at GitHub to authorize:
+        <span class="c-yellow">●</span> Enter this code at GitHub:
       </div>
       <div class="device-code-box">
         <span id="device-code-text" class="device-code-text">--------</span>
@@ -38,7 +39,7 @@
       </div>
       <div class="term-line term-info" id="device-status">
         <span class="spinner-char" id="device-spinner">⠋</span>
-        <span id="device-status-text">Waiting for authorization...</span>
+        <span id="device-status-text">Waiting for authorization…</span>
       </div>
       <div class="term-line term-dim" id="device-expires"></div>
     </div>
@@ -52,48 +53,47 @@
         <div class="banner-inner">
           <div class="banner-row">
             <span class="banner-logo">○ ○</span>
-            <span class="banner-blocks">█▀▀ █▀▄</span>
           </div>
           <div class="banner-title"><span class="c-purple">GitHub Copilot</span> <span class="c-dim">v0.1.30</span></div>
           <div class="banner-sub">Describe a task to get started.</div>
-          <div class="banner-tip">Tip: <span class="c-bold">/model</span> Select AI model to use</div>
-          <div class="banner-warn">Copilot uses AI, so always check for mistakes.</div>
+          <div class="banner-tip">Tip: Switch modes with the mode selector below.</div>
+          <div class="banner-warn">Copilot uses AI. Always verify suggestions.</div>
         </div>
       </div>
 
-      <!-- Environment info lines -->
+      <!-- Environment info -->
       <div class="env-lines" id="env-lines">
-        <div class="term-line"><span class="c-green">●</span> <span class="c-dim">Environment loaded: <span id="env-model-text">1 model</span></span></div>
+        <div class="term-line"><span class="c-green">●</span> <span class="c-dim">Environment: <span id="env-model-text">1 model</span></span></div>
       </div>
 
-      <!-- Scrollable output area -->
-      <div id="messages" class="messages">
-        <!-- conversation turns appear here -->
-      </div>
+      <!-- Messages area -->
+      <div id="messages" class="messages"></div>
 
-      <!-- Prompt input -->
+      <!-- Input area -->
       <div id="input-area" class="input-area">
-        <div class="prompt-line">
-          <span class="term-prompt" id="status-indicator">❯</span>
-          <textarea id="message-input" placeholder="Type @ to mention files, # for issues/PRs, / for commands, or ? for shortcuts" rows="1" autofocus></textarea>
-        </div>
-        <div class="input-footer">
-          <span class="input-footer-left">
-            <span id="status-text" class="c-dim"></span>
-            <span id="user-badge" class="c-dim"></span>
-          </span>
-          <span class="input-footer-right">
-            <select id="mode-select" class="mode-select" title="Agent mode">
-              <option value="interactive">interactive</option>
-              <option value="plan">plan</option>
-              <option value="autopilot">autopilot</option>
-            </select>
-            <select id="model-select" class="model-select">
-              <option value="gpt-4.1">gpt-4.1</option>
-            </select>
-            <button class="term-btn" id="new-chat-btn" title="New chat">/new</button>
-            <button class="term-btn term-btn-danger" id="logout-btn" title="Logout">/quit</button>
-          </span>
+        <div class="input-container">
+          <div class="prompt-line">
+            <span class="term-prompt" id="status-indicator">❯</span>
+            <textarea id="message-input" placeholder="Ask Copilot…" rows="1" autofocus></textarea>
+          </div>
+          <div class="status-bar">
+            <div class="status-left">
+              <span id="status-text"></span>
+              <span id="user-badge"></span>
+            </div>
+            <div class="status-right">
+              <div class="mode-toggle" id="mode-toggle">
+                <button class="mode-opt active" data-mode="interactive" title="Interactive mode">ask</button>
+                <button class="mode-opt" data-mode="plan" title="Plan mode">plan</button>
+                <button class="mode-opt" data-mode="autopilot" title="Autopilot mode">auto</button>
+              </div>
+              <select id="model-select" class="pill-select" title="Model">
+                <option value="gpt-4.1">gpt-4.1</option>
+              </select>
+              <button class="action-btn" id="new-chat-btn" title="New session">new</button>
+              <button class="action-btn danger" id="logout-btn" title="Sign out">quit</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

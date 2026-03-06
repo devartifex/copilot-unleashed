@@ -14,12 +14,6 @@ param managedIdentityClientId string
 @description('Key Vault URI for secret references')
 param keyVaultUri string
 
-@description('Azure AD client ID (non-secret, safe as env var)')
-param azureClientId string
-
-@description('Azure AD tenant ID (non-secret, safe as env var)')
-param azureTenantId string
-
 @description('Log Analytics workspace ID for the environment')
 param logAnalyticsWorkspaceId string
 
@@ -82,11 +76,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       ]
       secrets: [
         {
-          name: 'azure-client-secret'
-          keyVaultUrl: '${keyVaultUri}secrets/azure-client-secret'
-          identity: managedIdentityId
-        }
-        {
           name: 'github-client-id'
           keyVaultUrl: '${keyVaultUri}secrets/github-client-id'
           identity: managedIdentityId
@@ -107,9 +96,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'NODE_ENV', value: 'production' }
             { name: 'PORT', value: '3000' }
             { name: 'BASE_URL', value: 'https://${name}.${containerAppsEnvironment.properties.defaultDomain}' }
-            { name: 'AZURE_CLIENT_ID', value: azureClientId }
-            { name: 'AZURE_TENANT_ID', value: azureTenantId }
-            { name: 'AZURE_CLIENT_SECRET', secretRef: 'azure-client-secret' }
             { name: 'GITHUB_CLIENT_ID', secretRef: 'github-client-id' }
             { name: 'SESSION_SECRET', secretRef: 'session-secret' }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }

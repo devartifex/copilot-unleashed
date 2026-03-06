@@ -29,26 +29,62 @@ The same Copilot CLI experience you get on your terminal — but accessible from
 ## Architecture
 
 ```
-Mobile / Desktop Browser              Self-hosted Server
-┌──────────────────────┐              ┌───────────────────────────┐
-│                      │              │  Express + TypeScript     │
-│  Chat UI (SPA)       │◄── WSS ────►│                           │
-│                      │              │  ┌── Copilot SDK ───────┐ │
-│  GitHub Device Flow  │── OAuth ───►│  │  CopilotClient        │ │
-│  (enter code on      │              │  │  ├─ JSON-RPC (stdio)  │ │
-│   github.com/login/  │              │  │  └─ Copilot CLI proc  │ │
-│   device)            │              │  └──────────────────────┘ │
-│                      │              │                           │
-└──────────────────────┘              └───────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Mobile / Desktop Browser                          │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────────────┐   │
+│  │  Device Flow UI  │  │   Chat UI (SPA) │  │  Markdown + Highlight   │   │
+│  │  (login screen)  │  │  (chat screen)  │  │  (marked + DOMPurify)   │   │
+│  └────────┬─────────┘  └───────┬─────────┘  └──────────────────────────┘   │
+│           │ HTTP                │ WebSocket (ws/wss)                       │
+└───────────┼────────────────────┼──────────────────────────────────────────┘
+            │                    │
+            ▼                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Express + TypeScript Server                           │
+│  ┌──────────┐  ┌──────────┐  ┌─────────────┐  ┌────────────────────────┐  │
+│  │  Helmet   │  │  Rate    │  │  Session    │  │  Static File Server   │  │
+│  │  (CSP)    │  │  Limiter │  │  (file/mem) │  │  (public/)            │  │
+│  └──────────┘  └──────────┘  └──────┬──────┘  └────────────────────────┘  │
+│                                     │                                     │
+│  ┌──────────────────────────────────┼──────────────────────────────────┐  │
+│  │  Routes                          │                                  │  │
+│  │  /auth/* ─── Device Flow ────────┤                                  │  │
+│  │  /api/*  ─── Models (guarded) ───┤                                  │  │
+│  │  /ws     ─── WebSocket ──────────┘                                  │  │
+│  └──────────────────────────────────┬──────────────────────────────────┘  │
+│                                     │                                     │
+│  ┌──────────────────────────────────┴──────────────────────────────────┐  │
+│  │  Copilot SDK                                                        │  │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌────────────────────┐  │  │
+│  │  │  CopilotClient   │  │  Session +       │  │  MCP GitHub       │  │  │
+│  │  │  (per connection) │  │  Model Config    │  │  HTTP Server      │  │  │
+│  │  └────────┬─────────┘  └─────────────────┘  └────────────────────┘  │  │
+│  │           │ JSON-RPC (stdio)                                        │  │
+│  │           ▼                                                         │  │
+│  │  ┌─────────────────┐                                                │  │
+│  │  │  @github/copilot │ ← CLI subprocess (one per connection)         │  │
+│  │  │  CLI process      │                                               │  │
+│  │  └─────────────────┘                                                │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+            │
+            ▼
+┌──────────────────────────┐
+│  github.com              │
+│  ├─ Device Flow OAuth    │
+│  ├─ Copilot API          │
+│  └─ REST API (via MCP)   │
+└──────────────────────────┘
 ```
 
 **How it works:**
 
 1. User opens the app → GitHub Device Flow starts (enter a code at `github.com/login/device`)
-2. After auth → chat screen appears, user picks a model and starts chatting
-3. Server creates a `CopilotClient` per WebSocket connection (SDK manages the CLI process)
-4. Messages go through `sendAndWait()` → SDK emits `assistant.message_delta` events → streamed to browser
-5. On disconnect → `client.stop()` cleans up the CLI process
+2. After auth → token stored server-side in Express session (never sent to browser)
+3. Chat screen appears — user picks a model, WebSocket connection opens
+4. Server creates a `CopilotClient` per WebSocket connection (SDK spawns a CLI subprocess)
+5. Messages go through `sendAndWait()` → SDK emits `assistant.message_delta` events → streamed token-by-token to browser via WebSocket
+6. On disconnect → `client.stop()` cleans up the CLI process
 
 ## Getting Started
 
@@ -126,31 +162,34 @@ npm run dev:local
 ```
 copilot-cli-mobile/
 ├── src/
-│   ├── index.ts              # Server entry point
-│   ├── config.ts             # Environment variable validation
-│   ├── server.ts             # Express app, middleware, static files
+│   ├── index.ts              # Entry point — HTTP server + WebSocket setup
+│   ├── config.ts             # Env var validation (fail-fast on missing)
+│   ├── server.ts             # Express app, middleware stack, routes
 │   ├── auth/
-│   │   ├── github.ts         # GitHub Device Flow (OAuth)
-│   │   └── middleware.ts     # requireGitHub guard
+│   │   ├── github.ts         # GitHub Device Flow OAuth (fetch-based)
+│   │   └── middleware.ts     # requireGitHub session guard
 │   ├── copilot/
-│   │   ├── client.ts         # CopilotClient factory
-│   │   └── session.ts        # Session creation, model listing
+│   │   ├── client.ts         # CopilotClient factory (one per WS conn)
+│   │   └── session.ts        # Session creation, model listing, MCP config
 │   ├── routes/
-│   │   ├── auth.ts           # /auth/* (device flow, logout, status)
-│   │   └── api.ts            # /api/* (models)
+│   │   ├── auth.ts           # /auth/* (device/start, device/poll, logout, status)
+│   │   └── api.ts            # /api/* (models) — behind requireGitHub
 │   ├── ws/
-│   │   └── handler.ts        # WebSocket: chat, streaming, lifecycle
+│   │   └── handler.ts        # WebSocket: chat streaming, message protocol
 │   └── types/
 │       └── session.d.ts      # Express session type augmentation
 ├── public/
-│   ├── index.html            # Single-page app shell
-│   ├── css/style.css         # Dark theme, mobile-first
+│   ├── index.html            # SPA shell (two screens: login + chat)
+│   ├── css/style.css         # Dark theme, mobile-first, CSS custom properties
 │   └── js/
 │       ├── app.js            # App init + auth orchestration
 │       ├── auth.js           # Device flow API client
-│       └── chat.js           # Chat UI, WebSocket, markdown
+│       └── chat.js           # WebSocket client, markdown rendering, streaming
+├── infra/                    # Azure Bicep IaC (Container Apps, ACR, Key Vault)
+├── .github/workflows/        # CI (lint + build) + CD (Docker → ACR → Container Apps)
 ├── Dockerfile                # Multi-stage build (Node 24 + Copilot CLI)
-├── docker-compose.yml        # Local development
+├── docker-compose.yml        # Local development with volume mounts
+├── entrypoint.sh             # Container entry — validates Copilot CLI availability
 ├── package.json
 └── tsconfig.json
 ```

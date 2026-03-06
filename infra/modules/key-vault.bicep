@@ -10,10 +10,6 @@ param tags object = {}
 param managedIdentityPrincipalId string
 
 @secure()
-@description('Azure AD client secret')
-param azureClientSecret string
-
-@secure()
 @description('GitHub OAuth client ID')
 param githubClientId string
 
@@ -47,14 +43,6 @@ resource keyVaultRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04
     principalId: managedIdentityPrincipalId
     roleDefinitionId: keyVaultSecretsUserRoleId
     principalType: 'ServicePrincipal'
-  }
-}
-
-resource secretAzureClientSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: keyVault
-  name: 'azure-client-secret'
-  properties: {
-    value: azureClientSecret
   }
 }
 

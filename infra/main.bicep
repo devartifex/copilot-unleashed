@@ -11,17 +11,6 @@ param location string
 
 param containerAppName string = 'copilot-cli-web'
 
-@description('Azure AD app registration client ID')
-param azureClientId string
-
-@description('Azure AD tenant ID')
-param azureTenantId string
-
-@secure()
-@minLength(1)
-@description('Azure AD app client secret')
-param azureClientSecret string
-
 @secure()
 @minLength(1)
 @description('GitHub OAuth app client ID')
@@ -78,7 +67,6 @@ module keyVault './modules/key-vault.bicep' = {
     location: location
     tags: tags
     managedIdentityPrincipalId: managedIdentity.outputs.principalId
-    azureClientSecret: azureClientSecret
     githubClientId: githubClientId
     sessionSecret: sessionSecret
   }
@@ -107,8 +95,6 @@ module containerApps './modules/container-apps.bicep' = {
     managedIdentityId: managedIdentity.outputs.id
     managedIdentityClientId: managedIdentity.outputs.clientId
     keyVaultUri: keyVault.outputs.uri
-    azureClientId: azureClientId
-    azureTenantId: azureTenantId
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     minReplicas: minReplicas

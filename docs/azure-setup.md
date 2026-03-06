@@ -1,57 +1,18 @@
-# Azure & GitHub OAuth Setup Guide
+# Azure & GitHub Setup Guide
 
-This guide walks you through manually configuring Azure AD (Microsoft Entra ID) and GitHub OAuth for Copilot CLI Web. If you prefer automation, run the setup script instead:
-
-```bash
-az login
-./infra/scripts/setup-entra-app.sh http://localhost:3000
-```
+This guide walks you through configuring GitHub OAuth and deploying Copilot CLI Mobile to Azure.
 
 ---
 
 ## Prerequisites
 
-- [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli) installed and authenticated (`az login`)
-- A GitHub account with an active [Copilot license](https://github.com/features/copilot#pricing)
-- *(Optional)* [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) for `azd up` deployment
+- A GitHub account with an active [Copilot license](https://github.com/features/copilot#pricing) (free tier works)
+- *(For Azure deployment)* [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and authenticated (`az login`)
+- *(For Azure deployment)* [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) (`azd`)
 
 ---
 
-## 1. Azure AD App Registration (Microsoft Entra ID)
-
-### Create the App Registration
-
-1. Navigate to [Azure Portal → App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
-2. Click **New registration**
-3. Fill in:
-   - **Name**: `copilot-cli-web`
-   - **Supported account types**: *Accounts in this organizational directory only* (single tenant)
-   - **Redirect URI**: Platform = `Web`, URI = `http://localhost:3000/auth/callback`
-4. Click **Register**
-5. Note the following values from the **Overview** page:
-   - **Application (client) ID** → `AZURE_CLIENT_ID`
-   - **Directory (tenant) ID** → `AZURE_TENANT_ID`
-
-### Create a Client Secret
-
-1. In the app registration page, go to **Certificates & secrets**
-2. Click **New client secret**
-3. Set:
-   - **Description**: `copilot-cli-web`
-   - **Expires**: 24 months
-4. Click **Add**
-5. **Copy the secret Value immediately** (it won't be shown again) → `AZURE_CLIENT_SECRET`
-
-### Add Production Redirect URI
-
-After deploying to Azure, return to the app registration and add a second redirect URI:
-
-- Platform: `Web`
-- URI: `https://<your-container-app-fqdn>/auth/callback`
-
----
-
-## 2. GitHub OAuth App — Device Flow
+## 1. Register a GitHub OAuth App
 
 The app uses [GitHub Device Authorization Flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) — the same interactive flow used by `gh auth login`. This means:
 
@@ -67,7 +28,7 @@ The app uses [GitHub Device Authorization Flow](https://docs.github.com/en/apps/
 1. Go to [GitHub → Settings → Developer settings → OAuth Apps](https://github.com/settings/developers)
 2. Click **New OAuth App**
 3. Fill in:
-   - **Application name**: `Copilot CLI Web`
+   - **Application name**: `Copilot CLI Mobile`
    - **Homepage URL**: any valid URL — e.g. `http://localhost:3000`
    - **Authorization callback URL**: same as above — device flow never redirects here
 4. Click **Register application**
@@ -80,7 +41,7 @@ After deploying, you can optionally update the **Homepage URL** to your producti
 
 ---
 
-## 3. Local Configuration
+## 2. Local Configuration
 
 Create your `.env` file from the template:
 
@@ -88,28 +49,26 @@ Create your `.env` file from the template:
 cp .env.example .env
 ```
 
-Fill in the values:
+Fill in the two required values:
 
 ```env
-AZURE_CLIENT_ID=<from step 1>
-AZURE_TENANT_ID=<from step 1>
-AZURE_CLIENT_SECRET=<from step 1>
-GITHUB_CLIENT_ID=<from step 2>
+GITHUB_CLIENT_ID=<from step 1>
 SESSION_SECRET=<run: openssl rand -hex 32>
-BASE_URL=http://localhost:3000
 ```
 
-> No `GITHUB_CLIENT_SECRET` — device flow only needs the client ID.
+That's it — no client secret, no Azure AD credentials, no redirect URIs.
 
 Start the dev server:
 
 ```bash
-npm run dev
+docker compose up --build
+# or without Docker (requires Node 24+):
+npm install && npm run build && npm start
 ```
 
 ---
 
-## 4. Deploy to Azure with `azd`
+## 3. Deploy to Azure with `azd`
 
 ### Install Azure Developer CLI
 
@@ -129,31 +88,33 @@ az login
 azd auth login
 
 # Set secrets in azd environment
-azd env set AZURE_CLIENT_ID <value>
-azd env set AZURE_TENANT_ID <value>
-azd env set AZURE_CLIENT_SECRET <value>
-azd env set GITHUB_CLIENT_ID <value>
-# No GITHUB_CLIENT_SECRET — device flow doesn't need it
+azd env set GITHUB_CLIENT_ID <your-github-client-id>
 
 # Provision Azure resources + build Docker image + deploy
 azd up
 ```
 
-After `azd up` completes, note the Container App FQDN from the output and update:
-1. **Azure AD** redirect URI (see [Add Production Redirect URI](#add-production-redirect-uri))
-2. **GitHub OAuth** callback URL (see [Update for Production](#update-for-production))
+`azd up` provisions:
 
-`azd up` provisions: Container Registry, Container App, **Key Vault** (secrets), **Managed Identity** (RBAC for ACR + Key Vault), and **Application Insights + Log Analytics** (monitoring). All secrets are stored in Key Vault and referenced by the Container App via the managed identity — no plaintext secrets in the app configuration.
+| Resource | Purpose |
+|----------|---------|
+| **Container Registry** | Docker image storage |
+| **Container App** | Serverless container runtime (port 3000, auto-TLS) |
+| **Key Vault** | Stores `GITHUB_CLIENT_ID` and `SESSION_SECRET` (auto-generated) |
+| **Managed Identity** | RBAC for ACR pull + Key Vault read (no stored credentials) |
+| **Log Analytics + Application Insights** | Monitoring and diagnostics |
+
+All secrets are stored in Key Vault and referenced by the Container App via managed identity — no plaintext secrets in the app configuration.
 
 ### Subsequent Deploys
 
 ```bash
-azd deploy    # Redeploy without re-provisioning
+azd deploy    # Redeploy without re-provisioning infrastructure
 ```
 
 ---
 
-## 5. CI/CD with GitHub Actions
+## 4. CI/CD with GitHub Actions
 
 ### Create a Service Principal
 
@@ -161,7 +122,7 @@ The deploy workflow needs Azure credentials. Create a service principal scoped t
 
 ```bash
 az ad sp create-for-rbac \
-  --name "copilot-cli-web-cicd" \
+  --name "copilot-cli-mobile-cicd" \
   --role contributor \
   --scopes /subscriptions/<subscription-id>/resourceGroups/<resource-group> \
   --sdk-auth
@@ -175,20 +136,19 @@ In your GitHub repo → **Settings → Secrets and variables → Actions**, add:
 |--------|-------|
 | `AZURE_CREDENTIALS` | Full JSON output from `az ad sp create-for-rbac` |
 | `ACR_LOGIN_SERVER` | `<registry-name>.azurecr.io` |
-| `ACR_NAME` | Container Registry name |
+| `ACR_NAME` | Container Registry name (without `.azurecr.io`) |
 | `AZURE_RESOURCE_GROUP` | Resource Group name |
 
 All four values are displayed in the `azd up` output.
 
+### How It Works
+
+- **CI** (`ci.yml`): Runs on every push — type-checks and builds the TypeScript
+- **Deploy** (`deploy.yml`): Runs on push to `main`/`master` or manual trigger — builds Docker image, pushes to ACR, deploys to Container Apps, runs health check
+
 ---
 
 ## Troubleshooting
-
-### "AADSTS50011: The redirect URI does not match"
-
-Your Azure AD app registration's redirect URI doesn't match the `BASE_URL`. Verify:
-- The redirect URI in Azure Portal matches `{BASE_URL}/auth/callback` exactly
-- The protocol matches (`http` vs `https`)
 
 ### "Device code expired"
 
@@ -197,6 +157,21 @@ The device code is valid for 15 minutes. If you see this error, refresh the page
 ### "Bad credentials" / GitHub token rejected
 
 Your session's GitHub token may have been revoked. Log out and log in again to re-authorize via device flow.
+
+### Container App not starting
+
+Check the container logs:
+
+```bash
+az containerapp logs show \
+  --name copilot-cli-web \
+  --resource-group <resource-group> \
+  --type console
+```
+
+Common issues:
+- Missing `GITHUB_CLIENT_ID` or `SESSION_SECRET` — check Key Vault secrets
+- Copilot CLI not installed — verify the Docker build completed successfully
 
 ### Cold Start Delays
 

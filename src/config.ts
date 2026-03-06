@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-export type ChatBackend = 'sdk' | 'gh-cli';
+export type ChatBackend = 'sdk' | 'cli';
 
 function required(name: string): string {
   const val = process.env[name];
@@ -14,8 +14,9 @@ export const config = {
   baseUrl: required('BASE_URL'),
   sessionSecret: required('SESSION_SECRET'),
   sessionStorePath: process.env.SESSION_STORE_PATH || '.sessions',
-  enableGitHubMcp: process.env.ENABLE_GITHUB_MCP === 'true',
-  chatBackend: (process.env.CHAT_BACKEND === 'gh-cli' ? 'gh-cli' : 'sdk') as ChatBackend,
+  // Disable GitHub MCP in development to avoid auth issues; enable only in production with proper config
+  enableGitHubMcp: process.env.NODE_ENV === 'production' && process.env.ENABLE_GITHUB_MCP === 'true',
+  chatBackend: (process.env.CHAT_BACKEND === 'cli' ? 'cli' : 'sdk') as ChatBackend,
   azure: {
     clientId: required('AZURE_CLIENT_ID'),
     tenantId: required('AZURE_TENANT_ID'),

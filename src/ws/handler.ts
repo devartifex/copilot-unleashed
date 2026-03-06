@@ -2,17 +2,13 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
 import { getCopilotClient, destroyCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
-import { ensureGhCopilotAvailable, runGhCopilotSuggest } from '../copilot/ghCli.js';
+import { runGhCopilotSuggest, runGhCopilotExplain } from '../copilot/ghCli.js';
 import { config, type ChatBackend } from '../config.js';
 
 type SessionMiddleware = (req: any, res: any, next: () => void) => void;
 
 const MAX_MESSAGE_LENGTH = 10_000;
-const VALID_MESSAGE_TYPES = new Set(['new_session', 'message', 'list_models']);
-
-function normalizeBackend(value: unknown): ChatBackend {
-  return value === 'gh-cli' ? 'gh-cli' : 'sdk';
-}
+const VALID_MESSAGE_TYPES = new Set(['new_session', 'message', 'list_models', 'cli_suggest', 'cli_explain']);
 
 function send(ws: WebSocket, data: Record<string, unknown>): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -70,7 +66,7 @@ export function setupWebSocket(
 
         switch (msg.type) {
           case 'new_session': {
-            activeBackend = normalizeBackend(msg.backend ?? config.chatBackend);
+            activeBackend = (msg.backend === 'cli' || msg.backend === 'gh-cli') ? 'cli' : 'sdk';
 
             // Destroy previous session before creating a new one
             if (copilotSession) {
@@ -78,19 +74,28 @@ export function setupWebSocket(
               copilotSession = null;
             }
 
-            if (activeBackend === 'gh-cli') {
-              await ensureGhCopilotAvailable();
-              send(ws, { type: 'session_created', model: 'gh-copilot-suggest', backend: activeBackend });
+            if (activeBackend === 'cli') {
+              // CLI mode: no SDK session needed, just verify gh copilot is available
+              try {
+                const { ensureGhCopilotAvailable } = await import('../copilot/ghCli.js');
+                await ensureGhCopilotAvailable(githubToken);
+                send(ws, { type: 'session_created', backend: 'cli' });
+              } catch (cliErr: any) {
+                send(ws, { type: 'error', message: `CLI not available: ${cliErr.message}` });
+              }
               break;
             }
 
             try {
+              if (process.env.DEBUG_COPILOT) console.log(`[WS] Creating Copilot session for user`);
               const client = await getCopilotClient(sessionId, githubToken);
               copilotSession = await createCopilotSession(client, githubToken, msg.model);
 
+              if (process.env.DEBUG_COPILOT) console.log(`[WS] Attaching event listeners to session`);
               copilotSession.on(
                 'assistant.message_delta',
                 (event: any) => {
+                  if (process.env.DEBUG_COPILOT) console.log(`[WS] Received delta chunk:`, event.data.deltaContent.substring(0, 50));
                   send(ws, {
                     type: 'delta',
                     content: event.data.deltaContent,
@@ -98,9 +103,11 @@ export function setupWebSocket(
                 }
               );
 
+              if (process.env.DEBUG_COPILOT) console.log(`[WS] Session created successfully, sending confirmation`);
               send(ws, { type: 'session_created', model: msg.model, backend: activeBackend });
             } catch (sessionErr: any) {
               console.error('Session creation error:', sessionErr.message);
+              if (process.env.DEBUG_COPILOT) console.error('[WS] Full error stack:', sessionErr.stack);
               send(ws, {
                 type: 'error',
                 message: `Failed to create session: ${sessionErr.message}`,
@@ -116,10 +123,15 @@ export function setupWebSocket(
               return;
             }
 
-            if (activeBackend === 'gh-cli') {
-              const output = await runGhCopilotSuggest(content);
-              send(ws, { type: 'delta', content: output });
-              send(ws, { type: 'done' });
+            if (activeBackend === 'cli') {
+              // CLI mode: use gh copilot suggest with the user's GitHub token
+              try {
+                const output = await runGhCopilotSuggest(content, githubToken);
+                send(ws, { type: 'delta', content: output });
+                send(ws, { type: 'done' });
+              } catch (cliErr: any) {
+                send(ws, { type: 'error', message: `CLI error: ${cliErr.message}` });
+              }
               break;
             }
 
@@ -128,17 +140,14 @@ export function setupWebSocket(
               return;
             }
 
+            if (process.env.DEBUG_COPILOT) console.log(`[WS] Sending message to session:`, content.substring(0, 50));
             await copilotSession.sendAndWait({ prompt: content });
+            if (process.env.DEBUG_COPILOT) console.log(`[WS] Message processing complete`);
             send(ws, { type: 'done' });
             break;
           }
 
           case 'list_models': {
-            if (activeBackend === 'gh-cli') {
-              send(ws, { type: 'models', models: ['gh-copilot-suggest'] });
-              break;
-            }
-
             const client = await getCopilotClient(sessionId, githubToken);
             const models = await getAvailableModels(client);
             // Ensure models is always an array before sending

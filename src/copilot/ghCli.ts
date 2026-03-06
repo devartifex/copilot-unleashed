@@ -10,10 +10,10 @@ type CommandResult = {
   stderr: string;
 };
 
-function runCommand(command: string, args: string[], timeoutMs = GH_COPILOT_TIMEOUT_MS): Promise<CommandResult> {
+function runCommand(command: string, args: string[], timeoutMs = GH_COPILOT_TIMEOUT_MS, extraEnv?: Record<string, string>): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      env: process.env,
+      env: { ...process.env, ...extraEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
@@ -50,11 +50,12 @@ function runCommand(command: string, args: string[], timeoutMs = GH_COPILOT_TIME
   });
 }
 
-export async function ensureGhCopilotAvailable(): Promise<void> {
+export async function ensureGhCopilotAvailable(githubToken?: string): Promise<void> {
   if (ghCopilotAvailable) return;
 
+  const env = githubToken ? { GH_TOKEN: githubToken } : undefined;
   try {
-    const probe = await runCommand('gh', ['copilot', '--help'], 15_000);
+    const probe = await runCommand('gh', ['copilot', '--help'], 15_000, env);
     if (probe.code === 0) {
       ghCopilotAvailable = true;
       return;
@@ -68,13 +69,31 @@ export async function ensureGhCopilotAvailable(): Promise<void> {
   );
 }
 
-export async function runGhCopilotSuggest(prompt: string): Promise<string> {
-  await ensureGhCopilotAvailable();
+export async function runGhCopilotSuggest(prompt: string, githubToken?: string): Promise<string> {
+  await ensureGhCopilotAvailable(githubToken);
 
-  const result = await runCommand('gh', ['copilot', 'suggest', '-t', 'shell', prompt]);
+  const env = githubToken ? { GH_TOKEN: githubToken } : undefined;
+  const result = await runCommand('gh', ['copilot', 'suggest', '-t', 'shell', prompt], GH_COPILOT_TIMEOUT_MS, env);
   if (result.code !== 0) {
     const details = (result.stderr || result.stdout || 'unknown error').trim();
     throw new Error(`gh copilot suggest failed: ${details}`);
+  }
+
+  const output = result.stdout.trim();
+  if (!output) {
+    return 'No output returned by gh copilot.';
+  }
+  return output;
+}
+
+export async function runGhCopilotExplain(prompt: string, githubToken?: string): Promise<string> {
+  await ensureGhCopilotAvailable(githubToken);
+
+  const env = githubToken ? { GH_TOKEN: githubToken } : undefined;
+  const result = await runCommand('gh', ['copilot', 'explain', prompt], GH_COPILOT_TIMEOUT_MS, env);
+  if (result.code !== 0) {
+    const details = (result.stderr || result.stdout || 'unknown error').trim();
+    throw new Error(`gh copilot explain failed: ${details}`);
   }
 
   const output = result.stdout.trim();

@@ -10,7 +10,16 @@ const APP_SYSTEM_MESSAGE = [
 ].join(' ');
 
 // Only approve read-only requests; deny shell, write, and unknown custom tools.
+// In development, also deny GitHub tools to avoid auth issues
 const approveReadOnly: PermissionHandler = (request: PermissionRequest): PermissionRequestResult => {
+  if (process.env.NODE_ENV !== 'production') {
+    // Deny any tool with "github" in the name in development
+    if (typeof request.toolName === 'string' && request.toolName.toLowerCase().includes('github')) {
+      if (process.env.DEBUG_COPILOT) console.log(`[Permission] Denied GitHub tool in development:`, request.toolName);
+      return { kind: 'denied-by-rules' };
+    }
+  }
+  
   if (request.kind === 'read' || request.kind === 'url') {
     return { kind: 'approved' };
   }
@@ -55,8 +64,12 @@ export async function createCopilotSession(
   model?: string
 ) {
   try {
+    if (process.env.DEBUG_COPILOT) console.log(`[Session] Creating Copilot session with model: ${model || 'gpt-4.1'}`);
+    
     const shouldEnableGitHubMcp = config.enableGitHubMcp && !!githubToken;
     const mcpServer = shouldEnableGitHubMcp ? resolveGitHubMcpServer() : null;
+    
+    if (process.env.DEBUG_COPILOT) console.log(`[Session] GitHub MCP enabled: ${!!mcpServer}`);
 
     const sessionConfig: Parameters<typeof client.createSession>[0] = {
       model: model || 'gpt-4.1',
@@ -69,6 +82,7 @@ export async function createCopilotSession(
     };
 
     if (mcpServer && githubToken) {
+      if (process.env.DEBUG_COPILOT) console.log(`[Session] Configuring GitHub MCP server`);
       (sessionConfig as any).mcpServers = {
         github: {
           command: mcpServer.command,

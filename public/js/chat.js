@@ -6,7 +6,7 @@ const Chat = {
   currentAssistantEl: null,
   currentContent: '',
   isStreaming: false,
-  backend: 'sdk',
+
 
   connect() {
     if (this.ws) {
@@ -56,7 +56,6 @@ const Chat = {
         break;
 
       case 'session_created':
-        this.backend = msg.backend || this.backend;
         this.setStatus('connected');
         break;
 
@@ -150,10 +149,8 @@ const Chat = {
 
   requestNewSession() {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    const backendSelect = document.getElementById('backend-select');
-    this.backend = backendSelect ? backendSelect.value : 'sdk';
     const model = document.getElementById('model-select').value;
-    this.ws.send(JSON.stringify({ type: 'new_session', model, backend: this.backend }));
+    this.ws.send(JSON.stringify({ type: 'new_session', model }));
     this.ws.send(JSON.stringify({ type: 'list_models' }));
   },
 
@@ -255,12 +252,4 @@ const Chat = {
   },
 };
 
-// Switching backend starts a fresh session immediately.
-document.addEventListener('DOMContentLoaded', () => {
-  const backendSelect = document.getElementById('backend-select');
-  if (!backendSelect) return;
 
-  backendSelect.addEventListener('change', () => {
-    Chat.newChat();
-  });
-});

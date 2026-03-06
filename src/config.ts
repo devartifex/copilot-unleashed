@@ -1,8 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-export type ChatBackend = 'sdk' | 'cli';
-
 function required(name: string): string {
   const val = process.env[name];
   if (!val) throw new Error(`Missing required env var: ${name}`);
@@ -16,7 +14,6 @@ export const config = {
   sessionStorePath: process.env.SESSION_STORE_PATH || '.sessions',
   // Disable GitHub MCP in development to avoid auth issues; enable only in production with proper config
   enableGitHubMcp: process.env.NODE_ENV === 'production' && process.env.ENABLE_GITHUB_MCP === 'true',
-  chatBackend: (process.env.CHAT_BACKEND === 'cli' ? 'cli' : 'sdk') as ChatBackend,
   azure: {
     clientId: required('AZURE_CLIENT_ID'),
     tenantId: required('AZURE_TENANT_ID'),

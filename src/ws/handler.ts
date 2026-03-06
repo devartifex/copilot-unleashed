@@ -2,13 +2,12 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
 import { getCopilotClient, destroyCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
-import { runGhCopilotSuggest, runGhCopilotExplain } from '../copilot/ghCli.js';
-import { config, type ChatBackend } from '../config.js';
+import { config } from '../config.js';
 
 type SessionMiddleware = (req: any, res: any, next: () => void) => void;
 
 const MAX_MESSAGE_LENGTH = 10_000;
-const VALID_MESSAGE_TYPES = new Set(['new_session', 'message', 'list_models', 'cli_suggest', 'cli_explain']);
+const VALID_MESSAGE_TYPES = new Set(['new_session', 'message', 'list_models']);
 
 function send(ws: WebSocket, data: Record<string, unknown>): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -42,7 +41,6 @@ export function setupWebSocket(
 
     const githubToken: string = session.githubToken;
     const sessionId: string = session.id;
-    let activeBackend: ChatBackend = config.chatBackend;
     let copilotSession: any = null;
 
     const cleanup = async () => {
@@ -66,24 +64,10 @@ export function setupWebSocket(
 
         switch (msg.type) {
           case 'new_session': {
-            activeBackend = (msg.backend === 'cli' || msg.backend === 'gh-cli') ? 'cli' : 'sdk';
-
             // Destroy previous session before creating a new one
             if (copilotSession) {
               try { copilotSession.removeAllListeners?.(); } catch { /* ignore */ }
               copilotSession = null;
-            }
-
-            if (activeBackend === 'cli') {
-              // CLI mode: no SDK session needed, just verify gh copilot is available
-              try {
-                const { ensureGhCopilotAvailable } = await import('../copilot/ghCli.js');
-                await ensureGhCopilotAvailable(githubToken);
-                send(ws, { type: 'session_created', backend: 'cli' });
-              } catch (cliErr: any) {
-                send(ws, { type: 'error', message: `CLI not available: ${cliErr.message}` });
-              }
-              break;
             }
 
             try {
@@ -104,7 +88,7 @@ export function setupWebSocket(
               );
 
               if (process.env.DEBUG_COPILOT) console.log(`[WS] Session created successfully, sending confirmation`);
-              send(ws, { type: 'session_created', model: msg.model, backend: activeBackend });
+              send(ws, { type: 'session_created', model: msg.model });
             } catch (sessionErr: any) {
               console.error('Session creation error:', sessionErr.message);
               if (process.env.DEBUG_COPILOT) console.error('[WS] Full error stack:', sessionErr.stack);
@@ -121,18 +105,6 @@ export function setupWebSocket(
             if (!content.trim() || content.length > MAX_MESSAGE_LENGTH) {
               send(ws, { type: 'error', message: `Message must be 1-${MAX_MESSAGE_LENGTH} characters` });
               return;
-            }
-
-            if (activeBackend === 'cli') {
-              // CLI mode: use gh copilot suggest with the user's GitHub token
-              try {
-                const output = await runGhCopilotSuggest(content, githubToken);
-                send(ws, { type: 'delta', content: output });
-                send(ws, { type: 'done' });
-              } catch (cliErr: any) {
-                send(ws, { type: 'error', message: `CLI error: ${cliErr.message}` });
-              }
-              break;
             }
 
             if (!copilotSession) {

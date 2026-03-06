@@ -135,4 +135,8 @@ function initChat(status) {
   });
 
   document.getElementById('model-select').addEventListener('change', () => Chat.newChat());
+
+  document.getElementById('mode-select').addEventListener('change', (e) => {
+    Chat.setMode(e.target.value);
+  });
 }

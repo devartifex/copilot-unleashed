@@ -444,7 +444,8 @@ html, body {
 }
 
 /* Model select — minimal terminal style */
-.model-select {
+.model-select,
+.mode-select {
   background: none;
   color: var(--fg-dim);
   border: 1px solid var(--border-dim);
@@ -456,7 +457,10 @@ html, body {
   outline: none;
 }
 
-.model-select:focus { border-color: var(--purple); }
+.model-select:focus,
+.mode-select:focus { border-color: var(--purple); }
+
+.mode-select option { background: var(--bg); }
 
 /* Terminal buttons */
 .term-btn {
@@ -507,3 +511,103 @@ html, body {
 .messages::-webkit-scrollbar-track { background: transparent; }
 .messages::-webkit-scrollbar-thumb { background: var(--border-dim); border-radius: 3px; }
 .messages::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
+
+/* ===== REASONING / THINKING BLOCK ===== */
+.reasoning-block {
+  margin: 4px 0;
+  margin-left: 4px;
+  border-left: 2px solid var(--yellow);
+  padding-left: 16px;
+  font-size: 0.85em;
+}
+
+.reasoning-header {
+  color: var(--yellow);
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reasoning-icon {
+  display: inline-block;
+  animation: spin-reasoning 1s linear infinite;
+}
+
+.reasoning-block.collapsed .reasoning-icon {
+  animation: none;
+}
+
+@keyframes spin-reasoning {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.reasoning-label {
+  font-size: 0.95em;
+}
+
+.reasoning-block.collapsed .reasoning-label::after {
+  content: ' (click to expand)';
+  color: var(--fg-dim);
+  font-size: 0.85em;
+}
+
+.reasoning-content {
+  color: var(--fg-dim);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  padding: 4px 0;
+  max-height: 300px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.reasoning-block.collapsed .reasoning-content {
+  display: none;
+}
+
+/* ===== INTENT LINE ===== */
+.intent-line {
+  color: var(--cyan);
+  font-size: 0.85em;
+  padding: 2px 0;
+  margin-left: 4px;
+  padding-left: 16px;
+}
+
+.intent-icon {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+/* ===== TOOL CALL LINE ===== */
+.tool-call {
+  color: var(--fg-muted);
+  font-size: 0.85em;
+  padding: 2px 0;
+  margin-left: 4px;
+  padding-left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tool-icon {
+  color: var(--yellow);
+  flex-shrink: 0;
+}
+
+.tool-call.completed .tool-icon {
+  color: var(--green);
+}
+
+.tool-name {
+  color: var(--blue);
+}
+
+.tool-status {
+  color: var(--fg-dim);
+}

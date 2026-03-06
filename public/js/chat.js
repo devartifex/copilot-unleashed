@@ -6,6 +6,9 @@ const Chat = {
   currentAssistantEl: null,
   currentContent: '',
   isStreaming: false,
+  currentReasoningEl: null,
+  currentReasoningContent: '',
+  activeTools: new Map(),
 
 
   connect() {
@@ -59,6 +62,50 @@ const Chat = {
         this.setStatus('connected');
         break;
 
+      case 'turn_start':
+        // Reset state for a new assistant turn
+        this.currentReasoningEl = null;
+        this.currentReasoningContent = '';
+        this.activeTools.clear();
+        break;
+
+      case 'reasoning_delta':
+        if (!this.currentReasoningEl) {
+          this.currentReasoningEl = this.addReasoningBlock();
+        }
+        this.currentReasoningContent += msg.content;
+        this.renderReasoningContent();
+        this.scrollToBottom();
+        break;
+
+      case 'reasoning_done':
+        if (this.currentReasoningEl) {
+          this.currentReasoningEl.classList.add('collapsed');
+          this.currentReasoningEl = null;
+          this.currentReasoningContent = '';
+        }
+        break;
+
+      case 'intent':
+        this.addIntentMessage(msg.intent);
+        this.scrollToBottom();
+        break;
+
+      case 'tool_start':
+        this.addToolStart(msg);
+        this.scrollToBottom();
+        break;
+
+      case 'tool_progress':
+        this.updateToolProgress(msg);
+        this.scrollToBottom();
+        break;
+
+      case 'tool_end':
+        this.completeToolCall(msg.toolCallId);
+        this.scrollToBottom();
+        break;
+
       case 'delta':
         if (!this.currentAssistantEl) {
           this.currentAssistantEl = this.addMessage('assistant', '');
@@ -70,6 +117,7 @@ const Chat = {
         this.scrollToBottom();
         break;
 
+      case 'turn_end':
       case 'done':
         this.isStreaming = false;
         if (this.currentAssistantEl) {
@@ -78,11 +126,18 @@ const Chat = {
         }
         this.currentAssistantEl = null;
         this.currentContent = '';
-        this.enableInput();
+        this.currentReasoningEl = null;
+        this.currentReasoningContent = '';
+        this.activeTools.clear();
+        if (msg.type === 'done') this.enableInput();
         break;
 
       case 'models':
         this.populateModels(msg.models);
+        break;
+
+      case 'mode_changed':
+        this.syncModeSelect(msg.mode);
         break;
 
       case 'error':
@@ -154,12 +209,27 @@ const Chat = {
     this.ws.send(JSON.stringify({ type: 'list_models' }));
   },
 
+  setMode(mode) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ type: 'set_mode', mode }));
+  },
+
+  syncModeSelect(mode) {
+    const select = document.getElementById('mode-select');
+    if (select && [...select.options].some((o) => o.value === mode)) {
+      select.value = mode;
+    }
+  },
+
   newChat() {
     const messagesEl = document.getElementById('messages');
     messagesEl.innerHTML = '';
     this.currentAssistantEl = null;
     this.currentContent = '';
     this.isStreaming = false;
+    this.currentReasoningEl = null;
+    this.currentReasoningContent = '';
+    this.activeTools.clear();
     this.requestNewSession();
     this.enableInput();
   },
@@ -228,6 +298,84 @@ const Chat = {
     if (envText) {
       envText.textContent = `${models.length} model${models.length !== 1 ? 's' : ''} available`;
     }
+  },
+
+  addReasoningBlock() {
+    const messagesEl = document.getElementById('messages');
+    const el = document.createElement('div');
+    el.className = 'reasoning-block';
+
+    const header = document.createElement('div');
+    header.className = 'reasoning-header';
+    header.innerHTML = '<span class="reasoning-icon">◐</span> <span class="reasoning-label">Thinking…</span>';
+    header.addEventListener('click', () => {
+      el.classList.toggle('collapsed');
+    });
+
+    const content = document.createElement('div');
+    content.className = 'reasoning-content';
+
+    el.appendChild(header);
+    el.appendChild(content);
+    messagesEl.appendChild(el);
+    return el;
+  },
+
+  renderReasoningContent() {
+    if (!this.currentReasoningEl) return;
+    const contentEl = this.currentReasoningEl.querySelector('.reasoning-content');
+    if (!contentEl) return;
+    contentEl.textContent = this.currentReasoningContent;
+  },
+
+  addIntentMessage(intent) {
+    const messagesEl = document.getElementById('messages');
+    const el = document.createElement('div');
+    el.className = 'intent-line';
+    el.innerHTML = '<span class="intent-icon">→</span> ' + DOMPurify.sanitize(intent);
+    messagesEl.appendChild(el);
+  },
+
+  addToolStart(msg) {
+    const messagesEl = document.getElementById('messages');
+    const el = document.createElement('div');
+    el.className = 'tool-call';
+    el.dataset.toolCallId = msg.toolCallId;
+
+    const displayName = msg.mcpToolName
+      ? `${msg.mcpServerName || 'mcp'}/${msg.mcpToolName}`
+      : msg.toolName;
+
+    el.innerHTML =
+      '<span class="tool-icon spinner-char">⠋</span> ' +
+      '<span class="tool-name">' + DOMPurify.sanitize(displayName) + '</span>' +
+      '<span class="tool-status"> running…</span>';
+
+    messagesEl.appendChild(el);
+    this.activeTools.set(msg.toolCallId, el);
+  },
+
+  updateToolProgress(msg) {
+    const el = this.activeTools.get(msg.toolCallId);
+    if (!el) return;
+    const status = el.querySelector('.tool-status');
+    if (status && msg.message) {
+      status.textContent = ' ' + msg.message;
+    }
+  },
+
+  completeToolCall(toolCallId) {
+    const el = this.activeTools.get(toolCallId);
+    if (!el) return;
+    const icon = el.querySelector('.tool-icon');
+    if (icon) {
+      icon.textContent = '✓';
+      icon.classList.remove('spinner-char');
+    }
+    const status = el.querySelector('.tool-status');
+    if (status) status.textContent = ' done';
+    el.classList.add('completed');
+    this.activeTools.delete(toolCallId);
   },
 
   scrollToBottom() {

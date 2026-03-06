@@ -80,6 +80,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           env: [
             { name: 'NODE_ENV', value: 'production' }
             { name: 'PORT', value: '3000' }
+            { name: 'BASE_URL', value: 'https://${name}.${containerAppsEnvironment.properties.defaultDomain}' }
             { name: 'AZURE_CLIENT_ID', secretRef: 'azure-client-id' }
             { name: 'AZURE_TENANT_ID', secretRef: 'azure-tenant-id' }
             { name: 'AZURE_CLIENT_SECRET', secretRef: 'azure-client-secret' }

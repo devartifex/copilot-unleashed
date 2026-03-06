@@ -143,6 +143,8 @@ After `azd up` completes, note the Container App FQDN from the output and update
 1. **Azure AD** redirect URI (see [Add Production Redirect URI](#add-production-redirect-uri))
 2. **GitHub OAuth** callback URL (see [Update for Production](#update-for-production))
 
+`azd up` provisions: Container Registry, Container App, **Key Vault** (secrets), **Managed Identity** (RBAC for ACR + Key Vault), and **Application Insights + Log Analytics** (monitoring). All secrets are stored in Key Vault and referenced by the Container App via the managed identity — no plaintext secrets in the app configuration.
+
 ### Subsequent Deploys
 
 ```bash

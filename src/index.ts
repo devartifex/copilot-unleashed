@@ -1,7 +1,7 @@
 import http from 'http';
-import { app, sessionMiddleware } from './server';
-import { setupWebSocket } from './ws/handler';
-import { config } from './config';
+import { app, sessionMiddleware } from './server.js';
+import { setupWebSocket } from './ws/handler.js';
+import { config } from './config.js';
 
 const server = http.createServer(app);
 setupWebSocket(server, sessionMiddleware);

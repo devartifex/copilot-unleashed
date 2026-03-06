@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { requireAuth, requireGitHubToken } from '../auth/middleware';
-import { getCopilotClient } from '../copilot/client';
-import { getAvailableModels } from '../copilot/session';
+import { requireAuth, requireGitHubToken } from '../auth/middleware.js';
+import { getCopilotClient } from '../copilot/client.js';
+import { getAvailableModels } from '../copilot/session.js';
 
 const router = Router();
 
@@ -18,7 +18,7 @@ router.get('/models', async (req, res) => {
     res.json({ models });
   } catch (err: any) {
     console.error('Models error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to list models' });
   }
 });
 

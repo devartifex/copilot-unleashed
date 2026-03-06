@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { refreshToken } from './azure';
+import { refreshToken } from './azure.js';
 
 export async function requireAuth(
   req: Request,

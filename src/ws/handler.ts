@@ -1,9 +1,12 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
-import { getCopilotClient } from '../copilot/client';
-import { createCopilotSession, getAvailableModels } from '../copilot/session';
+import { getCopilotClient, destroyCopilotClient } from '../copilot/client.js';
+import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
 
 type SessionMiddleware = (req: any, res: any, next: () => void) => void;
+
+const MAX_MESSAGE_LENGTH = 10_000;
+const VALID_MESSAGE_TYPES = new Set(['new_session', 'message', 'list_models']);
 
 function send(ws: WebSocket, data: Record<string, unknown>): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -39,12 +42,33 @@ export function setupWebSocket(
     const sessionId: string = session.id;
     let copilotSession: any = null;
 
+    const cleanup = async () => {
+      if (copilotSession) {
+        try { copilotSession.removeAllListeners?.(); } catch { /* ignore */ }
+        copilotSession = null;
+      }
+      await destroyCopilotClient(sessionId);
+    };
+
+    ws.on('close', () => { cleanup(); });
+
     ws.on('message', async (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
 
+        if (!msg.type || !VALID_MESSAGE_TYPES.has(msg.type)) {
+          send(ws, { type: 'error', message: 'Unknown message type' });
+          return;
+        }
+
         switch (msg.type) {
           case 'new_session': {
+            // Destroy previous session before creating a new one
+            if (copilotSession) {
+              try { copilotSession.removeAllListeners?.(); } catch { /* ignore */ }
+              copilotSession = null;
+            }
+
             const client = await getCopilotClient(sessionId, githubToken);
             copilotSession = await createCopilotSession(client, githubToken, msg.model);
 
@@ -68,7 +92,13 @@ export function setupWebSocket(
               return;
             }
 
-            await copilotSession.sendAndWait({ prompt: msg.content });
+            const content = typeof msg.content === 'string' ? msg.content : '';
+            if (!content.trim() || content.length > MAX_MESSAGE_LENGTH) {
+              send(ws, { type: 'error', message: `Message must be 1-${MAX_MESSAGE_LENGTH} characters` });
+              return;
+            }
+
+            await copilotSession.sendAndWait({ prompt: content });
             send(ws, { type: 'done' });
             break;
           }
@@ -79,13 +109,10 @@ export function setupWebSocket(
             send(ws, { type: 'models', models });
             break;
           }
-
-          default:
-            send(ws, { type: 'error', message: `Unknown message type: ${msg.type}` });
         }
       } catch (err: any) {
         console.error('WS message error:', err);
-        send(ws, { type: 'error', message: err.message || 'Internal error' });
+        send(ws, { type: 'error', message: 'An internal error occurred' });
       }
     });
 

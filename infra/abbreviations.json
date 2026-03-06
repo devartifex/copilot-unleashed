@@ -1,5 +1,8 @@
 {
   "containerAppsEnvironment": "cae-",
   "containerRegistry": "cr",
-  "resourceGroup": "rg-"
+  "resourceGroup": "rg-",
+  "managedIdentity": "mi-",
+  "keyVault": "kv-",
+  "monitoring": "mon-"
 }

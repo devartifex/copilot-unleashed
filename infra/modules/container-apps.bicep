@@ -5,30 +5,45 @@ param name string
 param location string
 
 param tags object = {}
-param containerRegistryName string
+param containerRegistryLoginServer string
 param environmentName string
 param image string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param managedIdentityId string
+param managedIdentityClientId string
 
-@secure()
+@description('Key Vault URI for secret references')
+param keyVaultUri string
+
+@description('Azure AD client ID (non-secret, safe as env var)')
 param azureClientId string
-@secure()
-param azureTenantId string
-@secure()
-param azureClientSecret string
-@secure()
-param githubClientId string
-@secure()
-param sessionSecret string
 
-resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
-  name: containerRegistryName
-}
+@description('Azure AD tenant ID (non-secret, safe as env var)')
+param azureTenantId string
+
+@description('Log Analytics workspace ID for the environment')
+param logAnalyticsWorkspaceId string
+
+@description('Application Insights connection string')
+param appInsightsConnectionString string
+
+@description('Minimum number of replicas (0 for dev, 1+ for prod)')
+param minReplicas int = 1
+
+@description('Maximum number of replicas')
+param maxReplicas int = 3
 
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: environmentName
   location: location
   tags: tags
   properties: {
+    appLogsConfiguration: {
+      destination: 'log-analytics'
+      logAnalyticsConfiguration: {
+        customerId: reference(logAnalyticsWorkspaceId, '2023-09-01').customerId
+        sharedKey: listKeys(logAnalyticsWorkspaceId, '2023-09-01').primarySharedKey
+      }
+    }
     workloadProfiles: [
       {
         name: 'Consumption'
@@ -42,6 +57,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
   location: location
   tags: union(tags, { 'azd-service-name': 'web' })
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${managedIdentityId}': {}
+    }
+  }
   properties: {
     environmentId: containerAppsEnvironment.id
     workloadProfileName: 'Consumption'
@@ -55,21 +76,26 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
       registries: [
         {
-          server: containerRegistry.properties.loginServer
-          username: containerRegistry.listCredentials().username
-          passwordSecretRef: 'registry-password'
+          server: containerRegistryLoginServer
+          identity: managedIdentityId
         }
       ]
       secrets: [
         {
-          name: 'registry-password'
-          value: containerRegistry.listCredentials().passwords[0].value
+          name: 'azure-client-secret'
+          keyVaultUrl: '${keyVaultUri}secrets/azure-client-secret'
+          identity: managedIdentityId
         }
-        { name: 'azure-client-id', value: azureClientId }
-        { name: 'azure-tenant-id', value: azureTenantId }
-        { name: 'azure-client-secret', value: azureClientSecret }
-        { name: 'github-client-id', value: githubClientId }
-        { name: 'session-secret', value: sessionSecret }
+        {
+          name: 'github-client-id'
+          keyVaultUrl: '${keyVaultUri}secrets/github-client-id'
+          identity: managedIdentityId
+        }
+        {
+          name: 'session-secret'
+          keyVaultUrl: '${keyVaultUri}secrets/session-secret'
+          identity: managedIdentityId
+        }
       ]
     }
     template: {
@@ -81,21 +107,44 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'NODE_ENV', value: 'production' }
             { name: 'PORT', value: '3000' }
             { name: 'BASE_URL', value: 'https://${name}.${containerAppsEnvironment.properties.defaultDomain}' }
-            { name: 'AZURE_CLIENT_ID', secretRef: 'azure-client-id' }
-            { name: 'AZURE_TENANT_ID', secretRef: 'azure-tenant-id' }
+            { name: 'AZURE_CLIENT_ID', value: azureClientId }
+            { name: 'AZURE_TENANT_ID', value: azureTenantId }
             { name: 'AZURE_CLIENT_SECRET', secretRef: 'azure-client-secret' }
             { name: 'GITHUB_CLIENT_ID', secretRef: 'github-client-id' }
             { name: 'SESSION_SECRET', secretRef: 'session-secret' }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
           ]
           resources: {
             cpu: json('0.25')
             memory: '0.5Gi'
           }
+          probes: [
+            {
+              type: 'Liveness'
+              httpGet: {
+                path: '/health'
+                port: 3000
+              }
+              initialDelaySeconds: 10
+              periodSeconds: 30
+              failureThreshold: 3
+            }
+            {
+              type: 'Readiness'
+              httpGet: {
+                path: '/health'
+                port: 3000
+              }
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              failureThreshold: 3
+            }
+          ]
         }
       ]
       scale: {
-        minReplicas: 0
-        maxReplicas: 1
+        minReplicas: minReplicas
+        maxReplicas: maxReplicas
         rules: [
           {
             name: 'http-rule'

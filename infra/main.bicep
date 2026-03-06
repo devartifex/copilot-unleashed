@@ -11,17 +11,33 @@ param location string
 
 param containerAppName string = 'copilot-cli-web'
 
-// Azure AD + GitHub OAuth Device Flow (no client secret needed)
+@description('Azure AD app registration client ID')
+param azureClientId string
+
+@description('Azure AD tenant ID')
+param azureTenantId string
+
 @secure()
-param azureClientId string = ''
+@minLength(1)
+@description('Azure AD app client secret')
+param azureClientSecret string
+
 @secure()
-param azureTenantId string = ''
+@minLength(1)
+@description('GitHub OAuth app client ID')
+param githubClientId string
+
 @secure()
-param azureClientSecret string = ''
-@secure()
-param githubClientId string = ''
-@secure()
+@description('Session encryption secret')
 param sessionSecret string = newGuid()
+
+param containerAppImage string = ''
+
+@description('Minimum replicas (0 for dev, 1+ for prod)')
+param minReplicas int = 1
+
+@description('Maximum replicas')
+param maxReplicas int = 3
 
 var abbrs = loadJsonContent('./abbreviations.json')
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
@@ -43,7 +59,40 @@ module containerRegistry './modules/container-registry.bicep' = {
   }
 }
 
-param containerAppImage string = ''
+module managedIdentity './modules/managed-identity.bicep' = {
+  name: 'managed-identity'
+  scope: rg
+  params: {
+    name: '${abbrs.managedIdentity}${resourceToken}'
+    location: location
+    tags: tags
+    containerRegistryId: containerRegistry.outputs.id
+  }
+}
+
+module keyVault './modules/key-vault.bicep' = {
+  name: 'key-vault'
+  scope: rg
+  params: {
+    name: '${abbrs.keyVault}${resourceToken}'
+    location: location
+    tags: tags
+    managedIdentityPrincipalId: managedIdentity.outputs.principalId
+    azureClientSecret: azureClientSecret
+    githubClientId: githubClientId
+    sessionSecret: sessionSecret
+  }
+}
+
+module monitoring './modules/monitoring.bicep' = {
+  name: 'monitoring'
+  scope: rg
+  params: {
+    name: '${abbrs.monitoring}${resourceToken}'
+    location: location
+    tags: tags
+  }
+}
 
 module containerApps './modules/container-apps.bicep' = {
   name: 'container-apps'
@@ -52,14 +101,18 @@ module containerApps './modules/container-apps.bicep' = {
     name: containerAppName
     location: location
     tags: tags
-    containerRegistryName: containerRegistry.outputs.name
+    containerRegistryLoginServer: containerRegistry.outputs.loginServer
     environmentName: '${abbrs.containerAppsEnvironment}${resourceToken}'
     image: empty(containerAppImage) ? 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest' : containerAppImage
+    managedIdentityId: managedIdentity.outputs.id
+    managedIdentityClientId: managedIdentity.outputs.clientId
+    keyVaultUri: keyVault.outputs.uri
     azureClientId: azureClientId
     azureTenantId: azureTenantId
-    azureClientSecret: azureClientSecret
-    githubClientId: githubClientId
-    sessionSecret: sessionSecret
+    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
+    appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
+    minReplicas: minReplicas
+    maxReplicas: maxReplicas
   }
 }
 
@@ -67,3 +120,5 @@ output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.logi
 output AZURE_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
 output AZURE_CONTAINER_APP_FQDN string = containerApps.outputs.fqdn
 output AZURE_RESOURCE_GROUP string = rg.name
+output AZURE_MANAGED_IDENTITY_CLIENT_ID string = managedIdentity.outputs.clientId
+output AZURE_KEY_VAULT_NAME string = keyVault.outputs.name

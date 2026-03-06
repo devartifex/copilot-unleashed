@@ -40,8 +40,23 @@ Browser (mobile / desktop)         Azure Container Apps
                                   │  │  JSON-RPC (stdio)    │ │
                                   │  │  Copilot CLI server  │ │
                                   │  └──────────────────────┘ │
-                                  └──────────────────────────┘
+                                  └────────┬────────┬────────┘
+                                           │        │
+                              ┌────────────┘        └──────────────┐
+                              ▼                                    ▼
+                     Azure Key Vault                    Application Insights
+                     (secrets via MI)                   + Log Analytics
 ```
+
+### Azure Resources (provisioned by `azd up`)
+
+| Resource | Purpose |
+|----------|---------|
+| **Container Registry** | Docker image store (no admin creds — RBAC only) |
+| **Container App** | Runs the app with managed identity |
+| **User-Assigned Managed Identity** | AcrPull + Key Vault Secrets User roles |
+| **Key Vault** | Stores `AZURE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `SESSION_SECRET` |
+| **Application Insights + Log Analytics** | Monitoring, logging, and diagnostics |
 
 ## Getting Started
 
@@ -131,9 +146,12 @@ azd up
 ```
 
 This creates:
-- **Azure Container Registry** (Basic) — ~$5/month
+- **Azure Container Registry** (Basic, no admin credentials) — ~$5/month
+- **User-Assigned Managed Identity** — RBAC for ACR pull + Key Vault secrets
+- **Azure Key Vault** — stores all secrets securely (referenced via managed identity)
+- **Application Insights + Log Analytics** — monitoring and diagnostics
 - **Container Apps Environment** — managed Kubernetes
-- **Container App** — your app, with scale-to-zero (Consumption plan)
+- **Container App** — your app, with health probes and auto-scaling
 
 > **Important**: After deployment, update your Azure AD and GitHub OAuth redirect URIs to use the production URL (shown in `azd up` output).
 

@@ -5,7 +5,7 @@ import {
   type AccountInfo,
   type AuthenticationResult,
 } from '@azure/msal-node';
-import { config } from '../config';
+import { config } from '../config.js';
 
 const cryptoProvider = new CryptoProvider();
 
@@ -27,7 +27,7 @@ const msalConfig = {
 
 export const msalClient = new ConfidentialClientApplication(msalConfig);
 
-export async function getAuthUrl(state: string, loginHint?: string) {
+export async function getAuthUrl(state: string, loginHint?: string, silent = false) {
   const { verifier, challenge } = await cryptoProvider.generatePkceCodes();
   const url = await msalClient.getAuthCodeUrl({
     scopes: ['openid', 'profile', 'email'],
@@ -35,7 +35,7 @@ export async function getAuthUrl(state: string, loginHint?: string) {
     state,
     codeChallenge: challenge,
     codeChallengeMethod: 'S256',
-    prompt: loginHint ? undefined : 'select_account',
+    prompt: silent ? 'none' : (loginHint ? undefined : 'select_account'),
     loginHint,
   });
   return { url, verifier };

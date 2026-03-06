@@ -1,11 +1,18 @@
 import { Router } from 'express';
 import crypto from 'crypto';
-import { getAuthUrl, handleCallback } from '../auth/azure';
+import { getAuthUrl, handleCallback } from '../auth/azure.js';
 import {
   requestDeviceCode,
   pollForToken,
   validateGitHubToken,
-} from '../auth/github';
+} from '../auth/github.js';
+
+function sanitizeReturnTo(path?: string): string {
+  if (!path || typeof path !== 'string') return '/';
+  // Only allow relative paths starting with / and not // (prevents protocol-relative open redirects)
+  if (!path.startsWith('/') || path.startsWith('//')) return '/';
+  return path;
+}
 
 const router = Router();
 
@@ -24,9 +31,34 @@ router.get('/login', async (req, res) => {
   }
 });
 
+// Silent SSO — tries prompt=none; if Azure AD has an active browser session, logs in automatically
+router.get('/sso', async (req, res) => {
+  try {
+    const state = 'sso:' + crypto.randomBytes(32).toString('hex');
+    req.session.authState = state;
+    const { url, verifier } = await getAuthUrl(state, undefined, true);
+    req.session.pkceVerifier = verifier;
+    res.redirect(url);
+  } catch (err) {
+    console.error('SSO attempt error:', err);
+    res.redirect('/?sso=failed');
+  }
+});
+
 // Azure AD callback
 router.get('/callback', async (req, res) => {
-  const { code, state } = req.query;
+  const { code, state, error } = req.query;
+
+  // Handle Azure AD error responses (e.g. interaction_required from silent SSO)
+  if (error) {
+    if ((state as string)?.startsWith('sso:')) {
+      delete req.session.authState;
+      delete req.session.pkceVerifier;
+      return res.redirect('/?sso=failed');
+    }
+    console.error('Azure AD callback error:', error, req.query.error_description);
+    return res.status(403).send('Authentication failed');
+  }
 
   if (!code || state !== req.session.authState) {
     return res.status(403).send('Invalid state parameter');
@@ -39,18 +71,23 @@ router.get('/callback', async (req, res) => {
       username: result.account!.username,
       name: result.account!.name ?? undefined,
     };
+    const wasSso = req.session.authState?.startsWith('sso:');
     delete req.session.authState;
     delete req.session.pkceVerifier;
 
     // If GitHub token already in session, proceed to app; otherwise the UI will trigger device flow
     if (req.session.githubToken) {
-      const returnTo = req.session.returnTo || '/';
+      const returnTo = sanitizeReturnTo(req.session.returnTo);
       delete req.session.returnTo;
       return res.redirect(returnTo);
     }
 
     res.redirect('/');
   } catch (err) {
+    // If SSO silent attempt failed (e.g. interaction_required), just redirect to home
+    if ((state as string)?.startsWith('sso:')) {
+      return res.redirect('/?sso=failed');
+    }
     console.error('Azure callback error:', err);
     res.status(500).send('Authentication failed');
   }
@@ -119,9 +156,8 @@ router.post('/github/device/poll', async (req, res) => {
 
     res.json({ status: 'authorized', githubUser: user.login });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('GitHub device flow poll error:', err);
-    res.status(500).json({ error: message });
+    res.status(500).json({ error: 'Device flow polling failed' });
   }
 });
 

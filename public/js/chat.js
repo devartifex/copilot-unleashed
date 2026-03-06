@@ -2,6 +2,7 @@
 const Chat = {
   ws: null,
   reconnectTimer: null,
+  reconnectDelay: 3000,
   currentAssistantEl: null,
   currentContent: '',
   isStreaming: false,
@@ -17,6 +18,7 @@ const Chat = {
 
     this.ws.onopen = () => {
       this.setStatus('connected');
+      this.reconnectDelay = 3000;
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
@@ -38,7 +40,8 @@ const Chat = {
         Auth.login();
         return;
       }
-      this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+      this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectDelay);
+      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 60000);
     };
 
     this.ws.onerror = () => this.setStatus('disconnected');
@@ -96,10 +99,11 @@ const Chat = {
     if (!contentEl) return;
 
     try {
-      contentEl.innerHTML = marked.parse(this.currentContent, {
+      const rawHtml = marked.parse(this.currentContent, {
         breaks: true,
         gfm: true,
       });
+      contentEl.innerHTML = DOMPurify.sanitize(rawHtml);
       // Highlight code blocks
       contentEl.querySelectorAll('pre code').forEach((block) => {
         if (!block.dataset.highlighted) {

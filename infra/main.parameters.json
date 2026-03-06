@@ -7,6 +7,7 @@
     "azureClientId": { "value": "${AZURE_CLIENT_ID}" },
     "azureTenantId": { "value": "${AZURE_TENANT_ID}" },
     "azureClientSecret": { "value": "${AZURE_CLIENT_SECRET}" },
-    "githubClientId": { "value": "${GITHUB_CLIENT_ID}" }
+    "githubClientId": { "value": "${GITHUB_CLIENT_ID}" },
+    "containerAppImage": { "value": "${SERVICE_WEB_IMAGE_NAME}" }
   }
 }

@@ -1,13 +1,18 @@
 import express from 'express';
 import session from 'express-session';
+import FileStoreFactory from 'session-file-store';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
-import { config } from './config';
-import { authRoutes } from './routes/auth';
-import { apiRoutes } from './routes/api';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { config } from './config.js';
+import { authRoutes } from './routes/auth.js';
+import { apiRoutes } from './routes/api.js';
 
 const app = express();
+const FileStore = FileStoreFactory(session);
 
 // Security headers
 app.use(
@@ -15,7 +20,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+        scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
         connectSrc: ["'self'", 'ws:', 'wss:'],
         imgSrc: ["'self'", 'data:', 'https://avatars.githubusercontent.com'],
@@ -37,6 +42,7 @@ app.use(
 
 // Session
 const sessionMiddleware = session({
+  store: config.isDev ? new FileStore({ path: '.sessions', ttl: 86400, retries: 0, logFn: () => {} }) : undefined,
   secret: config.sessionSecret,
   resave: false,
   saveUninitialized: false,
@@ -58,6 +64,9 @@ if (!config.isDev) {
 }
 
 // Routes
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 app.use('/auth', authRoutes);
 app.use('/api', apiRoutes);
 

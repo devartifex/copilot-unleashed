@@ -3,7 +3,18 @@
   const status = await Auth.checkStatus();
 
   if (!status.azureAuthenticated) {
+    // If we haven't tried SSO yet, attempt silent login first
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('sso')) {
+      // Redirect to silent SSO — Azure AD will auto-login if browser session exists
+      window.location.href = '/auth/sso';
+      return;
+    }
+    // SSO failed or not available — show the login button
     showScreen('login-screen');
+    document.getElementById('login-btn').addEventListener('click', () => {
+      window.location.href = '/auth/login';
+    });
     return;
   }
 

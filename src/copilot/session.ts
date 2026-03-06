@@ -2,12 +2,23 @@ import { CopilotClient, approveAll } from '@github/copilot-sdk';
 
 export async function createCopilotSession(
   client: CopilotClient,
+  githubToken: string,
   model?: string
 ) {
   return client.createSession({
     model: model || 'gpt-4.1',
     streaming: true,
     onPermissionRequest: approveAll,
+    mcpServers: {
+      github: {
+        type: 'http',
+        url: 'https://api.githubcopilot.com/mcp/x/all/readonly',
+        headers: {
+          Authorization: `Bearer ${githubToken}`,
+        },
+        tools: ['*'],
+      },
+    },
   });
 }
 

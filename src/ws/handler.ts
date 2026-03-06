@@ -63,7 +63,7 @@ export function setupWebSocket(
             }
 
             try {
-              copilotSession = await createCopilotSession(client, msg.model);
+              copilotSession = await createCopilotSession(client, githubToken, msg.model);
 
               copilotSession.on(
                 'assistant.message_delta',

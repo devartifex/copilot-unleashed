@@ -2,11 +2,17 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
 import { getCopilotClient, destroyCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
+import { ensureGhCopilotAvailable, runGhCopilotSuggest } from '../copilot/ghCli.js';
+import { config, type ChatBackend } from '../config.js';
 
 type SessionMiddleware = (req: any, res: any, next: () => void) => void;
 
 const MAX_MESSAGE_LENGTH = 10_000;
 const VALID_MESSAGE_TYPES = new Set(['new_session', 'message', 'list_models']);
+
+function normalizeBackend(value: unknown): ChatBackend {
+  return value === 'gh-cli' ? 'gh-cli' : 'sdk';
+}
 
 function send(ws: WebSocket, data: Record<string, unknown>): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -40,6 +46,7 @@ export function setupWebSocket(
 
     const githubToken: string = session.githubToken;
     const sessionId: string = session.id;
+    let activeBackend: ChatBackend = config.chatBackend;
     let copilotSession: any = null;
 
     const cleanup = async () => {
@@ -63,10 +70,18 @@ export function setupWebSocket(
 
         switch (msg.type) {
           case 'new_session': {
+            activeBackend = normalizeBackend(msg.backend ?? config.chatBackend);
+
             // Destroy previous session before creating a new one
             if (copilotSession) {
               try { copilotSession.removeAllListeners?.(); } catch { /* ignore */ }
               copilotSession = null;
+            }
+
+            if (activeBackend === 'gh-cli') {
+              await ensureGhCopilotAvailable();
+              send(ws, { type: 'session_created', model: 'gh-copilot-suggest', backend: activeBackend });
+              break;
             }
 
             try {
@@ -83,7 +98,7 @@ export function setupWebSocket(
                 }
               );
 
-              send(ws, { type: 'session_created', model: msg.model });
+              send(ws, { type: 'session_created', model: msg.model, backend: activeBackend });
             } catch (sessionErr: any) {
               console.error('Session creation error:', sessionErr.message);
               send(ws, {
@@ -95,14 +110,21 @@ export function setupWebSocket(
           }
 
           case 'message': {
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
-              return;
-            }
-
             const content = typeof msg.content === 'string' ? msg.content : '';
             if (!content.trim() || content.length > MAX_MESSAGE_LENGTH) {
               send(ws, { type: 'error', message: `Message must be 1-${MAX_MESSAGE_LENGTH} characters` });
+              return;
+            }
+
+            if (activeBackend === 'gh-cli') {
+              const output = await runGhCopilotSuggest(content);
+              send(ws, { type: 'delta', content: output });
+              send(ws, { type: 'done' });
+              break;
+            }
+
+            if (!copilotSession) {
+              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
 
@@ -112,6 +134,11 @@ export function setupWebSocket(
           }
 
           case 'list_models': {
+            if (activeBackend === 'gh-cli') {
+              send(ws, { type: 'models', models: ['gh-copilot-suggest'] });
+              break;
+            }
+
             const client = await getCopilotClient(sessionId, githubToken);
             const models = await getAvailableModels(client);
             // Ensure models is always an array before sending

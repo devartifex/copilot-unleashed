@@ -16,6 +16,7 @@
 | Feature | Description |
 |---------|-------------|
 | 🤖 **Copilot SDK** | Uses `@github/copilot-sdk` — the same engine behind GitHub Copilot CLI, accessed programmatically via JSON-RPC |
+| 🔀 **Dual Backend Mode** | Keep SDK chat or switch to direct `gh copilot` execution for CLI-native behavior |
 | 💬 **Chat UI** | Clean, responsive, mobile-first interface with markdown rendering and syntax highlighting |
 | ⚡ **Streaming** | Real-time token-by-token responses over WebSocket |
 | 🔐 **Azure AD** | Enterprise-grade authentication via Microsoft Entra ID (OIDC + PKCE + refresh tokens) |
@@ -190,7 +191,30 @@ Two workflows are included:
 | `SESSION_SECRET` | ✅ | — | Random string for session encryption (≥32 chars) |
 | `BASE_URL` | ✅ | — | Full app URL (e.g., `http://localhost:3000`) |
 | `PORT` | ❌ | `3000` | HTTP server port |
+| `CHAT_BACKEND` | ❌ | `sdk` | Chat backend: `sdk` or `gh-cli` |
 | `NODE_ENV` | ❌ | `development` | Set to `production` for secure cookies + trust proxy |
+
+## Chat Backend Modes
+
+This app now supports two chat backends:
+
+1. `sdk` (default): uses `@github/copilot-sdk` sessions.
+2. `gh-cli`: runs `gh copilot suggest` directly for each prompt.
+
+Set a default in `.env`:
+
+```env
+CHAT_BACKEND=sdk
+```
+
+Or switch interactively from the UI header (`SDK` / `GH CLI`).
+
+If using `gh-cli`, ensure the command is available and authenticated:
+
+```bash
+gh extension install github/gh-copilot
+gh copilot auth
+```
 
 ## GitHub MCP Tools (Optional)
 

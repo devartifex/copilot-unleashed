@@ -42,7 +42,9 @@ app.use(
 
 // Session
 const sessionMiddleware = session({
-  store: config.isDev ? new FileStore({ path: '.sessions', ttl: 86400, retries: 0, logFn: () => {} }) : undefined,
+  store: config.isDev
+    ? new FileStore({ path: config.sessionStorePath, ttl: 86400, retries: 0, logFn: () => {} })
+    : undefined,
   secret: config.sessionSecret,
   resave: false,
   saveUninitialized: false,

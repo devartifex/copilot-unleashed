@@ -8,6 +8,7 @@ services:
     environment:
       - NODE_ENV=development
       - BASE_URL=http://localhost:3000
+      - SESSION_STORE_PATH=/tmp/.sessions
     volumes:
       - ./public:/app/public:ro
     restart: unless-stopped

@@ -49,12 +49,12 @@ test.describe('Chat screen', () => {
     await expect(page.locator('#github-screen')).toBeHidden();
   });
 
-  test('displays banner with title and version', async ({ page }) => {
+  test('displays banner with ASCII art', async ({ page }) => {
     await openChatScreen(page);
     const banner = page.locator('#banner');
     await expect(banner).toBeVisible();
-    await expect(banner.locator('.banner-title')).toContainText('GitHub Copilot');
-    await expect(banner.locator('.banner-title .c-dim')).toContainText('v0.1.30');
+    await expect(banner.locator('.banner-art')).toBeVisible();
+    await expect(banner.locator('.banner-sub')).toContainText('Describe a task');
   });
 
   test('shows environment info line', async ({ page }) => {
@@ -127,7 +127,7 @@ test.describe('Chat screen', () => {
 
   test('banner shows tip and warning', async ({ page }) => {
     await openChatScreen(page);
-    await expect(page.locator('#banner .banner-tip')).toContainText('mode selector');
+    await expect(page.locator('#banner .banner-tip')).toContainText('selector below');
     await expect(page.locator('#banner .banner-warn')).toContainText('Always verify');
   });
 });

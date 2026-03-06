@@ -18,25 +18,29 @@
     <div class="terminal">
       <div class="term-line">
         <span class="term-prompt">❯</span>
-        <span class="term-cmd">copilot --login</span>
+        <span class="term-cmd">copilot auth login</span>
       </div>
-      <div class="banner-box">
+      <div class="banner-box login-banner">
         <div class="banner-inner">
-          <div class="banner-logo">○ ○</div>
-          <div class="banner-title"><span class="c-purple">GitHub Copilot</span> <span class="c-dim">CLI</span></div>
-          <div class="banner-sub">Authenticate with GitHub to get started.</div>
+          <pre class="banner-art">      <span class="c-dim">┌──┬─────────┬──┐</span>
+      <span class="c-dim">│</span><span class="c-purple">██</span><span class="c-dim">│</span><span class="c-cyan"> ███ ███ </span><span class="c-dim">│</span><span class="c-purple">██</span><span class="c-dim">│</span>
+      <span class="c-dim">│</span><span class="c-purple">██</span><span class="c-dim">│</span><span class="c-cyan"> ███ ███ </span><span class="c-dim">│</span><span class="c-purple">██</span><span class="c-dim">│</span>
+      <span class="c-dim">└──┤</span><span class="c-green">  ▄   ▄  </span><span class="c-dim">├──┘</span>
+         <span class="c-dim">└─────────┘</span>
+  <span class="c-muted">Welcome to GitHub</span>
+<span class="c-cyan">  █▀▀ █▀█ █▀█ █ █   █▀█ ▀█▀</span>
+<span class="c-cyan">  █▄▄ █▄█ █▀▀ █ █▄▄ █▄█  █</span>
+  <span class="c-dim">Command-line interface</span></pre>
         </div>
       </div>
       <div class="term-line term-info">
-        <span class="c-yellow">●</span> Enter this code at GitHub:
+        <span class="c-yellow">●</span> Enter this code at <span class="c-bold">github.com/login/device</span>
       </div>
       <div class="device-code-box">
-        <span id="device-code-text" class="device-code-text">--------</span>
+        <span id="device-code-text" class="device-code-text">- - - - - - - -</span>
         <button class="copy-code-btn" id="copy-code-btn" title="Copy code">copy</button>
       </div>
-      <div class="term-line">
-        <a id="device-link" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer" class="term-link">→ Open github.com/login/device</a>
-      </div>
+      <a id="device-link" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer" class="device-link-btn">Open github.com/login/device ↗</a>
       <div class="term-line term-info" id="device-status">
         <span class="spinner-char" id="device-spinner">⠋</span>
         <span id="device-status-text">Waiting for authorization…</span>
@@ -51,12 +55,11 @@
       <!-- Banner -->
       <div class="banner-box" id="banner">
         <div class="banner-inner">
-          <div class="banner-row">
-            <span class="banner-logo">○ ○</span>
-          </div>
-          <div class="banner-title"><span class="c-purple">GitHub Copilot</span> <span class="c-dim">v0.1.30</span></div>
+          <pre class="banner-art banner-art-sm"><span class="c-dim">┌┬───────┬┐</span>  <span class="c-cyan">█▀▀ █▀█ █▀█ █ █   █▀█ ▀█▀</span>
+<span class="c-dim">│</span><span class="c-purple">█</span><span class="c-dim">│</span><span class="c-cyan">███ ███</span><span class="c-dim">│</span><span class="c-purple">█</span><span class="c-dim">│</span>  <span class="c-cyan">█▄▄ █▄█ █▀▀ █ █▄▄ █▄█  █</span>
+<span class="c-dim">└┴───────┴┘</span></pre>
           <div class="banner-sub">Describe a task to get started.</div>
-          <div class="banner-tip">Tip: Switch modes with the mode selector below.</div>
+          <div class="banner-tip">Tip: Switch modes with the selector below.</div>
           <div class="banner-warn">Copilot uses AI. Always verify suggestions.</div>
         </div>
       </div>

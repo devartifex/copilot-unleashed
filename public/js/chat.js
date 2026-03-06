@@ -9,6 +9,9 @@ const Chat = {
   currentReasoningEl: null,
   currentReasoningContent: '',
   activeTools: new Map(),
+  _renderPending: false,
+  _renderTimer: null,
+  _spinnerInterval: null,
 
 
   connect() {
@@ -116,13 +119,13 @@ const Chat = {
           this.isStreaming = true;
         }
         this.currentContent += msg.content;
-        this.renderAssistantContent();
-        this.scrollToBottom();
+        this.scheduleRender();
         break;
 
       case 'turn_end':
       case 'done':
         this.isStreaming = false;
+        this.flushRender();
         if (this.currentAssistantEl) {
           this.renderAssistantContent();
           this.addCopyButtons(this.currentAssistantEl);
@@ -152,6 +155,25 @@ const Chat = {
     }
   },
 
+  // Throttled render — schedule a markdown parse at most every 50ms
+  scheduleRender() {
+    if (this._renderPending) return;
+    this._renderPending = true;
+    this._renderTimer = setTimeout(() => {
+      this._renderPending = false;
+      this.renderAssistantContent();
+      this.scrollToBottom();
+    }, 50);
+  },
+
+  flushRender() {
+    if (this._renderTimer) {
+      clearTimeout(this._renderTimer);
+      this._renderTimer = null;
+    }
+    this._renderPending = false;
+  },
+
   renderAssistantContent() {
     if (!this.currentAssistantEl) return;
     const contentEl = this.currentAssistantEl.querySelector('.content');
@@ -162,7 +184,12 @@ const Chat = {
         breaks: true,
         gfm: true,
       });
-      contentEl.innerHTML = DOMPurify.sanitize(rawHtml);
+      // Append typing cursor while still streaming
+      const cursor = this.isStreaming ? '<span class="typing-indicator"></span>' : '';
+      contentEl.innerHTML = DOMPurify.sanitize(rawHtml + cursor, {
+        ADD_TAGS: ['span'],
+        ADD_ATTR: ['class'],
+      });
       // Highlight code blocks
       contentEl.querySelectorAll('pre code').forEach((block) => {
         if (!block.dataset.highlighted) {
@@ -356,6 +383,23 @@ const Chat = {
 
     messagesEl.appendChild(el);
     this.activeTools.set(msg.toolCallId, el);
+    this.startSpinners();
+  },
+
+  startSpinners() {
+    if (this._spinnerInterval) return;
+    const chars = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+    let i = 0;
+    this._spinnerInterval = setInterval(() => {
+      const spinners = document.querySelectorAll('.tool-call:not(.completed) .spinner-char');
+      if (spinners.length === 0) {
+        clearInterval(this._spinnerInterval);
+        this._spinnerInterval = null;
+        return;
+      }
+      i = (i + 1) % chars.length;
+      spinners.forEach((s) => { s.textContent = chars[i]; });
+    }, 80);
   },
 
   updateToolProgress(msg) {
@@ -384,7 +428,7 @@ const Chat = {
   scrollToBottom() {
     const el = document.getElementById('messages');
     requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     });
   },
 

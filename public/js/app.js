@@ -14,7 +14,14 @@
 
 function showScreen(id) {
   ['github-screen', 'chat-screen'].forEach((s) => {
-    document.getElementById(s).style.display = s === id ? 'flex' : 'none';
+    const el = document.getElementById(s);
+    if (s === id) {
+      el.style.display = 'flex';
+      el.style.opacity = '0';
+      requestAnimationFrame(() => { el.style.opacity = '1'; });
+    } else {
+      el.style.display = 'none';
+    }
   });
 }
 

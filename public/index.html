@@ -14,92 +14,82 @@
 
   <!-- GITHUB DEVICE FLOW SCREEN -->
   <div id="github-screen" class="screen">
-    <div class="login-card">
-      <div class="logo github-logo">
-        <svg width="40" height="40" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
-        </svg>
+    <div class="terminal">
+      <div class="term-line">
+        <span class="term-prompt">❯</span>
+        <span class="term-cmd">copilot --banner</span>
       </div>
-      <h1>Connect GitHub</h1>
-      <p class="subtitle">Enter this code at GitHub to authorize Copilot access</p>
-
+      <div class="banner-box">
+        <div class="banner-inner">
+          <div class="banner-logo">○ ○</div>
+          <div class="banner-title"><span class="c-purple">GitHub Copilot</span></div>
+          <div class="banner-sub">Authenticate to get started.</div>
+        </div>
+      </div>
+      <div class="term-line term-info">
+        <span class="c-yellow">●</span> Enter this code at GitHub to authorize:
+      </div>
       <div class="device-code-box">
-        <span id="device-code-text" class="device-code-text">Loading...</span>
-        <button class="copy-btn" id="copy-code-btn" title="Copy code">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/>
-          </svg>
-        </button>
+        <span id="device-code-text" class="device-code-text">--------</span>
+        <button class="copy-code-btn" id="copy-code-btn" title="Copy code">copy</button>
       </div>
-
-      <a id="device-link" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer" class="btn-primary btn-github">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right:8px;flex-shrink:0">
-          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
-        </svg>
-        Open github.com/login/device
-      </a>
-
-      <div class="device-status" id="device-status">
-        <span class="spinner"></span>
+      <div class="term-line">
+        <a id="device-link" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer" class="term-link">→ Open github.com/login/device</a>
+      </div>
+      <div class="term-line term-info" id="device-status">
+        <span class="spinner-char" id="device-spinner">⠋</span>
         <span id="device-status-text">Waiting for authorization...</span>
       </div>
-
-      <p class="device-expires" id="device-expires"></p>
+      <div class="term-line term-dim" id="device-expires"></div>
     </div>
   </div>
 
   <!-- CHAT SCREEN -->
   <div id="chat-screen" class="screen" style="display:none">
-    <header id="header">
-      <div class="header-left">
-        <span class="header-logo">
-          <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"/>
-          </svg>
-        </span>
-        <span class="header-title">Copilot CLI</span>
+    <div class="terminal">
+      <!-- Banner -->
+      <div class="banner-box" id="banner">
+        <div class="banner-inner">
+          <div class="banner-row">
+            <span class="banner-logo">○ ○</span>
+            <span class="banner-blocks">█▀▀ █▀▄</span>
+          </div>
+          <div class="banner-title"><span class="c-purple">GitHub Copilot</span> <span class="c-dim">v0.1.30</span></div>
+          <div class="banner-sub">Describe a task to get started.</div>
+          <div class="banner-tip">Tip: <span class="c-bold">/model</span> Select AI model to use</div>
+          <div class="banner-warn">Copilot uses AI, so always check for mistakes.</div>
+        </div>
       </div>
-      <div class="header-center">
-        <select id="model-select" class="model-select">
-          <option value="gpt-4.1">GPT-4.1</option>
-        </select>
-      </div>
-      <div class="header-right">
-        <span id="user-badge" class="user-badge"></span>
-        <button class="icon-btn" id="new-chat-btn" title="New chat">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M7.25 1a.75.75 0 0 1 .75.75V7h5.25a.75.75 0 0 1 0 1.5H8v5.25a.75.75 0 0 1-1.5 0V8.5H1.25a.75.75 0 0 1 0-1.5H6.5V1.75A.75.75 0 0 1 7.25 1Z"/>
-          </svg>
-        </button>
-        <button class="icon-btn" id="logout-btn" title="Logout">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M2 2.75C2 1.784 2.784 1 3.75 1h2.5a.75.75 0 0 1 0 1.5h-2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h2.5a.75.75 0 0 1 0 1.5h-2.5A1.75 1.75 0 0 1 2 13.25Zm10.44 4.5-1.97-1.97a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.97-1.97H6.75a.75.75 0 0 1 0-1.5Z"/>
-          </svg>
-        </button>
-      </div>
-    </header>
 
-    <main id="messages" class="messages">
-      <div class="welcome-message">
-        <h2>How can I help you today?</h2>
-        <p>Ask me anything — I'm powered by GitHub Copilot.</p>
+      <!-- Environment info lines -->
+      <div class="env-lines" id="env-lines">
+        <div class="term-line"><span class="c-green">●</span> <span class="c-dim">Environment loaded: <span id="env-model-text">1 model</span></span></div>
       </div>
-    </main>
 
-    <footer id="input-area" class="input-area">
-      <div class="input-wrapper">
-        <textarea id="message-input" placeholder="Ask Copilot..." rows="1" autofocus></textarea>
-        <button id="send-btn" class="send-btn" disabled title="Send">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M.989 8 .064 2.68a1.342 1.342 0 0 1 1.85-1.462l13.402 5.744a1.13 1.13 0 0 1 0 2.076L1.913 14.782a1.343 1.343 0 0 1-1.85-1.463L.99 8Zm1.014.017L1.14 13.5a.25.25 0 0 0 .346.273L14.64 8.018 2.003 8.017ZM2.003 7.983 14.64 7.982 1.487 2.227a.25.25 0 0 0-.346.273l.876 5.483Z"/>
-          </svg>
-        </button>
+      <!-- Scrollable output area -->
+      <div id="messages" class="messages">
+        <!-- conversation turns appear here -->
       </div>
-      <div class="input-footer">
-        <span id="status-indicator" class="status-dot disconnected"></span>
-        <span id="status-text" class="status-text">Connecting...</span>
+
+      <!-- Prompt input -->
+      <div id="input-area" class="input-area">
+        <div class="prompt-line">
+          <span class="term-prompt" id="status-indicator">❯</span>
+          <textarea id="message-input" placeholder="Type @ to mention files, # for issues/PRs, / for commands, or ? for shortcuts" rows="1" autofocus></textarea>
+        </div>
+        <div class="input-footer">
+          <span id="status-text" class="c-dim"></span>
+          <span class="input-footer-right">
+            <span id="user-badge" class="c-dim"></span>
+            <select id="model-select" class="model-select">
+              <option value="gpt-4.1">gpt-4.1</option>
+            </select>
+            <button class="term-btn" id="new-chat-btn" title="New chat">/new</button>
+            <button class="term-btn term-btn-danger" id="logout-btn" title="Logout">/logout</button>
+          </span>
+        </div>
       </div>
-    </footer>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>

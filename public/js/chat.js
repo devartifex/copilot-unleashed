@@ -51,7 +51,7 @@ const Chat = {
   handleMessage(msg) {
     switch (msg.type) {
       case 'connected':
-        document.getElementById('user-badge').textContent = msg.user || '';
+        document.getElementById('user-badge').textContent = '@' + (msg.user || '');
         this.requestNewSession();
         break;
 
@@ -156,11 +156,7 @@ const Chat = {
 
   newChat() {
     const messagesEl = document.getElementById('messages');
-    messagesEl.innerHTML = `
-      <div class="welcome-message">
-        <h2>How can I help you today?</h2>
-        <p>Ask me anything — I'm powered by GitHub Copilot.</p>
-      </div>`;
+    messagesEl.innerHTML = '';
     this.currentAssistantEl = null;
     this.currentContent = '';
     this.isStreaming = false;
@@ -170,14 +166,23 @@ const Chat = {
 
   addMessage(role, content) {
     const messagesEl = document.getElementById('messages');
-    const welcome = messagesEl.querySelector('.welcome-message');
-    if (welcome) welcome.remove();
 
     const el = document.createElement('div');
     el.className = `message ${role}`;
 
     if (role === 'user') {
-      el.textContent = content;
+      // Terminal-style: ❯ user text
+      const promptLine = document.createElement('div');
+      promptLine.className = 'user-prompt-line';
+      const prompt = document.createElement('span');
+      prompt.className = 'term-prompt';
+      prompt.textContent = '❯';
+      const text = document.createElement('span');
+      text.className = 'user-text';
+      text.textContent = content;
+      promptLine.appendChild(prompt);
+      promptLine.appendChild(text);
+      el.appendChild(promptLine);
     } else {
       const contentDiv = document.createElement('div');
       contentDiv.className = 'content';
@@ -193,7 +198,7 @@ const Chat = {
     const messagesEl = document.getElementById('messages');
     const el = document.createElement('div');
     el.className = 'message error';
-    el.textContent = `⚠ ${message}`;
+    el.textContent = message;
     messagesEl.appendChild(el);
     this.scrollToBottom();
   },
@@ -217,6 +222,12 @@ const Chat = {
     if ([...select.options].some((o) => o.value === currentValue)) {
       select.value = currentValue;
     }
+
+    // Update env line
+    const envText = document.getElementById('env-model-text');
+    if (envText) {
+      envText.textContent = `${models.length} model${models.length !== 1 ? 's' : ''} available`;
+    }
   },
 
   scrollToBottom() {
@@ -227,12 +238,15 @@ const Chat = {
   },
 
   setStatus(status) {
-    const dot = document.getElementById('status-indicator');
+    const prompt = document.getElementById('status-indicator');
     const text = document.getElementById('status-text');
-    dot.className = `status-dot ${status}`;
+
+    // Update prompt color
+    prompt.className = `term-prompt ${status}`;
+
     const labels = {
-      connected: 'Connected',
-      disconnected: 'Disconnected',
+      connected: '',
+      disconnected: 'Disconnected — reconnecting...',
       connecting: 'Connecting...',
     };
     text.textContent = labels[status] || status;
@@ -240,15 +254,12 @@ const Chat = {
 
   enableInput() {
     const input = document.getElementById('message-input');
-    const btn = document.getElementById('send-btn');
     input.disabled = false;
-    btn.disabled = !input.value.trim();
     input.focus();
   },
 
   disableInput() {
     document.getElementById('message-input').disabled = true;
-    document.getElementById('send-btn').disabled = true;
   },
 };
 

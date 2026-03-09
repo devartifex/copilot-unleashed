@@ -1,0 +1,35 @@
+{
+  "name": "Copilot CLI Mobile",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
+
+  // Install dependencies + Copilot CLI once at Codespace creation
+  "postCreateCommand": "npm install && npm install -g @github/copilot",
+
+  // On every Codespace start: write .env with the correct BASE_URL and start the server
+  "postStartCommand": "bash .devcontainer/startup.sh",
+
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Copilot CLI Mobile",
+      "onAutoForward": "openBrowserOnce",
+      "visibility": "public"
+    }
+  },
+
+  // Declare which Codespace secrets are needed — set them at github.com/settings/codespaces
+  "customizations": {
+    "codespaces": {
+      "secrets": [
+        {
+          "name": "GITHUB_CLIENT_ID",
+          "description": "GitHub OAuth App Client ID (no client secret needed). Create one at github.com/settings/developers — Homepage URL and callback URL can both be http://localhost:3000.",
+          "documentationUrl": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app"
+        }
+      ]
+    },
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  }
+}

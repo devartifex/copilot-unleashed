@@ -492,6 +492,9 @@ html, body {
   flex-shrink: 0;
   padding-top: 1px;
 }
+.message.user .user-prompt-line .term-prompt[data-mode="interactive"] { color: #e6edf3; }
+.message.user .user-prompt-line .term-prompt[data-mode="plan"]        { color: var(--blue); }
+.message.user .user-prompt-line .term-prompt[data-mode="autopilot"]   { color: var(--green); }
 
 .message.user .user-text {
   color: var(--fg);
@@ -854,7 +857,7 @@ html, body {
   transition: color 0.2s ease;
 }
 
-.prompt-line .term-prompt.connected[data-mode="interactive"] { color: var(--cyan); }
+.prompt-line .term-prompt.connected[data-mode="interactive"] { color: #e6edf3; }
 .prompt-line .term-prompt.connected[data-mode="plan"]        { color: var(--blue); }
 .prompt-line .term-prompt.connected[data-mode="autopilot"]   { color: var(--green); }
 .prompt-line .term-prompt.connected { color: var(--blue); } /* fallback when data-mode is absent */
@@ -979,8 +982,8 @@ html, body {
 }
 
 .mode-toggle .mode-opt[data-mode="interactive"].active {
-  background: rgba(86, 212, 221, 0.15);
-  color: var(--cyan);
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
 }
 
 .mode-toggle .mode-opt[data-mode="plan"].active {

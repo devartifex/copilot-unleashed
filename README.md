@@ -140,10 +140,10 @@ The core of the app is a thin WebSocket layer on top of `@github/copilot-sdk`. E
 
 ### Prerequisites
 
-- **Node.js 22+** — required by `@github/copilot-sdk`
 - **GitHub account** with an active [Copilot license](https://github.com/features/copilot#pricing) (free tier works)
+- **GitHub OAuth App** — register one in ~30 seconds (see below)
 
-### 1. Register a GitHub OAuth App
+### Register a GitHub OAuth App
 
 The app uses [GitHub Device Authorization Flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) — the same flow as `gh auth login`. **No client secret needed.**
 
@@ -157,24 +157,32 @@ The app uses [GitHub Device Authorization Flow](https://docs.github.com/en/apps/
 
 > No client secret, no redirect URI configuration, and no updates needed when the URL changes.
 
-### 2. Set Environment Variables
+---
+
+### Try It — GitHub Codespaces
+
+The fastest way to try the app. Runs entirely in the browser — no local setup needed.
+
+1. **Add your `GITHUB_CLIENT_ID` as a Codespace secret** at [github.com/settings/codespaces](https://github.com/settings/codespaces) (scope it to this repo)
+2. Click the button below to launch:
+
+   [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/devartifex/copilot-cli-mobile?quickstart=1)
+
+3. The Codespace installs dependencies, generates a `SESSION_SECRET`, builds the app, and opens it in your browser automatically.
+
+---
+
+### Run Locally
+
+<details>
+<summary><strong>Docker (recommended)</strong></summary>
 
 Create a `.env` file:
 
 ```env
 GITHUB_CLIENT_ID=<your-client-id>
 SESSION_SECRET=<run: openssl rand -hex 32>
-
-# Optional: restrict access to specific GitHub users (comma-separated)
-# ALLOWED_GITHUB_USERS=user1,user2,user3
-
-# Optional: token freshness lifetime in ms (default: 24 hours)
-# TOKEN_MAX_AGE_MS=86400000
 ```
-
-> **Note**: When deploying to Azure with `azd up`, `SESSION_SECRET` is auto-generated — you don't need to set it.
-
-### 3. Run With Docker
 
 ```bash
 docker compose up --build
@@ -182,7 +190,19 @@ docker compose up --build
 
 Open [http://localhost:3000](http://localhost:3000) — enter the code on GitHub, and start chatting.
 
-### 4. Run Directly (Without Docker)
+</details>
+
+<details>
+<summary><strong>Node.js (without Docker)</strong></summary>
+
+Requires **Node.js 22+**.
+
+Create a `.env` file:
+
+```env
+GITHUB_CLIENT_ID=<your-client-id>
+SESSION_SECRET=<run: openssl rand -hex 32>
+```
 
 ```bash
 npm install
@@ -195,6 +215,8 @@ Or for development with hot reload:
 ```bash
 npm run dev:local
 ```
+
+</details>
 
 ## Configuration
 
@@ -212,21 +234,19 @@ npm run dev:local
 ## Security
 
 - **Server-side token storage** — GitHub token is stored in the Express session, never sent to the browser
-- **Security headers** — Helmet sets CSP, HSTS, X-Frame-Options, X-Content-Type-Options
+- **Security headers** — Helmet sets CSP, HSTS, X-Frame-Options, X-Content-Type-Options, frame-ancestors none
 - **Rate limiting** — per-IP request throttling (200 req / 15 min)
 - **Secure cookies** — `httpOnly`, `secure` (in production), `sameSite: lax`, 30-day rolling
 - **Session fixation protection** — `session.regenerate()` after GitHub auth
-- **Token freshness** — tokens expire after 7 days (configurable via `TOKEN_MAX_AGE_MS`)
+- **Token freshness** — tokens expire after 24 hours (configurable via `TOKEN_MAX_AGE_MS`)
 - **Token revalidation** — WebSocket connections validate the GitHub token against GitHub's API on connect (catches revoked tokens)
 - **Origin validation** — WebSocket connections are validated against the configured `BASE_URL` in production
-- **CORS policy** — ACA ingress restricts cross-origin requests to the app's own domain
-- **IP restrictions** — optional IP allowlist via Bicep params for ACA ingress
-- **User allowlist** — optional `ALLOWED_GITHUB_USERS` restricts who can log in (stored in Key Vault on Azure)
+- **User allowlist** — optional `ALLOWED_GITHUB_USERS` restricts who can log in
 - **Input limits** — Messages capped at 10,000 chars; custom instructions at 2,000 chars (server-enforced)
-- **XSS prevention** — All rendered markdown sanitized through DOMPurify
+- **XSS prevention** — All rendered markdown sanitized through DOMPurify; CDN scripts use Subresource Integrity (SRI) hashes
 - **System prompt safety** — Custom instructions use `append` mode only, preserving SDK security guardrails
 - **Full Copilot CLI parity** — SDK built-in tools (GitHub API, file access, shell) are approved via `approveAll`, matching the desktop CLI
-- **Infrastructure secrets** — Secrets stored natively in Container Apps (encrypted at rest); managed identity for registry pull; no plaintext values in app config
+- **Infrastructure secrets** (Azure) — Secrets stored natively in Container Apps (encrypted at rest); managed identity for registry pull; CORS policy restricts origins; optional IP restrictions via Bicep params
 
 ## Project Structure
 
@@ -259,11 +279,11 @@ copilot-cli-mobile/
 │       ├── app.js            # App init, auth orchestration, settings panel wiring
 │       ├── auth.js           # Device flow API client
 │       └── chat.js           # WebSocket client, markdown rendering, streaming, localStorage persistence
-├── infra/                    # Azure Bicep IaC (Container Apps, ACR, Key Vault)
+├── .devcontainer/            # GitHub Codespaces configuration
+├── infra/                    # Azure Bicep IaC (Container Apps, ACR, Managed Identity, monitoring)
 ├── .github/workflows/        # CI (lint + build) + CD (Docker → ACR → Container Apps)
 ├── Dockerfile                # Multi-stage build (Node 24 + Copilot CLI)
 ├── docker-compose.yml        # Local development with volume mounts
-├── entrypoint.sh             # Container entry — validates Copilot CLI availability
 ├── package.json
 └── tsconfig.json
 ```
@@ -327,20 +347,88 @@ Messages between client and server use typed JSON. Here's the full protocol:
 | `done` | — | Response complete, input re-enabled |
 | `aborted` | — | Response cancelled |
 
-## Deployment
+## Deploy to Azure
 
-The app is a standard Docker container. Deploy it anywhere that runs containers — a VPS, a home server, or any cloud provider:
+<details>
+<summary><strong>Production deployment with Azure Container Apps</strong></summary>
+
+### Prerequisites
+
+- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and authenticated (`az login`)
+- [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) (`azd`)
+
+### Deploy with `azd up`
 
 ```bash
-docker build -t copilot-cli-mobile .
-docker run -p 3000:3000 \
-  -e GITHUB_CLIENT_ID=<id> \
-  -e SESSION_SECRET=<secret> \
-  -e NODE_ENV=production \
-  copilot-cli-mobile
+az login
+azd auth login
+
+# Set your GitHub OAuth App client ID
+azd env set GITHUB_CLIENT_ID <your-github-client-id>
+
+# Optional: restrict to specific GitHub users
+azd env set allowedGithubUsers "your-username,teammate"
+
+# Optional: restrict to specific IP ranges (CIDR notation)
+azd env set ipRestrictions "203.0.113.0/24"
+
+# Provision + build + deploy
+azd up
 ```
 
-Azure deployment infrastructure (Bicep templates for Container Apps, ACR, Key Vault, Managed Identity, monitoring) is included in the `infra/` directory for `azd up`. See [docs/azure-setup.md](docs/azure-setup.md) for full deployment instructions.
+This provisions:
+
+| Resource | Purpose |
+|----------|---------|
+| **Container Registry** | Docker image storage |
+| **Container App** | Serverless container runtime (port 3000, auto-TLS, CORS) |
+| **Managed Identity** | RBAC for ACR pull (no stored credentials) |
+| **Log Analytics + App Insights** | Monitoring and diagnostics |
+
+`SESSION_SECRET` is auto-generated during provisioning. All secrets are stored natively in Container Apps (encrypted at rest).
+
+### Subsequent deploys
+
+```bash
+azd deploy    # Redeploy without re-provisioning infrastructure
+```
+
+### CI/CD with GitHub Actions
+
+Create a service principal scoped to your resource group:
+
+```bash
+az ad sp create-for-rbac \
+  --name "copilot-cli-mobile-cicd" \
+  --role contributor \
+  --scopes /subscriptions/<subscription-id>/resourceGroups/<resource-group> \
+  --sdk-auth
+```
+
+Add these secrets in **GitHub → Settings → Secrets → Actions**:
+
+| Secret | Value |
+|--------|-------|
+| `AZURE_CREDENTIALS` | Full JSON output from the command above |
+| `ACR_LOGIN_SERVER` | `<registry-name>.azurecr.io` |
+| `ACR_NAME` | Container Registry name |
+| `AZURE_RESOURCE_GROUP` | Resource Group name |
+
+- **CI** (`ci.yml`): Runs on every push — type-checks and builds
+- **Deploy** (`deploy.yml`): Runs on push to `main` — builds Docker image, pushes to ACR, deploys to Container Apps
+
+### Troubleshooting
+
+**Container App not starting** — check logs:
+
+```bash
+az containerapp logs show \
+  --name copilot-cli-mobile \
+  --resource-group <resource-group> \
+  --type console
+```
+
+</details>
 
 ## License
 

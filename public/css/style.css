@@ -789,9 +789,9 @@ html, body {
   transition: color 0.2s ease;
 }
 
-.prompt-line .term-prompt.connected[data-mode="interactive"] { color: var(--blue); }
-.prompt-line .term-prompt.connected[data-mode="plan"]        { color: var(--yellow); }
-.prompt-line .term-prompt.connected[data-mode="autopilot"]   { color: var(--purple); }
+.prompt-line .term-prompt.connected[data-mode="interactive"] { color: var(--cyan); }
+.prompt-line .term-prompt.connected[data-mode="plan"]        { color: var(--blue); }
+.prompt-line .term-prompt.connected[data-mode="autopilot"]   { color: var(--green); }
 .prompt-line .term-prompt.connected { color: var(--blue); } /* fallback when data-mode is absent */
 .prompt-line .term-prompt.disconnected { color: var(--red); }
 .prompt-line .term-prompt.connecting   { color: var(--yellow); animation: pulse 1.5s ease-in-out infinite; }
@@ -914,18 +914,18 @@ html, body {
 }
 
 .mode-toggle .mode-opt[data-mode="interactive"].active {
+  background: rgba(86, 212, 221, 0.15);
+  color: var(--cyan);
+}
+
+.mode-toggle .mode-opt[data-mode="plan"].active {
   background: rgba(88, 166, 255, 0.15);
   color: var(--blue);
 }
 
-.mode-toggle .mode-opt[data-mode="plan"].active {
-  background: rgba(210, 153, 34, 0.15);
-  color: var(--yellow);
-}
-
 .mode-toggle .mode-opt[data-mode="autopilot"].active {
-  background: var(--border-accent);
-  color: var(--purple);
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--green);
 }
 
 .mode-toggle .mode-opt:active {

@@ -1,5 +1,7 @@
 // App entry point — GitHub device flow auth then chat
 (async function init() {
+  fetchAndUpdateSdkVersion();
+
   const status = await Auth.checkStatus();
 
   if (!status.authenticated) {
@@ -11,6 +13,23 @@
   showScreen('chat-screen');
   initChat(status);
 })();
+
+async function fetchAndUpdateSdkVersion() {
+  try {
+    const res = await fetch('/api/version');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.sdkVersion && data.sdkVersion !== 'unknown') {
+      document.querySelectorAll('.ct').forEach((el) => {
+        if (el.textContent.includes('Copilot SDK')) {
+          el.textContent = `Copilot SDK v${data.sdkVersion}`;
+        }
+      });
+    }
+  } catch {
+    // keep static fallback in HTML
+  }
+}
 
 function showScreen(id) {
   ['github-screen', 'chat-screen'].forEach((s) => {

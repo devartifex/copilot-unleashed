@@ -17,7 +17,7 @@ Self-hosted web app that brings GitHub Copilot CLI to mobile browsers via the of
 
 | Layer | Technology |
 |-------|-----------|
-| Runtime | Node.js 22+ (Docker uses node:24-slim) |
+| Runtime | Node.js 24+ (Docker uses node:24-slim) |
 | Language | TypeScript 5.7 (strict mode, ES2022, NodeNext modules) |
 | Server | Express 4.21 |
 | AI Engine | `@github/copilot-sdk` 0.1.30 |

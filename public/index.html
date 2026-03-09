@@ -23,7 +23,7 @@
           <path fill-rule="evenodd" clip-rule="evenodd" d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z" fill="currentColor"/>
         </svg>
       </div>
-      <h1 class="login-title">GitHub Copilot CLI Mobile</h1>
+      <h1 class="login-title">Copilot CLI Mobile</h1>
       <p class="login-subtitle">Sign in to get started</p>
       <div class="login-instruction">
         <span class="c-yellow">●</span> Enter this code at <span class="c-bold">github.com/login/device</span>
@@ -58,8 +58,18 @@
     <span class="cbs">└────┘</span> <span class="cbs">└────┘</span> <span class="cbs">└─┘</span>    <span class="cbs">└─┘└─────┘</span> <span class="cbs">└────┘</span>   <span class="cbs">└─┘</span>     <span class="ch">▀███▄</span>            <span class="ch">▄███▀</span>
 <span class="cb">│</span>                        <span class="ct">SDK v0.1.32</span>                    <span class="ch">▀▀████████████▀▀</span>      <span class="cb">│</span>
 <span class="cb">└──</span>                                                                         <span class="cb">──┘</span></pre>
+          <!-- Compact banner for mobile < 600px -->
+          <div class="banner-compact">
+            <svg class="banner-compact-icon" viewBox="0 0 98 96" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z" fill="currentColor"/>
+            </svg>
+            <div class="banner-compact-text">
+              <span class="banner-compact-title">GitHub Copilot</span>
+              <span class="banner-compact-version ct">SDK v0.1.32</span>
+            </div>
+          </div>
           <div class="banner-sub">Describe a task to get started.</div>
-          <div class="banner-tip">Tip: Switch modes with the selector below.</div>
+          <div class="banner-tip">Tip: Open the menu (☰) to switch modes.</div>
           <div class="banner-warn">Copilot uses AI. Always verify suggestions.</div>
         </div>
       </div>
@@ -111,27 +121,61 @@
               <span id="quota-indicator" class="quota-dot" style="display:none"></span>
             </div>
             <div class="status-right">
-              <div class="mode-toggle" id="mode-toggle">
-                <button class="mode-opt active" data-mode="interactive" title="Interactive mode">ask</button>
-                <button class="mode-opt" data-mode="plan" title="Plan mode">plan</button>
-                <button class="mode-opt" data-mode="autopilot" title="Autopilot mode">auto</button>
-              </div>
-              <select id="model-select" class="pill-select" title="Model">
-                <option value="gpt-4.1">gpt-4.1</option>
-              </select>
-              <div class="reasoning-toggle" id="reasoning-toggle" style="display:none" title="Reasoning effort">
-                <button class="reasoning-opt" data-effort="low">low</button>
-                <button class="reasoning-opt active" data-effort="medium">med</button>
-                <button class="reasoning-opt" data-effort="high">high</button>
-                <button class="reasoning-opt" data-effort="xhigh">max</button>
-              </div>
+              <span id="model-label" class="model-label">gpt-4.1</span>
               <button class="action-btn stop-btn" id="stop-btn" title="Stop response" style="display:none">stop</button>
-              <button class="action-btn" id="new-chat-btn" title="New session">new</button>
-              <button class="action-btn" id="settings-btn" title="Settings">⚙</button>
-              <button class="action-btn danger" id="logout-btn" title="Sign out">quit</button>
+              <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="Menu" aria-label="Open menu">☰</button>
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR PANEL -->
+  <div id="sidebar-overlay" class="sidebar-overlay" style="display:none">
+    <div class="sidebar-panel" id="sidebar-panel">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Menu</span>
+        <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">✕</button>
+      </div>
+      <div class="sidebar-body">
+        <div class="sidebar-section">
+          <label class="sidebar-label">Mode</label>
+          <div class="mode-toggle sidebar-mode-toggle" id="mode-toggle">
+            <button class="mode-opt active" data-mode="interactive" title="Interactive mode">ask</button>
+            <button class="mode-opt" data-mode="plan" title="Plan mode">plan</button>
+            <button class="mode-opt" data-mode="autopilot" title="Autopilot mode">auto</button>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <label class="sidebar-label">Model</label>
+          <select id="model-select" class="sidebar-select" title="Model">
+            <option value="gpt-4.1">gpt-4.1</option>
+          </select>
+        </div>
+        <div class="sidebar-section" id="sidebar-reasoning-section" style="display:none">
+          <label class="sidebar-label">Reasoning Effort</label>
+          <div class="reasoning-toggle sidebar-reasoning-toggle" id="reasoning-toggle" title="Reasoning effort">
+            <button class="reasoning-opt" data-effort="low">low</button>
+            <button class="reasoning-opt active" data-effort="medium">med</button>
+            <button class="reasoning-opt" data-effort="high">high</button>
+            <button class="reasoning-opt" data-effort="xhigh">max</button>
+          </div>
+        </div>
+        <div class="sidebar-divider"></div>
+        <button class="sidebar-action" id="new-chat-btn">
+          <span class="sidebar-action-icon">+</span>
+          <span>New Chat</span>
+        </button>
+        <button class="sidebar-action" id="settings-btn">
+          <span class="sidebar-action-icon">⚙</span>
+          <span>Settings</span>
+        </button>
+        <div class="sidebar-divider"></div>
+        <button class="sidebar-action sidebar-action-danger" id="logout-btn">
+          <span class="sidebar-action-icon">⏻</span>
+          <span>Sign Out</span>
+        </button>
       </div>
     </div>
   </div>

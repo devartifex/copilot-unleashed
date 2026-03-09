@@ -28,7 +28,11 @@ const Chat = {
       const raw = localStorage.getItem(this._storageKey);
       if (!raw) return;
       const s = JSON.parse(raw);
-      if (s.model) document.getElementById('model-select').value = s.model;
+      if (s.model) {
+        document.getElementById('model-select').value = s.model;
+        const modelLabel = document.getElementById('model-label');
+        if (modelLabel) modelLabel.textContent = s.model;
+      }
       if (s.mode) this.syncModeSelect(s.mode);
       if (s.reasoningEffort && ['low', 'medium', 'high', 'xhigh'].includes(s.reasoningEffort)) {
         this.reasoningEffort = s.reasoningEffort;
@@ -446,6 +450,9 @@ const Chat = {
     const isReasoning = this.isReasoningModel(modelId);
     toggle.style.display = isReasoning ? '' : 'none';
 
+    const sidebarSection = document.getElementById('sidebar-reasoning-section');
+    if (sidebarSection) sidebarSection.style.display = isReasoning ? '' : 'none';
+
     if (isReasoning) {
       const model = this.modelsMap.get(modelId);
       // Reset to model's default reasoning effort when switching models
@@ -572,6 +579,11 @@ const Chat = {
       promptLine.appendChild(text);
       el.appendChild(promptLine);
     } else {
+      // Assistant message with role marker
+      const markerSpan = document.createElement('span');
+      markerSpan.className = 'assistant-marker';
+      markerSpan.textContent = '◆';
+      el.appendChild(markerSpan);
       const contentDiv = document.createElement('div');
       contentDiv.className = 'content';
       el.appendChild(contentDiv);
@@ -647,6 +659,10 @@ const Chat = {
     if (envText) {
       envText.textContent = `${models.length} model${models.length !== 1 ? 's' : ''} available`;
     }
+
+    // Sync inline model label
+    const modelLabel = document.getElementById('model-label');
+    if (modelLabel) modelLabel.textContent = select.value;
 
     // Show/hide reasoning effort selector based on selected model
     this.updateReasoningVisibility(select.value);
@@ -801,6 +817,8 @@ const Chat = {
   changeModel(model) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.sessionReady) return;
     this.ws.send(JSON.stringify({ type: 'set_model', model }));
+    const modelLabel = document.getElementById('model-label');
+    if (modelLabel) modelLabel.textContent = model;
     this.saveSettings();
   },
 

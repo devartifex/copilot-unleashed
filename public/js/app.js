@@ -203,9 +203,13 @@ function initChat(status) {
     }
   });
 
-  document.getElementById('new-chat-btn').addEventListener('click', () => Chat.newChat());
+  document.getElementById('new-chat-btn').addEventListener('click', () => {
+    closeSidebar();
+    Chat.newChat();
+  });
 
   document.getElementById('logout-btn').addEventListener('click', () => {
+    closeSidebar();
     if (confirm('Sign out?')) Auth.logout();
   });
 
@@ -221,6 +225,31 @@ function initChat(status) {
   });
 
   document.getElementById('stop-btn').addEventListener('click', () => Chat.abort());
+
+  // Sidebar open/close
+  const sidebarOverlay = document.getElementById('sidebar-overlay');
+  const sidebarPanel = document.getElementById('sidebar-panel');
+
+  function openSidebar() {
+    sidebarOverlay.style.display = 'block';
+    requestAnimationFrame(() => sidebarOverlay.classList.add('open'));
+  }
+
+  function closeSidebar() {
+    sidebarOverlay.classList.remove('open');
+    sidebarPanel.addEventListener('transitionend', function handler() {
+      sidebarPanel.removeEventListener('transitionend', handler);
+      if (!sidebarOverlay.classList.contains('open')) {
+        sidebarOverlay.style.display = 'none';
+      }
+    });
+  }
+
+  document.getElementById('sidebar-toggle-btn').addEventListener('click', openSidebar);
+  document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
+  sidebarOverlay.addEventListener('click', (e) => {
+    if (e.target === sidebarOverlay) closeSidebar();
+  });
 
   // Mode toggle — button group replaces select
   document.getElementById('mode-toggle').addEventListener('click', (e) => {
@@ -240,6 +269,7 @@ function initChat(status) {
   settingsInstructions.value = Chat.customInstructions || '';
 
   document.getElementById('settings-btn').addEventListener('click', () => {
+    closeSidebar();
     settingsInstructions.value = Chat.customInstructions || '';
     settingsOverlay.style.display = 'flex';
   });

@@ -6,7 +6,7 @@ Self-hosted web app that brings GitHub Copilot CLI to mobile browsers via the of
 
 ## Architecture
 
-- **Backend**: Express + TypeScript (Node.js 22+, Dockerfile uses Node 24)
+- **Backend**: Express + TypeScript (Node.js 24)
 - **Frontend**: Vanilla JS SPA (no framework) — dark theme, mobile-first
 - **Real-time**: WebSocket with per-connection `CopilotClient` lifecycle
 - **Auth**: GitHub Device Flow only (no client secret, no redirect URI)
@@ -16,7 +16,7 @@ Self-hosted web app that brings GitHub Copilot CLI to mobile browsers via the of
 
 | Layer | Technology |
 |-------|-----------|
-| Runtime | Node.js 22+ (Docker uses node:24-slim) |
+| Runtime | Node.js 24 (node:24-slim in Docker) |
 | Language | TypeScript 5.7 (strict mode, ES2022, NodeNext modules) |
 | Server | Express 4.x |
 | AI Engine | `@github/copilot-sdk` ^0.1.32 |
@@ -111,7 +111,7 @@ public/
 docker compose up --build        # dev with hot-reload of public/
 npm run dev                      # alias for docker compose up
 
-# Local (requires Node 22+)
+# Local (requires Node 24+)
 npm install && npm run build && npm start
 npm run dev:local                # tsx watch mode
 
@@ -133,4 +133,4 @@ npm run lint                     # tsc --noEmit
 - Model defaults to `gpt-4.1` if not specified
 - The `approveAll` permission handler matches desktop CLI behavior (SDK built-in tools are auto-approved)
 - `excludedTools` and `availableTools` are supported in `SessionConfig` for tool filtering
-- `.nvmrc` says 22 but Dockerfile uses node:24-slim (SDK's `@github/copilot` CLI needs `node:sqlite` from Node 24)
+- The SDK's `@github/copilot` CLI needs `node:sqlite` which ships with Node 24

@@ -3,7 +3,7 @@
 > **GitHub Copilot CLI from your phone** — a lightweight, self-hosted web app powered by the official [GitHub Copilot SDK](https://github.com/github/copilot-sdk).
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 22+">
+  <img src="https://img.shields.io/badge/Node.js-24-339933?logo=nodedotjs&logoColor=white" alt="Node.js 24">
   <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/Copilot_SDK-%5E0.1.32-000000?logo=github&logoColor=white" alt="Copilot SDK">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License">
@@ -195,7 +195,7 @@ Open [http://localhost:3000](http://localhost:3000) — enter the code on GitHub
 <details>
 <summary><strong>Node.js (without Docker)</strong></summary>
 
-Requires **Node.js 22+**.
+Requires **Node.js 24+** (the Copilot CLI needs `node:sqlite` built into Node 24).
 
 Create a `.env` file:
 

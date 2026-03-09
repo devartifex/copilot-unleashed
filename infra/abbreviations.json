@@ -3,6 +3,5 @@
   "containerRegistry": "cr",
   "resourceGroup": "rg-",
   "managedIdentity": "mi-",
-  "keyVault": "kv-",
   "monitoring": "mon-"
 }

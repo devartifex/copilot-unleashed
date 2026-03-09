@@ -5,7 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 22+">
   <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Copilot_SDK-0.1.32-000000?logo=github&logoColor=white" alt="Copilot SDK">
+  <img src="https://img.shields.io/badge/Copilot_SDK-%5E0.1.32-000000?logo=github&logoColor=white" alt="Copilot SDK">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License">
 </p>
 
@@ -53,7 +53,7 @@ The core of the app is a thin WebSocket layer on top of `@github/copilot-sdk`. E
 | SDK Feature | Why Not |
 |-------------|---------|
 | `provider` (BYOK) | This app targets users with a Copilot license — custom providers are out of scope |
-| `availableTools` / `excludedTools` | All tools are enabled, matching the desktop CLI default |
+
 | `systemMessage: { mode: 'replace' }` | Only `append` mode is used to preserve SDK safety guardrails |
 | `hooks` (`onPreToolUse`, `onPostToolUse`, etc.) | Not needed — `approveAll` covers the permission model |
 | `customAgents` / `skillDirectories` | Desktop-only features that require local filesystem access |
@@ -172,6 +172,8 @@ SESSION_SECRET=<run: openssl rand -hex 32>
 # TOKEN_MAX_AGE_MS=86400000
 ```
 
+> **Note**: When deploying to Azure with `azd up`, `SESSION_SECRET` is auto-generated — you don't need to set it.
+
 ### 3. Run With Docker
 
 ```bash
@@ -199,23 +201,32 @@ npm run dev:local
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `GITHUB_CLIENT_ID` | Yes | — | GitHub OAuth App client ID |
-| `SESSION_SECRET` | Yes | — | Random string for session encryption (`openssl rand -hex 32`) |
+| `SESSION_SECRET` | Yes* | — | Random string for session encryption (`openssl rand -hex 32`). Auto-generated on Azure deploy. |
 | `PORT` | No | `3000` | HTTP server port |
-| `BASE_URL` | No | `http://localhost:3000` | Full app URL (used for cookies) |
-| `NODE_ENV` | No | `development` | Set to `production` for secure cookies |
-| `SESSION_STORE_PATH` | No | `.sessions` | Directory for file-based session store |
+| `BASE_URL` | No | `http://localhost:3000` | Full app URL (used for cookies + WebSocket origin validation) |
+| `NODE_ENV` | No | `development` | Set to `production` for secure cookies + trust proxy |
+| `SESSION_STORE_PATH` | No | `.sessions` | Directory for file-based session store (dev only) |
+| `ALLOWED_GITHUB_USERS` | No | — | Comma-separated GitHub usernames allowed to log in |
+| `TOKEN_MAX_AGE_MS` | No | `86400000` (24h) | Force re-auth after this many milliseconds |
 
 ## Security
 
 - **Server-side token storage** — GitHub token is stored in the Express session, never sent to the browser
 - **Security headers** — Helmet sets CSP, HSTS, X-Frame-Options, X-Content-Type-Options
 - **Rate limiting** — per-IP request throttling (200 req / 15 min)
-- **Secure cookies** — `httpOnly`, `secure` (in production), `sameSite: lax`
+- **Secure cookies** — `httpOnly`, `secure` (in production), `sameSite: lax`, 30-day rolling
+- **Session fixation protection** — `session.regenerate()` after GitHub auth
+- **Token freshness** — tokens expire after 7 days (configurable via `TOKEN_MAX_AGE_MS`)
+- **Token revalidation** — WebSocket connections validate the GitHub token against GitHub's API on connect (catches revoked tokens)
 - **Origin validation** — WebSocket connections are validated against the configured `BASE_URL` in production
+- **CORS policy** — ACA ingress restricts cross-origin requests to the app's own domain
+- **IP restrictions** — optional IP allowlist via Bicep params for ACA ingress
+- **User allowlist** — optional `ALLOWED_GITHUB_USERS` restricts who can log in (stored in Key Vault on Azure)
 - **Input limits** — Messages capped at 10,000 chars; custom instructions at 2,000 chars (server-enforced)
 - **XSS prevention** — All rendered markdown sanitized through DOMPurify
 - **System prompt safety** — Custom instructions use `append` mode only, preserving SDK security guardrails
 - **Full Copilot CLI parity** — SDK built-in tools (GitHub API, file access, shell) are approved via `approveAll`, matching the desktop CLI
+- **Infrastructure secrets** — Secrets stored natively in Container Apps (encrypted at rest); managed identity for registry pull; no plaintext values in app config
 
 ## Project Structure
 
@@ -228,7 +239,7 @@ copilot-cli-mobile/
 │   ├── security-log.ts       # Structured security event logging
 │   ├── auth/
 │   │   ├── github.ts         # GitHub Device Flow OAuth (fetch-based)
-│   │   └── middleware.ts     # requireGitHub session guard
+│   │   └── middleware.ts     # requireGitHub session guard + token freshness check
 │   ├── copilot/
 │   │   ├── client.ts         # CopilotClient factory (one per WS connection)
 │   │   └── session.ts        # SessionConfig builder — model, reasoning, MCP, custom instructions
@@ -236,12 +247,14 @@ copilot-cli-mobile/
 │   │   ├── auth.ts           # /auth/* (device/start, device/poll, logout, status)
 │   │   └── api.ts            # /api/* (models, version, client-error) — behind requireGitHub
 │   ├── ws/
-│   │   └── handler.ts        # WebSocket handler — message routing, SDK event forwarding
+│   │   └── handler.ts        # WebSocket handler — message routing, SDK event forwarding, token revalidation
 │   └── types/
 │       └── session.d.ts      # Express session type augmentation
 ├── public/
 │   ├── index.html            # SPA shell (login screen + chat screen + settings panel)
-│   ├── css/style.css         # Dark theme, mobile-first, CSS custom properties
+│   ├── css/
+│   │   ├── style.css         # Dark theme, mobile-first, CSS custom properties
+│   │   └── github-dark.min.css # Syntax highlighting theme
 │   └── js/
 │       ├── app.js            # App init, auth orchestration, settings panel wiring
 │       ├── auth.js           # Device flow API client
@@ -263,7 +276,7 @@ Messages between client and server use typed JSON. Here's the full protocol:
 
 | Message Type | Purpose |
 |------------|---------|
-| `new_session` | Create a session with `{ model, reasoningEffort?, customInstructions? }` |
+| `new_session` | Create a session with `{ model, reasoningEffort?, customInstructions?, excludedTools? }` |
 | `message` | Send user prompt `{ content }` (max 10,000 chars) |
 | `list_models` | Request available models from Copilot API |
 | `set_mode` | Switch mode: `interactive`, `plan`, or `autopilot` |
@@ -271,6 +284,13 @@ Messages between client and server use typed JSON. Here's the full protocol:
 | `set_reasoning` | Update reasoning effort for next session |
 | `abort` | Cancel the current streaming response |
 | `user_input_response` | Reply to an SDK `ask_user` tool prompt |
+| `list_tools` | List available tools in the current session |
+| `list_agents` | List available subagents |
+| `select_agent` / `deselect_agent` | Select or deselect a subagent |
+| `get_quota` | Get remaining quota/usage info |
+| `compact` | Manually trigger context compaction |
+| `list_sessions` / `resume_session` | List or resume previous sessions |
+| `get_plan` / `update_plan` / `delete_plan` | Manage plan mode plans |
 
 **Server → Client:**
 
@@ -293,6 +313,15 @@ Messages between client and server use typed JSON. Here's the full protocol:
 | `warning` | `session.warning` | Session warning |
 | `error` | `session.error` | Error message |
 | `subagent_start/end` | `subagent.started/completed` | Subagent lifecycle |
+| `subagent_failed` | `subagent.failed` | Subagent error |
+| `subagent_selected/deselected` | `subagent.selected/deselected` | Subagent selection state |
+| `skill_invoked` | `skill.invoked` | Skill invocation |
+| `compaction_start` | `session.compaction_start` | Context compaction started |
+| `compaction_complete` | `session.compaction_complete` | Compaction done (tokens/messages removed) |
+| `plan_changed` | `session.plan_changed` | Plan content updated |
+| `info` | `session.info` | Informational message |
+| `elicitation_requested` | `elicitation.requested` | SDK asks user for input/choice |
+| `elicitation_completed` | `elicitation.completed` | Elicitation answered |
 | `user_input_request` | `onUserInputRequest` callback | SDK asks user for input/choice |
 | `models` | `client.listModels()` | Available model list |
 | `done` | — | Response complete, input re-enabled |
@@ -311,7 +340,7 @@ docker run -p 3000:3000 \
   copilot-cli-mobile
 ```
 
-Azure deployment infrastructure (Bicep templates for Container Apps) is included in the `infra/` directory for `azd up` if desired.
+Azure deployment infrastructure (Bicep templates for Container Apps, ACR, Key Vault, Managed Identity, monitoring) is included in the `infra/` directory for `azd up`. See [docs/azure-setup.md](docs/azure-setup.md) for full deployment instructions.
 
 ## License
 

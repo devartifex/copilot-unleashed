@@ -10,23 +10,22 @@ Self-hosted web app that brings GitHub Copilot CLI to mobile browsers via the of
 - **Frontend**: Vanilla JS SPA (no framework) — dark theme, mobile-first
 - **Real-time**: WebSocket with per-connection `CopilotClient` lifecycle
 - **Auth**: GitHub Device Flow only (no client secret, no redirect URI)
-- **Session**: Server-side Express sessions (file store in dev, memory in prod)
+- **Session**: Server-side Express sessions (file store in dev, default MemoryStore in prod)
 - **Deployment**: Docker container → Azure Container Apps via `azd up` or GitHub Actions
-
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Runtime | Node.js 24+ (Docker uses node:24-slim) |
+| Runtime | Node.js 22+ (Docker uses node:24-slim) |
 | Language | TypeScript 5.7 (strict mode, ES2022, NodeNext modules) |
-| Server | Express 4.21 |
-| AI Engine | `@github/copilot-sdk` 0.1.30 |
-| WebSocket | `ws` 8.18 |
-| Security | Helmet (CSP, HSTS), express-rate-limit (200 req/15 min), DOMPurify |
-| Sessions | express-session + session-file-store |
+| Server | Express 4.x |
+| AI Engine | `@github/copilot-sdk` ^0.1.32 |
+| WebSocket | `ws` ^8.18 |
+| Security | Helmet (CSP, HSTS), express-rate-limit, DOMPurify, CORS policy on ACA |
+| Sessions | express-session + session-file-store (dev only) |
 | Build | `tsc` → `dist/` |
 | Container | Multi-stage Dockerfile (builder + runtime) |
-| IaC | Bicep (Azure Container Apps, ACR, Key Vault, Managed Identity, monitoring) |
+| IaC | Bicep (Container Apps, ACR, Managed Identity, Log Analytics, App Insights) |
 | CI/CD | GitHub Actions (ci.yml + deploy.yml) |
 
 ## Project Structure
@@ -36,23 +35,26 @@ src/
 ├── index.ts              # Entry point — HTTP server + WebSocket setup
 ├── config.ts             # Env var validation (fail-fast)
 ├── server.ts             # Express app, middleware stack, routes
+├── security-log.ts       # Structured security event logging
 ├── auth/
 │   ├── github.ts         # GitHub Device Flow OAuth (fetch-based)
-│   └── middleware.ts      # requireGitHub guard
+│   └── middleware.ts     # requireGitHub guard + token freshness check
 ├── copilot/
 │   ├── client.ts         # CopilotClient factory
 │   └── session.ts        # Session creation, model listing, MCP config
 ├── routes/
 │   ├── auth.ts           # /auth/* (device/start, device/poll, logout, status)
-│   └── api.ts            # /api/* (models) — behind requireGitHub
+│   └── api.ts            # /api/* (models, version, client-error) — behind requireGitHub
 ├── ws/
-│   └── handler.ts        # WebSocket: chat streaming, message protocol
+│   └── handler.ts        # WebSocket: chat streaming, message protocol, token revalidation
 └── types/
     └── session.d.ts      # Express session type augmentation
 
 public/
 ├── index.html            # SPA shell (two screens: login + chat)
-├── css/style.css         # Dark theme, mobile-first, CSS custom properties
+├── css/
+│   ├── style.css         # Dark theme, mobile-first, CSS custom properties
+│   └── github-dark.min.css # Syntax highlighting theme
 └── js/
     ├── app.js            # App init + auth orchestration
     ├── auth.js           # Device flow API client
@@ -77,14 +79,18 @@ public/
 - **Server-side secrets** — GitHub token stored in Express session, never sent to browser
 - **Message type whitelist** — WebSocket handler validates against `VALID_MESSAGE_TYPES` Set
 
-### Security Requirements
+### Security
 - CSP via Helmet: self + cdn.jsdelivr.net + GitHub avatars + WebSocket
 - Rate limiting: 200 requests per 15 minutes per IP
 - Session cookies: httpOnly, secure (prod), sameSite: lax, 30-day rolling
+- Session fixation protection: `session.regenerate()` after GitHub auth
 - XSS prevention: DOMPurify sanitizes all rendered markdown
 - Max message length: 10,000 chars (validated server-side in `ws/handler.ts`)
 - No client secret in OAuth — device flow only needs `GITHUB_CLIENT_ID`
 - Trust proxy only in production
+- Token revalidation: WebSocket connections validate GitHub token against GitHub API on connect
+- ACA ingress: CORS policy restricts origins, optional IP restrictions via Bicep params
+- Allowed users: optional allowlist via `ALLOWED_GITHUB_USERS` (passed as Bicep param, stored as native ACA secret)
 
 ### Environment Variables
 | Variable | Required | Default | Purpose |
@@ -94,9 +100,9 @@ public/
 | `PORT` | No | 3000 | HTTP server port |
 | `BASE_URL` | No | http://localhost:3000 | Cookie domain + WebSocket origin validation |
 | `NODE_ENV` | No | development | Dev vs prod behavior |
-| `SESSION_STORE_PATH` | No | .sessions | File-based session directory |
+| `SESSION_STORE_PATH` | No | .sessions | File-based session directory (dev only) |
 | `ALLOWED_GITHUB_USERS` | No | — | Comma-separated GitHub usernames allowed to log in |
-| `TOKEN_MAX_AGE_MS` | No | 86400000 (24h) | Force re-auth after this many ms |
+| `TOKEN_MAX_AGE_MS` | No | 604800000 (7d) | Force re-auth after this many ms |
 
 ## Build & Run
 
@@ -115,7 +121,7 @@ npm run lint                     # tsc --noEmit
 
 ## Deployment
 
-- **Azure**: `azd up` provisions ACR + Container Apps + Key Vault + Managed Identity + monitoring
+- **Azure**: `azd up` provisions ACR + Container Apps + Managed Identity + monitoring. Secrets stored natively in Container Apps. CORS, IP restrictions, and allowed users are configurable via Bicep params (`ipRestrictions`, `allowedGithubUsers`).
 - **CI**: GitHub Actions — ci.yml (lint + build on every push), deploy.yml (Docker build → ACR → Container Apps on push to main)
 - **Docker**: Node 24 multi-stage build, installs `@github/copilot` CLI globally, drops to `node` user
 
@@ -123,6 +129,8 @@ npm run lint                     # tsc --noEmit
 
 - The Copilot SDK spawns a CLI subprocess per connection — each `CopilotClient` must be `.stop()`'d on disconnect
 - WebSocket connections share Express session middleware for auth validation
+- WebSocket connections validate the GitHub token against GitHub's API on connect (catches revoked tokens)
 - Model defaults to `gpt-4.1` if not specified
 - The `approveAll` permission handler matches desktop CLI behavior (SDK built-in tools are auto-approved)
+- `excludedTools` and `availableTools` are supported in `SessionConfig` for tool filtering
 - `.nvmrc` says 22 but Dockerfile uses node:24-slim (SDK's `@github/copilot` CLI needs `node:sqlite` from Node 24)

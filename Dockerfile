@@ -25,13 +25,11 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOME=/home/node
 
-# Install GitHub Copilot CLI standalone (interactive agent mode)
+# Install Copilot CLI standalone (interactive agent mode)
 # See: https://github.com/github/copilot-cli
 RUN npm install -g @github/copilot
 
 RUN mkdir -p /home/node && chown node:node /home/node
-
-COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
 EXPOSE 3000
 
@@ -40,5 +38,4 @@ USER node
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "dist/index.js"]

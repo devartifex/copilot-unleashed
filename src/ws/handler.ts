@@ -4,6 +4,7 @@ import { createCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
+import { validateGitHubToken } from '../auth/github.js';
 
 type SessionMiddleware = (req: any, res: any, next: () => void) => void;
 
@@ -139,6 +140,15 @@ export function setupWebSocket(
     if (authTime && Date.now() - authTime > config.tokenMaxAge) {
       logSecurity('info', 'ws_token_expired', { user: session.githubUser?.login });
       ws.close(4001, 'Session expired');
+      return;
+    }
+
+    // Validate token is still valid with GitHub (catches revoked tokens)
+    const tokenUser = await validateGitHubToken(session.githubToken);
+    if (!tokenUser) {
+      logSecurity('warn', 'ws_token_revoked', { user: session.githubUser?.login });
+      session.destroy(() => {});
+      ws.close(4001, 'Token revoked');
       return;
     }
 

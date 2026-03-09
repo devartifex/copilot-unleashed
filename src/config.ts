@@ -20,6 +20,7 @@ export const config = {
   allowedUsers: process.env.ALLOWED_GITHUB_USERS
     ? process.env.ALLOWED_GITHUB_USERS.split(',').map((u) => u.trim().toLowerCase())
     : [],
-  // Token freshness: force re-auth after this many ms (default: 24 hours)
-  tokenMaxAge: parseInt(process.env.TOKEN_MAX_AGE_MS || String(24 * 60 * 60 * 1000)),
+  // Token freshness: force re-auth after this many ms (default: 7 days)
+  // 7 days balances UX (fewer re-auths) with security (token rotation)
+  tokenMaxAge: parseInt(process.env.TOKEN_MAX_AGE_MS || String(7 * 24 * 60 * 60 * 1000)),
 };

@@ -28,6 +28,12 @@ param minReplicas int = 1
 @description('Maximum replicas')
 param maxReplicas int = 3
 
+@description('Comma-separated IP ranges to allow access (CIDR notation, empty = allow all)')
+param ipRestrictions string = ''
+
+@description('Comma-separated GitHub usernames allowed to log in (empty = allow all)')
+param allowedGithubUsers string = ''
+
 var abbrs = loadJsonContent('./abbreviations.json')
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 var tags = { 'azd-env-name': environmentName }
@@ -59,19 +65,6 @@ module managedIdentity './modules/managed-identity.bicep' = {
   }
 }
 
-module keyVault './modules/key-vault.bicep' = {
-  name: 'key-vault'
-  scope: rg
-  params: {
-    name: '${abbrs.keyVault}${resourceToken}'
-    location: location
-    tags: tags
-    managedIdentityPrincipalId: managedIdentity.outputs.principalId
-    githubClientId: githubClientId
-    sessionSecret: sessionSecret
-  }
-}
-
 module monitoring './modules/monitoring.bicep' = {
   name: 'monitoring'
   scope: rg
@@ -93,12 +86,14 @@ module containerApps './modules/container-apps.bicep' = {
     environmentName: '${abbrs.containerAppsEnvironment}${resourceToken}'
     image: empty(containerAppImage) ? 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest' : containerAppImage
     managedIdentityId: managedIdentity.outputs.id
-    managedIdentityClientId: managedIdentity.outputs.clientId
-    keyVaultUri: keyVault.outputs.uri
+    githubClientId: githubClientId
+    sessionSecret: sessionSecret
+    allowedGithubUsers: allowedGithubUsers
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     minReplicas: minReplicas
     maxReplicas: maxReplicas
+    ipRestrictions: ipRestrictions
   }
 }
 
@@ -107,4 +102,3 @@ output AZURE_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
 output AZURE_CONTAINER_APP_FQDN string = containerApps.outputs.fqdn
 output AZURE_RESOURCE_GROUP string = rg.name
 output AZURE_MANAGED_IDENTITY_CLIENT_ID string = managedIdentity.outputs.clientId
-output AZURE_KEY_VAULT_NAME string = keyVault.outputs.name

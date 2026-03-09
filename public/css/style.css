@@ -1,6 +1,6 @@
 /* ============================================================
-   GitHub Copilot CLI Mobile — Mobile-First Design System
-   Inspired by the official GitHub Copilot CLI terminal UI
+   Copilot CLI Mobile — Mobile-First Design System
+   Inspired by the official Copilot CLI terminal UI
    ============================================================ */
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -333,7 +333,6 @@ html, body {
 .copilot-icon {
   width: 64px;
   height: 64px;
-  color: var(--purple);
   filter: drop-shadow(0 0 18px rgba(210, 168, 255, 0.25));
 }
 

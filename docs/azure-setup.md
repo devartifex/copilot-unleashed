@@ -54,6 +54,9 @@ Fill in the two required values:
 ```env
 GITHUB_CLIENT_ID=<from step 1>
 SESSION_SECRET=<run: openssl rand -hex 32>
+
+# Optional: restrict to specific GitHub users
+# ALLOWED_GITHUB_USERS=user1,user2
 ```
 
 That's it — no client secret, no Azure AD credentials, no redirect URIs.
@@ -90,6 +93,12 @@ azd auth login
 # Set secrets in azd environment
 azd env set GITHUB_CLIENT_ID <your-github-client-id>
 
+# Optional: restrict to specific GitHub users
+azd env set allowedGithubUsers "your-username,teammate"
+
+# Optional: restrict to specific IP ranges (CIDR notation)
+azd env set ipRestrictions "203.0.113.0/24"
+
 # Provision Azure resources + build Docker image + deploy
 azd up
 ```
@@ -99,12 +108,12 @@ azd up
 | Resource | Purpose |
 |----------|---------|
 | **Container Registry** | Docker image storage |
-| **Container App** | Serverless container runtime (port 3000, auto-TLS) |
-| **Key Vault** | Stores `GITHUB_CLIENT_ID` and `SESSION_SECRET` (auto-generated) |
+| **Container App** | Serverless container runtime (port 3000, auto-TLS, CORS policy) |
+| **Key Vault** | Stores `GITHUB_CLIENT_ID`, `SESSION_SECRET` (auto-generated), and `ALLOWED_GITHUB_USERS` (if set) |
 | **Managed Identity** | RBAC for ACR pull + Key Vault read (no stored credentials) |
 | **Log Analytics + Application Insights** | Monitoring and diagnostics |
 
-All secrets are stored in Key Vault and referenced by the Container App via managed identity — no plaintext secrets in the app configuration.
+All secrets are stored in Key Vault and referenced by the Container App via managed identity — no plaintext secrets in the app configuration. The CORS policy restricts cross-origin requests to the app's own domain, and optional IP restrictions can be set via the `ipRestrictions` Bicep parameter.
 
 ### Subsequent Deploys
 

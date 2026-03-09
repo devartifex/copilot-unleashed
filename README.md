@@ -114,6 +114,12 @@ Create a `.env` file:
 ```env
 GITHUB_CLIENT_ID=<your-client-id>
 SESSION_SECRET=<run: openssl rand -hex 32>
+
+# Optional: restrict access to specific GitHub users (comma-separated)
+# ALLOWED_GITHUB_USERS=user1,user2,user3
+
+# Optional: token freshness lifetime in ms (default: 24 hours)
+# TOKEN_MAX_AGE_MS=86400000
 ```
 
 ### 3. Run With Docker

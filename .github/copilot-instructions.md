@@ -92,9 +92,11 @@ public/
 | `GITHUB_CLIENT_ID` | Yes | — | GitHub OAuth App client ID |
 | `SESSION_SECRET` | Yes | — | Session cookie encryption |
 | `PORT` | No | 3000 | HTTP server port |
-| `BASE_URL` | No | http://localhost:3000 | Cookie domain |
+| `BASE_URL` | No | http://localhost:3000 | Cookie domain + WebSocket origin validation |
 | `NODE_ENV` | No | development | Dev vs prod behavior |
 | `SESSION_STORE_PATH` | No | .sessions | File-based session directory |
+| `ALLOWED_GITHUB_USERS` | No | — | Comma-separated GitHub usernames allowed to log in |
+| `TOKEN_MAX_AGE_MS` | No | 86400000 (24h) | Force re-auth after this many ms |
 
 ## Build & Run
 

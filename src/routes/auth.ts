@@ -4,6 +4,8 @@ import {
   pollForToken,
   validateGitHubToken,
 } from '../auth/github.js';
+import { config } from '../config.js';
+import { logSecurity } from '../security-log.js';
 
 const router = Router();
 
@@ -65,6 +67,21 @@ router.post('/github/device/poll', async (req, res) => {
     const user = await validateGitHubToken(result.token);
     if (!user) throw new Error('Could not validate GitHub token');
 
+    // Check allowed users list (if configured)
+    if (
+      config.allowedUsers.length > 0 &&
+      !config.allowedUsers.includes(user.login.toLowerCase())
+    ) {
+      logSecurity('warn', 'auth_denied_not_allowed', {
+        user: user.login,
+        ip: req.ip,
+      });
+      return res.status(403).json({
+        status: 'forbidden',
+        error: 'Your GitHub account is not authorized to use this application.',
+      });
+    }
+
     // Regenerate session to prevent session fixation, then save before responding
     const token = result.token;
     await new Promise<void>((resolve, reject) =>
@@ -72,10 +89,12 @@ router.post('/github/device/poll', async (req, res) => {
     );
     req.session.githubToken = token;
     req.session.githubUser = user;
+    req.session.githubAuthTime = Date.now();
     await new Promise<void>((resolve, reject) =>
       req.session.save((err) => (err ? reject(err) : resolve()))
     );
 
+    logSecurity('info', 'auth_success', { user: user.login });
     res.json({ status: 'authorized', githubUser: user.login });
   } catch (err) {
     console.error('GitHub device flow poll error:', err);
@@ -90,8 +109,19 @@ router.get('/logout', (req, res) => {
   });
 });
 
-// Auth status
+// Auth status — also validates token freshness
 router.get('/status', (req, res) => {
+  if (req.session?.githubToken) {
+    const authTime = req.session.githubAuthTime;
+    if (authTime && Date.now() - authTime > config.tokenMaxAge) {
+      logSecurity('info', 'status_check_expired', {
+        user: req.session.githubUser?.login,
+      });
+      req.session.destroy(() => {});
+      return res.json({ authenticated: false, githubUser: null });
+    }
+  }
+
   res.json({
     authenticated: !!req.session?.githubToken,
     githubUser: req.session?.githubUser?.login || null,

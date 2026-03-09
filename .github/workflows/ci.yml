@@ -19,6 +19,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Security audit
+        run: npm audit --audit-level=high
+
       - name: Type check
         run: npm run lint
 

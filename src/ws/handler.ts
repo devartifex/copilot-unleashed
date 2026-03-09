@@ -2,6 +2,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
 import { createCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
+import { config } from '../config.js';
+import { logSecurity } from '../security-log.js';
 
 type SessionMiddleware = (req: any, res: any, next: () => void) => void;
 
@@ -22,6 +24,17 @@ export function setupWebSocket(
   const wss = new WebSocketServer({ server, path: '/ws' });
 
   wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
+    // Validate WebSocket origin
+    const origin = req.headers.origin;
+    if (origin && !config.isDev) {
+      const baseOrigin = new URL(config.baseUrl).origin;
+      if (origin !== baseOrigin) {
+        logSecurity('warn', 'ws_forbidden_origin', { origin, expected: baseOrigin });
+        ws.close(1008, 'Forbidden origin');
+        return;
+      }
+    }
+
     // Extract Express session from the upgrade request
     await new Promise<void>((resolve) => {
       sessionMiddleware(req, {} as any, resolve);
@@ -29,7 +42,16 @@ export function setupWebSocket(
 
     const session = (req as any).session;
     if (!session?.githubToken) {
+      logSecurity('warn', 'ws_unauthorized', { ip: req.socket.remoteAddress });
       ws.close(4001, 'Unauthorized');
+      return;
+    }
+
+    // Token freshness check for WebSocket connections
+    const authTime = session.githubAuthTime;
+    if (authTime && Date.now() - authTime > config.tokenMaxAge) {
+      logSecurity('info', 'ws_token_expired', { user: session.githubUser?.login });
+      ws.close(4001, 'Session expired');
       return;
     }
 

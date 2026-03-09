@@ -25,6 +25,7 @@ app.use(
         connectSrc: ["'self'", 'ws:', 'wss:'],
         imgSrc: ["'self'", 'data:', 'https://avatars.githubusercontent.com'],
         fontSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+        frameAncestors: ["'none'"],
       },
     },
   })

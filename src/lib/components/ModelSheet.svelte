@@ -21,11 +21,11 @@
     onClose,
   }: Props = $props();
 
-  const reasoningLevels: { value: ReasoningEffort; label: string; desc: string }[] = [
-    { value: 'low', label: 'Low', desc: 'Faster' },
-    { value: 'medium', label: 'Med', desc: 'Balanced' },
-    { value: 'high', label: 'High', desc: 'Thorough' },
-    { value: 'xhigh', label: 'Max', desc: 'Deepest' },
+  const reasoningLevels: { value: ReasoningEffort; label: string; desc: string; color: string }[] = [
+    { value: 'low',    label: 'Low',  desc: 'Faster',   color: 'var(--blue)' },
+    { value: 'medium', label: 'Med',  desc: 'Balanced', color: 'var(--yellow)' },
+    { value: 'high',   label: 'High', desc: 'Thorough', color: 'var(--orange)' },
+    { value: 'xhigh',  label: 'Max',  desc: 'Deepest',  color: 'var(--red)' },
   ];
 
   const selectedModelInfo = $derived(models.get(currentModel));
@@ -76,6 +76,7 @@
                 class="reasoning-opt"
                 class:active={supportsReasoning && reasoningEffort === level.value}
                 disabled={!supportsReasoning}
+                style="--level-color: {level.color}"
                 onclick={() => onSetReasoning(level.value)}
               >
                 <span class="reasoning-opt-label">{level.label}</span>
@@ -296,13 +297,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 1px;
     -webkit-tap-highlight-color: transparent;
   }
 
   .reasoning-opt.active {
-    background: rgba(240, 136, 62, 0.18);
-    color: var(--orange);
+    background: color-mix(in srgb, var(--level-color) 18%, transparent);
+    color: var(--level-color);
   }
 
   .reasoning-opt:active {

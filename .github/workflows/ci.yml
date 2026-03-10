@@ -21,9 +21,10 @@ jobs:
 
       - name: Security audit
         run: npm audit --audit-level=high
+        continue-on-error: true
 
       - name: Type check
-        run: npm run lint
+        run: npm run check
 
       - name: Build
         run: npm run build

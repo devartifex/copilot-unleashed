@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ConnectionState, SessionMode } from '$lib/types/index.js';
+  import type { ConnectionState, SessionMode, FileAttachment } from '$lib/types/index.js';
 
   interface Props {
     connectionState: ConnectionState;
@@ -7,13 +7,19 @@
     isStreaming: boolean;
     mode: SessionMode;
     currentModel: string;
-    onSend: (content: string) => void;
+    onSend: (content: string, attachments?: Array<{ path: string; name: string; type: string }>) => void;
     onAbort: () => void;
     onToggleSidebar: () => void;
   }
 
   const MAX_LENGTH = 10_000;
   const MAX_TEXTAREA_HEIGHT = 120;
+  const MAX_FILES = 5;
+  const ACCEPTED_EXTENSIONS = [
+    '.jpg', '.jpeg', '.png', '.gif', '.webp',
+    '.ts', '.js', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.cs', '.rb', '.php',
+    '.md', '.txt', '.json', '.yaml', '.yml', '.xml', '.html', '.css', '.csv', '.sql',
+  ];
 
   const {
     connectionState,
@@ -28,9 +34,12 @@
 
   let inputValue = $state('');
   let textareaEl: HTMLTextAreaElement | undefined = $state();
+  let fileInputEl: HTMLInputElement | undefined = $state();
+  let selectedFiles = $state<File[]>([]);
+  let isUploading = $state(false);
 
   const isDisabled = $derived(
-    connectionState !== 'connected' || isStreaming || !sessionReady,
+    connectionState !== 'connected' || isStreaming || !sessionReady || isUploading,
   );
 
   const statusClass = $derived.by(() => {
@@ -40,6 +49,7 @@
   });
 
   const statusText = $derived.by(() => {
+    if (isUploading) return 'Uploading…';
     switch (connectionState) {
       case 'connecting':
         return 'Connecting…';
@@ -74,11 +84,69 @@
     }
   }
 
-  function send() {
+  function handleFileSelect() {
+    fileInputEl?.click();
+  }
+
+  function handleFilesChanged(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files) return;
+
+    const newFiles = Array.from(input.files);
+    const combined = [...selectedFiles, ...newFiles].slice(0, MAX_FILES);
+    selectedFiles = combined;
+
+    // Reset input so same file can be re-selected
+    input.value = '';
+  }
+
+  function removeFile(index: number) {
+    selectedFiles = selectedFiles.filter((_, i) => i !== index);
+  }
+
+  async function uploadFiles(files: File[]): Promise<FileAttachment[]> {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('files', file);
+    }
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(body.message ?? 'Upload failed');
+    }
+
+    const data = await response.json();
+    return data.files as FileAttachment[];
+  }
+
+  async function send() {
     const trimmed = inputValue.trim();
-    if (!trimmed || isDisabled) return;
-    onSend(trimmed);
+    if ((!trimmed && selectedFiles.length === 0) || isDisabled) return;
+
+    let attachments: Array<{ path: string; name: string; type: string }> | undefined;
+
+    if (selectedFiles.length > 0) {
+      isUploading = true;
+      try {
+        const uploaded = await uploadFiles(selectedFiles);
+        attachments = uploaded.map((f) => ({ path: f.path, name: f.name, type: f.type }));
+      } catch (err) {
+        console.error('Upload failed:', err);
+        isUploading = false;
+        return;
+      }
+      isUploading = false;
+    }
+
+    const content = trimmed || 'See attached files';
+    onSend(content, attachments);
     inputValue = '';
+    selectedFiles = [];
     if (textareaEl) {
       textareaEl.style.height = 'auto';
     }
@@ -89,6 +157,12 @@
       inputValue = inputValue.slice(0, MAX_LENGTH);
     }
     autoResize();
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
   }
 
   // Auto-resize when inputValue changes externally
@@ -118,6 +192,18 @@
 
 <div class="input-area">
   <div class="input-container">
+    {#if selectedFiles.length > 0}
+      <div class="file-preview-row">
+        {#each selectedFiles as file, i (file.name + i)}
+          <div class="file-chip">
+            <span class="file-chip-name">{file.name}</span>
+            <span class="file-chip-size">{formatFileSize(file.size)}</span>
+            <button class="file-chip-remove" onclick={() => removeFile(i)} aria-label="Remove {file.name}">×</button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
     <div class="prompt-line">
       <span class="term-prompt {statusClass}" data-mode={mode}>❯</span>
       <textarea
@@ -139,6 +225,22 @@
         {#if isStreaming}
           <button class="action-btn stop-btn" onclick={onAbort}>■ Stop</button>
         {/if}
+        <input
+          bind:this={fileInputEl}
+          type="file"
+          multiple
+          accept={ACCEPTED_EXTENSIONS.join(',')}
+          onchange={handleFilesChanged}
+          class="file-input-hidden"
+          aria-hidden="true"
+          tabindex={-1}
+        />
+        <button
+          class="action-btn attach-btn"
+          onclick={handleFileSelect}
+          disabled={isDisabled || selectedFiles.length >= MAX_FILES}
+          aria-label="Attach files"
+        >📎</button>
         <span class="model-label">{currentModel}</span>
         <button class="sidebar-toggle-btn" onclick={onToggleSidebar}>☰</button>
       </div>
@@ -328,5 +430,79 @@
   .action-btn.stop-btn:active {
     background: var(--red);
     color: var(--bg);
+  }
+
+  .file-input-hidden {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .attach-btn {
+    font-size: 1em;
+    min-height: 26px;
+    padding: var(--sp-1) var(--sp-2);
+  }
+
+  .attach-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .file-preview-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+    padding: var(--sp-2) 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .file-preview-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .file-chip {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    background: var(--border);
+    border-radius: var(--radius-sm);
+    padding: 2px var(--sp-2);
+    font-size: 0.78em;
+    font-family: var(--font-mono);
+    color: var(--fg-dim);
+    max-width: 180px;
+  }
+
+  .file-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .file-chip-size {
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .file-chip-remove {
+    background: none;
+    border: none;
+    color: var(--fg-muted);
+    font-size: 1.1em;
+    padding: 0 2px;
+    cursor: pointer;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .file-chip-remove:active {
+    color: var(--red);
   }
 </style>

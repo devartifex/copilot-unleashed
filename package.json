@@ -1,7 +1,7 @@
 {
-  "name": "copilot-cli-mobile",
+  "name": "copilot-hub",
   "version": "2.0.0",
-  "description": "Copilot CLI Mobile \u2014 GitHub OAuth + Copilot SDK",
+  "description": "Copilot Hub — Self-hosted multi-model AI chat powered by the GitHub Copilot SDK",
   "main": "build/index.js",
   "scripts": {
     "build:server": "tsc -p tsconfig.node.json",
@@ -19,10 +19,12 @@
   },
   "keywords": [
     "copilot",
-    "cli",
-    "mobile",
     "github",
-    "oauth"
+    "ai-chat",
+    "multi-model",
+    "sveltekit",
+    "self-hosted",
+    "copilot-sdk"
   ],
   "license": "MIT",
   "type": "module",

@@ -11,3 +11,4 @@ Thumbs.db
 test-results/
 playwright-report/
 .azure/
+public/

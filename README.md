@@ -1,6 +1,6 @@
-# Copilot CLI Mobile
+# Copilot Hub
 
-> **GitHub Copilot CLI — from your phone.** Self-hosted, real-time, powered by the official [Copilot SDK](https://github.com/github/copilot-sdk).
+> **Your AI chat, your server, all models.** Self-hosted multi-model AI chat powered by the official [GitHub Copilot SDK](https://github.com/github/copilot-sdk).
 
 <p align="center">
   <img src="https://img.shields.io/badge/SvelteKit-5-FF3E00?logo=svelte&logoColor=white" alt="SvelteKit 5">
@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License">
 </p>
 
-The same Copilot CLI you use in your terminal — accessible from any browser. Authenticate with GitHub, pick a model, chat. Full parity with the desktop CLI: built-in tools for the GitHub API, file access, and shell.
+A modern, self-hosted alternative to ChatGPT, Claude, and Gemini — access **all Copilot models** (GPT-4.1, o-series, Claude, Gemini) through a single interface. Built-in GitHub MCP tools, file attachments, extended thinking, session management, and more. Two env vars to deploy.
 
 > **Disclaimer:** This is an independent, community-driven project — not an official GitHub product. Use at your own risk.
 
@@ -338,7 +338,7 @@ Create a service principal:
 
 ```bash
 az ad sp create-for-rbac \
-  --name "copilot-cli-mobile-cicd" \
+  --name "copilot-hub-cicd" \
   --role contributor \
   --scopes /subscriptions/<sub-id>/resourceGroups/<rg> \
   --sdk-auth

@@ -1,8 +1,8 @@
-# Copilot CLI Mobile — Project Instructions
+# Copilot Hub — Project Instructions
 
 ## Project Overview
 
-Self-hosted web app that brings GitHub Copilot CLI to mobile browsers via the official `@github/copilot-sdk`. Users authenticate with GitHub Device Flow, pick a model, and chat over WebSocket with real-time token streaming. Full parity with the desktop Copilot CLI (including built-in tools for GitHub API, file access, and shell).
+Self-hosted multi-model AI chat platform powered by the official `@github/copilot-sdk`. A modern alternative to ChatGPT, Claude, and Gemini — with access to all Copilot models (GPT-4.1, o-series, Claude, Gemini) through a single interface. Users authenticate with GitHub Device Flow, pick a model, and chat over WebSocket with real-time token streaming.
 
 > See [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) for full architecture details, data flow diagrams, and component inventory.
 

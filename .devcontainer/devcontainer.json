@@ -1,23 +1,16 @@
 {
-  "name": "Copilot CLI Mobile",
+  "name": "Copilot Hub",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
-
-  // Install dependencies + Copilot CLI once at Codespace creation
   "postCreateCommand": "npm install && npm install -g @github/copilot",
-
-  // On every Codespace start: write .env with the correct BASE_URL and start the server
   "postStartCommand": "bash .devcontainer/startup.sh",
-
   "forwardPorts": [3000],
   "portsAttributes": {
     "3000": {
-      "label": "Copilot CLI Mobile",
+      "label": "Copilot Hub",
       "onAutoForward": "openBrowserOnce",
       "visibility": "public"
     }
   },
-
-  // Declare which Codespace secrets are needed — set them at github.com/settings/codespaces
   "customizations": {
     "codespaces": {
       "secrets": [
@@ -29,7 +22,11 @@
       ]
     },
     "vscode": {
-      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+      "extensions": [
+        "svelte.svelte-vscode",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
     }
   }
 }

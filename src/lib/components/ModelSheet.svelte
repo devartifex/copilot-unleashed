@@ -41,7 +41,12 @@
 
   function selectModel(id: string) {
     onSetModel(id);
-    if (!models.get(id)?.capabilities?.supports?.reasoningEffort) {
+    const info = models.get(id);
+    if (info?.capabilities?.supports?.reasoningEffort) {
+      if (info.defaultReasoningEffort) {
+        onSetReasoning(info.defaultReasoningEffort);
+      }
+    } else {
       onClose();
     }
   }
@@ -63,6 +68,22 @@
       </div>
 
       <div class="sheet-body">
+        <div class="reasoning-section" class:disabled={!supportsReasoning}>
+          <span class="reasoning-label">Reasoning Effort</span>
+          <div class="reasoning-toggle">
+            {#each reasoningLevels as level (level.value)}
+              <button
+                class="reasoning-opt"
+                class:active={supportsReasoning && reasoningEffort === level.value}
+                disabled={!supportsReasoning}
+                onclick={() => onSetReasoning(level.value)}
+              >
+                <span class="reasoning-opt-label">{level.label}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+
         <div class="model-list">
           {#each [...models.values()] as info (info.id)}
             <button
@@ -85,23 +106,6 @@
             </button>
           {/each}
         </div>
-
-        {#if supportsReasoning}
-          <div class="reasoning-section">
-            <span class="reasoning-label">Reasoning Effort</span>
-            <div class="reasoning-toggle">
-              {#each reasoningLevels as level (level.value)}
-                <button
-                  class="reasoning-opt"
-                  class:active={reasoningEffort === level.value}
-                  onclick={() => onSetReasoning(level.value)}
-                >
-                  <span class="reasoning-opt-label">{level.label}</span>
-                </button>
-              {/each}
-            </div>
-          </div>
-        {/if}
       </div>
     </div>
   </div>
@@ -246,12 +250,17 @@
 
   /* ── Reasoning section ─────────────────────────────────────────── */
   .reasoning-section {
-    margin-top: var(--sp-3);
-    padding-top: var(--sp-3);
-    border-top: 1px solid var(--border);
+    margin-bottom: var(--sp-3);
+    padding-bottom: var(--sp-3);
+    border-bottom: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+  }
+
+  .reasoning-section.disabled {
+    opacity: 0.4;
+    pointer-events: none;
   }
 
   .reasoning-label {

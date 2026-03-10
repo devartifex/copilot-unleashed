@@ -238,7 +238,7 @@
       open={modelSheetOpen}
       models={chatStore.models}
       currentModel={chatStore.currentModel}
-      reasoningEffort={chatStore.reasoningEffort}
+      reasoningEffort={chatStore.reasoningEffort ?? settings.reasoningEffort}
       onSetModel={handleSetModel}
       onSetReasoning={handleSetReasoning}
       onClose={() => modelSheetOpen = false}

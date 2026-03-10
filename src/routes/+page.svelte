@@ -6,6 +6,7 @@
   import EnvInfo from '$lib/components/EnvInfo.svelte';
   import PlanPanel from '$lib/components/PlanPanel.svelte';
   import UserInputPrompt from '$lib/components/UserInputPrompt.svelte';
+  import PermissionPrompt from '$lib/components/PermissionPrompt.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import SettingsModal from '$lib/components/SettingsModal.svelte';
   import SessionsSheet from '$lib/components/SessionsSheet.svelte';
@@ -78,12 +79,13 @@
       ...(isReasoning && { reasoningEffort: settings.reasoningEffort }),
       ...(settings.customInstructions.trim() && { customInstructions: settings.customInstructions.trim() }),
       ...(settings.excludedTools.length > 0 && { excludedTools: settings.excludedTools }),
+      ...(settings.customTools.length > 0 && { customTools: settings.customTools }),
     });
   }
 
-  function handleSend(content: string): void {
+  function handleSend(content: string, attachments?: Array<{ path: string; name: string; type: string }>): void {
     chatStore.addUserMessage(content);
-    wsStore.sendMessage(content);
+    wsStore.sendMessage(content, attachments);
   }
 
   function handleNewChat(): void {
@@ -136,6 +138,12 @@
   function handleUserInputResponse(answer: string, wasFreeform: boolean): void {
     wsStore.respondToUserInput(answer, wasFreeform);
   }
+
+  function handlePermissionResponse(requestId: string, decision: 'allow' | 'deny' | 'always_allow'): void {
+    const toolName = chatStore.pendingPermission?.toolName ?? '';
+    wsStore.respondToPermission(requestId, toolName, decision);
+    chatStore.clearPendingPermission();
+  }
 </script>
 
 {#if data.authenticated}
@@ -169,6 +177,15 @@
           choices={chatStore.pendingUserInput.choices}
           allowFreeform={chatStore.pendingUserInput.allowFreeform}
           onRespond={handleUserInputResponse}
+        />
+      {/if}
+
+      {#if chatStore.pendingPermission}
+        <PermissionPrompt
+          requestId={chatStore.pendingPermission.requestId}
+          toolName={chatStore.pendingPermission.toolName}
+          toolArgs={chatStore.pendingPermission.toolArgs}
+          onRespond={handlePermissionResponse}
         />
       {/if}
 
@@ -209,6 +226,7 @@
       quotaSnapshots={chatStore.quotaSnapshots}
       customInstructions={settings.customInstructions}
       excludedTools={settings.excludedTools}
+      customTools={settings.customTools}
       onClose={() => settingsOpen = false}
       onSaveInstructions={(v) => { settings.customInstructions = v; }}
       onToggleTool={(name, enabled) => {
@@ -218,6 +236,7 @@
           settings.excludedTools = [...settings.excludedTools, name];
         }
       }}
+      onSaveCustomTools={(tools) => { settings.customTools = tools; }}
       onSelectAgent={(name) => wsStore.selectAgent(name)}
       onDeselectAgent={() => wsStore.deselectAgent()}
       onCompact={() => wsStore.compact()}

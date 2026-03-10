@@ -20,7 +20,7 @@ export interface WsStore {
   onMessage(handler: (msg: ServerMessage) => void): () => void;
 
   // Typed send helpers
-  sendMessage(content: string): void;
+  sendMessage(content: string, attachments?: Array<{ path: string; name: string; type: string }>): void;
   newSession(config: NewSessionConfig): void;
   resumeSession(sessionId: string): void;
   setMode(mode: SessionMode): void;
@@ -40,6 +40,7 @@ export interface WsStore {
   updatePlan(content: string): void;
   deletePlan(): void;
   respondToUserInput(answer: string, wasFreeform: boolean): void;
+  respondToPermission(requestId: string, toolName: string, decision: 'allow' | 'deny' | 'always_allow' | 'always_deny'): void;
 }
 
 export function createWsStore(): WsStore {
@@ -179,8 +180,8 @@ export function createWsStore(): WsStore {
 
   // ── Typed send functions ────────────────────────────────────────────────
 
-  function sendMessage(content: string): void {
-    send({ type: 'message', content });
+  function sendMessage(content: string, attachments?: Array<{ path: string; name: string; type: string }>): void {
+    send({ type: 'message', content, ...(attachments?.length ? { attachments } : {}) });
   }
 
   function newSession(config: NewSessionConfig): void {
@@ -191,6 +192,7 @@ export function createWsStore(): WsStore {
       ...(config.reasoningEffort && { reasoningEffort: config.reasoningEffort }),
       ...(config.customInstructions?.trim() && { customInstructions: config.customInstructions.trim() }),
       ...(config.excludedTools?.length && { excludedTools: config.excludedTools }),
+      ...(config.customTools?.length && { customTools: config.customTools }),
     };
     send(msg);
   }
@@ -271,6 +273,10 @@ export function createWsStore(): WsStore {
     send({ type: 'user_input_response', answer, wasFreeform });
   }
 
+  function respondToPermission(requestId: string, toolName: string, decision: 'allow' | 'deny' | 'always_allow' | 'always_deny'): void {
+    send({ type: 'permission_response', requestId, toolName, decision });
+  }
+
   // ── Return public interface ─────────────────────────────────────────────
 
   return {
@@ -301,5 +307,6 @@ export function createWsStore(): WsStore {
     updatePlan,
     deletePlan,
     respondToUserInput,
+    respondToPermission,
   };
 }

@@ -26,6 +26,17 @@ export interface ModelInfo {
   supportedReasoningEfforts?: string[];
 }
 
+// ─── Custom tool definitions ────────────────────────────────────────────────
+
+export interface CustomToolDefinition {
+  name: string;
+  description: string;
+  webhookUrl: string;
+  method: 'GET' | 'POST';
+  headers: Record<string, string>;
+  parameters: Record<string, { type: string; description: string }>;
+}
+
 // ─── Tool / Agent types ─────────────────────────────────────────────────────
 
 export interface ToolInfo {
@@ -188,6 +199,13 @@ export interface UserInputRequestMessage {
   question: string;
   choices?: string[];
   allowFreeform: boolean;
+}
+
+export interface PermissionRequestMessage {
+  type: 'permission_request';
+  requestId: string;
+  toolName: string;
+  toolArgs: Record<string, unknown>;
 }
 
 export interface ToolsMessage {
@@ -356,6 +374,7 @@ export type ServerMessage =
   | ErrorMessage
   | AbortedMessage
   | UserInputRequestMessage
+  | PermissionRequestMessage
   | ToolsMessage
   | AgentsMessage
   | AgentChangedMessage
@@ -384,6 +403,15 @@ export type ServerMessage =
   | ContextInfoMessage
   | ReasoningChangedMessage;
 
+// ─── File attachment ─────────────────────────────────────────────────────────
+
+export interface FileAttachment {
+  path: string;
+  name: string;
+  size: number;
+  type: string;
+}
+
 // ─── Outgoing client messages (discriminated union on `type`) ────────────────
 
 export interface NewSessionMessage {
@@ -392,11 +420,13 @@ export interface NewSessionMessage {
   reasoningEffort?: ReasoningEffort;
   customInstructions?: string;
   excludedTools?: string[];
+  customTools?: CustomToolDefinition[];
 }
 
 export interface SendMessage {
   type: 'message';
   content: string;
+  attachments?: Array<{ path: string; name: string; type: string }>;
 }
 
 export interface ListModelsMessage {
@@ -426,6 +456,13 @@ export interface UserInputResponseMessage {
   type: 'user_input_response';
   answer: string;
   wasFreeform: boolean;
+}
+
+export interface PermissionResponseMessage {
+  type: 'permission_response';
+  requestId: string;
+  toolName: string;
+  decision: 'allow' | 'deny' | 'always_allow' | 'always_deny';
 }
 
 export interface ListToolsMessage {
@@ -490,6 +527,7 @@ export type ClientMessage =
   | SetModelMessage
   | SetReasoningMessage
   | UserInputResponseMessage
+  | PermissionResponseMessage
   | ListToolsMessage
   | ListAgentsMessage
   | SelectAgentMessage
@@ -557,6 +595,14 @@ export interface UserInputState {
   allowFreeform: boolean;
 }
 
+// ─── Permission request state ───────────────────────────────────────────────
+
+export interface PermissionRequestState {
+  requestId: string;
+  toolName: string;
+  toolArgs: Record<string, unknown>;
+}
+
 // ─── Context info state ─────────────────────────────────────────────────────
 
 export interface ContextInfo {
@@ -580,6 +626,7 @@ export interface NewSessionConfig {
   reasoningEffort?: ReasoningEffort;
   customInstructions?: string;
   excludedTools?: string[];
+  customTools?: CustomToolDefinition[];
 }
 
 // ─── Settings (persisted to localStorage) ───────────────────────────────────
@@ -590,4 +637,5 @@ export interface PersistedSettings {
   reasoningEffort: ReasoningEffort;
   customInstructions: string;
   excludedTools: string[];
+  customTools: CustomToolDefinition[];
 }

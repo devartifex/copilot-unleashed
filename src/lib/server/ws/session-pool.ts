@@ -10,6 +10,8 @@ export interface PoolEntry {
   messageBuffer: Record<string, unknown>[];
   ttlTimer: NodeJS.Timeout | null;
   userInputResolve: ((response: { answer: string; wasFreeform: boolean }) => void) | null;
+  permissionResolve: ((decision: string) => void) | null;
+  permissionPreferences: Map<string, 'allow' | 'deny'>;
   isProcessing: boolean;
 }
 
@@ -23,6 +25,8 @@ export function createPoolEntry(client: CopilotClient, ws: WebSocket): PoolEntry
     messageBuffer: [],
     ttlTimer: null,
     userInputResolve: null,
+    permissionResolve: null,
+    permissionPreferences: new Map(),
     isProcessing: false,
   };
 }
@@ -37,6 +41,8 @@ export async function destroyPoolEntry(entry: PoolEntry): Promise<void> {
     entry.session = null;
   }
   entry.userInputResolve = null;
+  entry.permissionResolve = null;
+  entry.permissionPreferences.clear();
   try { await entry.client.stop(); } catch { /* ignore */ }
 }
 

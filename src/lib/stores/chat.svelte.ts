@@ -10,6 +10,7 @@ import type {
   AgentInfo,
   SessionSummary,
   UserInputState,
+  PermissionRequestState,
   ContextInfo,
   PlanState,
   QuotaSnapshots,
@@ -32,6 +33,7 @@ export interface ChatStore {
   readonly currentAgent: string | null;
   readonly sessionTitle: string | null;
   readonly pendingUserInput: UserInputState | null;
+  readonly pendingPermission: PermissionRequestState | null;
 
   // Data lists
   readonly models: Map<string, ModelInfo>;
@@ -54,6 +56,7 @@ export interface ChatStore {
   handleServerMessage(msg: ServerMessage): void;
   clearMessages(): void;
   addUserMessage(content: string): void;
+  clearPendingPermission(): void;
 }
 
 let nextId = 0;
@@ -76,6 +79,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   let currentAgent = $state<string | null>(null);
   let sessionTitle = $state<string | null>(null);
   let pendingUserInput = $state<UserInputState | null>(null);
+  let pendingPermission = $state<PermissionRequestState | null>(null);
 
   // ── Data lists ──────────────────────────────────────────────────────────
   let models = $state(new Map<string, ModelInfo>());
@@ -286,6 +290,14 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         pendingUserInput = null;
         break;
 
+      case 'permission_request':
+        pendingPermission = {
+          requestId: msg.requestId,
+          toolName: msg.toolName,
+          toolArgs: msg.toolArgs,
+        };
+        break;
+
       case 'tools':
         tools = msg.tools;
         break;
@@ -429,10 +441,15 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     activeToolCalls = new Map();
     sessionTitle = null;
     pendingUserInput = null;
+    pendingPermission = null;
   }
 
   function addUserMessage(content: string): void {
     addMessage('user', content);
+  }
+
+  function clearPendingPermission(): void {
+    pendingPermission = null;
   }
 
   // ── Return public interface ─────────────────────────────────────────────
@@ -450,6 +467,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     get currentAgent() { return currentAgent; },
     get sessionTitle() { return sessionTitle; },
     get pendingUserInput() { return pendingUserInput; },
+    get pendingPermission() { return pendingPermission; },
 
     get models() { return models; },
     get tools() { return tools; },
@@ -467,5 +485,6 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     handleServerMessage,
     clearMessages,
     addUserMessage,
+    clearPendingPermission,
   };
 }

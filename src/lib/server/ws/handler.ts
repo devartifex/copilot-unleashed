@@ -16,6 +16,7 @@ const MAX_MESSAGE_LENGTH = 10_000;
 const VALID_MESSAGE_TYPES = new Set([
   'new_session', 'message', 'list_models', 'set_mode',
   'abort', 'set_model', 'set_reasoning', 'user_input_response',
+  'permission_response',
   'list_tools', 'list_agents', 'select_agent', 'deselect_agent',
   'get_quota', 'compact', 'list_sessions', 'resume_session',
   'delete_session', 'get_plan', 'update_plan', 'delete_plan',
@@ -132,6 +133,41 @@ function makeUserInputHandler(entry: PoolEntry) {
         question: request.question,
         choices: request.choices,
         allowFreeform: request.allowFreeform ?? true,
+      });
+    });
+  };
+}
+
+const PERMISSION_TIMEOUT_MS = 30_000;
+
+function makePermissionHandler(entry: PoolEntry) {
+  return (request: any) => {
+    const toolName = request.toolName ?? request.tool?.name ?? 'unknown';
+    const toolArgs = request.args ?? request.tool?.args ?? {};
+
+    // Check remembered preferences
+    const remembered = entry.permissionPreferences.get(toolName);
+    if (remembered === 'allow') return Promise.resolve(true);
+    if (remembered === 'deny') return Promise.resolve(false);
+
+    const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    return new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => {
+        entry.permissionResolve = null;
+        resolve(false);
+      }, PERMISSION_TIMEOUT_MS);
+
+      entry.permissionResolve = (decision: string) => {
+        clearTimeout(timeout);
+        resolve(decision === 'allow');
+      };
+
+      poolSend(entry, {
+        type: 'permission_request',
+        requestId,
+        toolName,
+        toolArgs,
       });
     });
   };
@@ -268,6 +304,7 @@ export function setupWebSocket(
               connectionEntry.session = null;
             }
             connectionEntry.userInputResolve = null;
+            connectionEntry.permissionResolve = null;
 
             try {
               const customInstructions = typeof msg.customInstructions === 'string'
@@ -290,13 +327,20 @@ export function setupWebSocket(
                   }
                 : undefined;
 
+              const permissionMode = msg.permissionMode === 'prompt' ? 'prompt' as const : 'approve_all' as const;
+
+              const customTools = Array.isArray(msg.customTools) ? msg.customTools.slice(0, 10) : undefined;
+
               connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, {
                 model: msg.model,
                 reasoningEffort: msg.reasoningEffort,
                 customInstructions,
                 excludedTools,
+                customTools,
                 infiniteSessions,
                 onUserInputRequest: makeUserInputHandler(connectionEntry),
+                permissionMode,
+                onPermissionRequest: makePermissionHandler(connectionEntry),
               });
 
               wireSessionEvents(connectionEntry.session, connectionEntry);
@@ -324,8 +368,27 @@ export function setupWebSocket(
               return;
             }
 
+            const attachments = Array.isArray(msg.attachments)
+              ? msg.attachments
+                  .filter((a: unknown) => {
+                    const att = a as Record<string, unknown>;
+                    return typeof att.path === 'string' && typeof att.name === 'string';
+                  })
+                  .map((a: unknown) => {
+                    const att = a as Record<string, unknown>;
+                    return {
+                      type: 'file' as const,
+                      path: att.path as string,
+                      displayName: att.name as string,
+                    };
+                  })
+              : undefined;
+
             connectionEntry.isProcessing = true;
-            await connectionEntry.session.sendAndWait({ prompt: content });
+            await connectionEntry.session.sendAndWait({
+              prompt: content,
+              ...(attachments?.length ? { attachments } : {}),
+            });
             connectionEntry.isProcessing = false;
             poolSend(connectionEntry, { type: 'done' });
             break;
@@ -419,6 +482,28 @@ export function setupWebSocket(
             const resolve = connectionEntry.userInputResolve;
             connectionEntry.userInputResolve = null;
             resolve({ answer, wasFreeform: msg.wasFreeform ?? true });
+            break;
+          }
+
+          case 'permission_response': {
+            if (!connectionEntry.permissionResolve) {
+              poolSend(connectionEntry, { type: 'error', message: 'No pending permission request' });
+              return;
+            }
+            const decision = msg.decision;
+            if (!['allow', 'deny', 'always_allow', 'always_deny'].includes(decision)) {
+              poolSend(connectionEntry, { type: 'error', message: 'Invalid decision' });
+              return;
+            }
+            if (decision === 'always_allow') {
+              connectionEntry.permissionPreferences.set(msg.toolName, 'allow');
+            }
+            if (decision === 'always_deny') {
+              connectionEntry.permissionPreferences.set(msg.toolName, 'deny');
+            }
+            const permResolve = connectionEntry.permissionResolve;
+            connectionEntry.permissionResolve = null;
+            permResolve(decision.replace('always_', ''));
             break;
           }
 
@@ -566,6 +651,7 @@ export function setupWebSocket(
               connectionEntry.session = null;
             }
             connectionEntry.userInputResolve = null;
+            connectionEntry.permissionResolve = null;
 
             try {
               connectionEntry.session = await connectionEntry.client.resumeSession(sessionId, {

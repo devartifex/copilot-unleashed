@@ -1,10 +1,11 @@
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async ({ request }) => {
-  // Session data will be available from the custom server's session middleware
-  // via request headers. For now, return empty auth state.
-  return {
-    authenticated: false,
-    user: null,
-  };
+export const load: LayoutServerLoad = async ({ locals }) => {
+	if (locals.session?.githubToken) {
+		return {
+			authenticated: true,
+			user: locals.session.githubUser || null,
+		};
+	}
+	return { authenticated: false, user: null };
 };

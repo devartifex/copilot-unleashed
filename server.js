@@ -5,6 +5,22 @@ import { parse } from 'cookie';
 import session from 'express-session';
 import FileStoreFactory from 'session-file-store';
 
+// Session bridge — shared with SvelteKit via globalThis
+const SESSION_MAP_KEY = '__copilotSessionMap';
+const SESSION_COUNTER_KEY = '__copilotSessionCounter';
+if (!globalThis[SESSION_MAP_KEY]) globalThis[SESSION_MAP_KEY] = new Map();
+
+function registerSession(sess) {
+  globalThis[SESSION_COUNTER_KEY] = (globalThis[SESSION_COUNTER_KEY] || 0) + 1;
+  const id = String(globalThis[SESSION_COUNTER_KEY]);
+  globalThis[SESSION_MAP_KEY].set(id, sess);
+  return id;
+}
+
+function deleteSessionById(id) {
+  globalThis[SESSION_MAP_KEY].delete(id);
+}
+
 const FileStore = FileStoreFactory(session);
 const isDev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000');
@@ -29,6 +45,16 @@ const sessionMiddleware = session({
 const server = createServer((req, res) => {
   // Apply session middleware then delegate to SvelteKit handler
   sessionMiddleware(req, res, () => {
+    const sessionId = registerSession(req.session);
+    req.headers['x-session-id'] = sessionId;
+
+    // Wrap res.end to clean up the session mapping after the response completes
+    const origEnd = res.end.bind(res);
+    res.end = function (...args) {
+      deleteSessionById(sessionId);
+      return origEnd(...args);
+    };
+
     handler(req, res);
   });
 });

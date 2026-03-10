@@ -1,5 +1,17 @@
 import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
+import { getSessionById, deleteSessionById } from '$lib/server/session-store';
+
+// Extract express-session from the bridge and attach to event.locals
+const sessionHandle: Handle = async ({ event, resolve }) => {
+	const sessionId = event.request.headers.get('x-session-id');
+	if (sessionId) {
+		event.locals.session = getSessionById(sessionId) ?? null;
+	} else {
+		event.locals.session = null;
+	}
+	return resolve(event);
+};
 
 const securityHeaders: Handle = async ({ event, resolve }) => {
   const response = await resolve(event);
@@ -52,4 +64,4 @@ const rateLimit: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
-export const handle: Handle = sequence(securityHeaders, rateLimit);
+export const handle: Handle = sequence(sessionHandle, securityHeaders, rateLimit);

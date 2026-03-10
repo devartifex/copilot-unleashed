@@ -1,0 +1,299 @@
+import type {
+  ConnectionState,
+  SessionMode,
+  ReasoningEffort,
+  ClientMessage,
+  ServerMessage,
+  NewSessionConfig,
+} from '$lib/types/index.js';
+
+const INITIAL_RECONNECT_DELAY = 3000;
+const MAX_RECONNECT_DELAY = 60_000;
+const UNAUTHORIZED_CODE = 4001;
+
+export interface WsStore {
+  readonly connectionState: ConnectionState;
+  readonly sessionReady: boolean;
+
+  connect(): void;
+  disconnect(): void;
+  onMessage(handler: (msg: ServerMessage) => void): () => void;
+
+  // Typed send helpers
+  sendMessage(content: string): void;
+  newSession(config: NewSessionConfig): void;
+  resumeSession(sessionId: string): void;
+  setMode(mode: SessionMode): void;
+  setModel(model: string): void;
+  setReasoning(effort: ReasoningEffort): void;
+  abort(): void;
+  compact(): void;
+  listModels(): void;
+  listTools(model?: string): void;
+  listAgents(): void;
+  listSessions(): void;
+  selectAgent(name: string): void;
+  deselectAgent(): void;
+  getQuota(): void;
+  getPlan(): void;
+  updatePlan(content: string): void;
+  deletePlan(): void;
+  respondToUserInput(answer: string, wasFreeform: boolean): void;
+}
+
+export function createWsStore(): WsStore {
+  let connectionState = $state<ConnectionState>('disconnected');
+  let sessionReady = $state(false);
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectDelay = INITIAL_RECONNECT_DELAY;
+  let messageHandlers: Array<(msg: ServerMessage) => void> = [];
+  let visibilityCleanup: (() => void) | null = null;
+
+  // ── Internal helpers ────────────────────────────────────────────────────
+
+  function send(msg: ClientMessage): void {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(msg));
+    }
+  }
+
+  function dispatchMessage(msg: ServerMessage): void {
+    // Track session readiness from protocol messages
+    if (msg.type === 'session_created' || msg.type === 'session_resumed') {
+      sessionReady = true;
+    }
+    if (msg.type === 'session_reconnected') {
+      sessionReady = msg.hasSession;
+    }
+
+    for (const handler of messageHandlers) {
+      handler(msg);
+    }
+  }
+
+  function clearReconnectTimer(): void {
+    if (reconnectTimer !== null) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  }
+
+  function scheduleReconnect(): void {
+    clearReconnectTimer();
+    reconnectTimer = setTimeout(() => connect(), reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+  }
+
+  function buildWsUrl(): string {
+    if (typeof window === 'undefined') return '';
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}/ws`;
+  }
+
+  function setupVisibilityHandler(): void {
+    if (typeof document === 'undefined' || visibilityCleanup) return;
+
+    const handler = () => {
+      if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
+        clearReconnectTimer();
+        connect();
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    visibilityCleanup = () => document.removeEventListener('visibilitychange', handler);
+  }
+
+  // ── Connection lifecycle ────────────────────────────────────────────────
+
+  function connect(): void {
+    if (typeof window === 'undefined') return;
+
+    // Close existing connection
+    if (ws) {
+      try { ws.close(); } catch { /* ignore */ }
+      ws = null;
+    }
+
+    connectionState = 'connecting';
+    const socket = new WebSocket(buildWsUrl());
+
+    socket.onopen = () => {
+      connectionState = 'connected';
+      reconnectDelay = INITIAL_RECONNECT_DELAY;
+      clearReconnectTimer();
+    };
+
+    socket.onmessage = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data as string) as ServerMessage;
+        dispatchMessage(msg);
+      } catch {
+        console.error('WS: failed to parse message');
+      }
+    };
+
+    socket.onclose = (event: CloseEvent) => {
+      connectionState = 'disconnected';
+      sessionReady = false;
+      ws = null;
+
+      if (event.code === UNAUTHORIZED_CODE) {
+        window.location.reload();
+        return;
+      }
+      scheduleReconnect();
+    };
+
+    socket.onerror = () => {
+      connectionState = 'error';
+    };
+
+    ws = socket;
+    setupVisibilityHandler();
+  }
+
+  function disconnect(): void {
+    clearReconnectTimer();
+    if (visibilityCleanup) {
+      visibilityCleanup();
+      visibilityCleanup = null;
+    }
+    if (ws) {
+      try { ws.close(); } catch { /* ignore */ }
+      ws = null;
+    }
+    connectionState = 'disconnected';
+    sessionReady = false;
+  }
+
+  // ── Message subscription ────────────────────────────────────────────────
+
+  function onMessage(handler: (msg: ServerMessage) => void): () => void {
+    messageHandlers.push(handler);
+    return () => {
+      messageHandlers = messageHandlers.filter((h) => h !== handler);
+    };
+  }
+
+  // ── Typed send functions ────────────────────────────────────────────────
+
+  function sendMessage(content: string): void {
+    send({ type: 'message', content });
+  }
+
+  function newSession(config: NewSessionConfig): void {
+    sessionReady = false;
+    const msg: ClientMessage = {
+      type: 'new_session',
+      model: config.model,
+      ...(config.reasoningEffort && { reasoningEffort: config.reasoningEffort }),
+      ...(config.customInstructions?.trim() && { customInstructions: config.customInstructions.trim() }),
+      ...(config.excludedTools?.length && { excludedTools: config.excludedTools }),
+    };
+    send(msg);
+  }
+
+  function resumeSession(sessionId: string): void {
+    sessionReady = false;
+    send({ type: 'resume_session', sessionId });
+  }
+
+  function setMode(mode: SessionMode): void {
+    send({ type: 'set_mode', mode });
+  }
+
+  function setModel(model: string): void {
+    send({ type: 'set_model', model });
+  }
+
+  function setReasoning(effort: ReasoningEffort): void {
+    send({ type: 'set_reasoning', effort });
+  }
+
+  function abort(): void {
+    send({ type: 'abort' });
+  }
+
+  function compact(): void {
+    send({ type: 'compact' });
+  }
+
+  function listModels(): void {
+    send({ type: 'list_models' });
+  }
+
+  function listTools(model?: string): void {
+    const msg: ClientMessage = model
+      ? { type: 'list_tools', model }
+      : { type: 'list_tools' };
+    send(msg);
+  }
+
+  function listAgents(): void {
+    send({ type: 'list_agents' });
+  }
+
+  function listSessions(): void {
+    send({ type: 'list_sessions' });
+  }
+
+  function selectAgent(name: string): void {
+    send({ type: 'select_agent', name });
+  }
+
+  function deselectAgent(): void {
+    send({ type: 'deselect_agent' });
+  }
+
+  function getQuota(): void {
+    send({ type: 'get_quota' });
+  }
+
+  function getPlan(): void {
+    send({ type: 'get_plan' });
+  }
+
+  function updatePlan(content: string): void {
+    send({ type: 'update_plan', content });
+  }
+
+  function deletePlan(): void {
+    send({ type: 'delete_plan' });
+  }
+
+  function respondToUserInput(answer: string, wasFreeform: boolean): void {
+    send({ type: 'user_input_response', answer, wasFreeform });
+  }
+
+  // ── Return public interface ─────────────────────────────────────────────
+
+  return {
+    get connectionState() { return connectionState; },
+    get sessionReady() { return sessionReady; },
+
+    connect,
+    disconnect,
+    onMessage,
+
+    sendMessage,
+    newSession,
+    resumeSession,
+    setMode,
+    setModel,
+    setReasoning,
+    abort,
+    compact,
+    listModels,
+    listTools,
+    listAgents,
+    listSessions,
+    selectAgent,
+    deselectAgent,
+    getQuota,
+    getPlan,
+    updatePlan,
+    deletePlan,
+    respondToUserInput,
+  };
+}

@@ -13,6 +13,24 @@ The same Copilot CLI you use in your terminal — accessible from any browser. A
 
 > **Disclaimer:** This is an independent, community-driven project — not an official GitHub product. Use at your own risk.
 
+---
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/login-mobile.png" width="320" alt="Login — mobile">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/chat-mobile.png" width="320" alt="Chat — mobile">
+</p>
+<p align="center">
+  <img src="docs/screenshots/login-desktop.png" width="700" alt="Login — desktop">
+</p>
+<p align="center">
+  <img src="docs/screenshots/chat-desktop.png" width="700" alt="Chat — desktop">
+</p>
+
+---
+
 - **Real-time streaming** — token-by-token over WebSocket
 - **All Copilot models** — GPT-4.1, o-series, Claude, Gemini — switch mid-conversation
 - **Extended thinking** — live reasoning traces for supported models

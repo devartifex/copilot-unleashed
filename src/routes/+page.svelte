@@ -28,7 +28,6 @@
   let settingsOpen = $state(false);
   let sessionsOpen = $state(false);
 
-  const showBanner = $derived(chatStore.messages.length === 0 && !chatStore.isStreaming);
   const modelCount = $derived(chatStore.models.size);
   const toolCount = $derived(chatStore.tools.length);
   const mcpServerCount = $derived(
@@ -165,18 +164,6 @@
 {#if data.authenticated}
   <div class="screen">
     <div class="terminal">
-      {#if showBanner}
-        <Banner visible={showBanner} />
-        <EnvInfo
-          modelCount={modelCount}
-          toolCount={toolCount}
-          mcpServerCount={mcpServerCount}
-          currentAgent={chatStore.currentAgent}
-          sessionTitle={chatStore.sessionTitle}
-          contextInfo={chatStore.contextInfo}
-        />
-      {/if}
-
       {#if chatStore.plan.exists}
         <PlanPanel
           plan={chatStore.plan}
@@ -185,7 +172,17 @@
         />
       {/if}
 
-      <MessageList {chatStore} />
+      <MessageList {chatStore}>
+        <Banner />
+        <EnvInfo
+          modelCount={modelCount}
+          toolCount={toolCount}
+          mcpServerCount={mcpServerCount}
+          currentAgent={chatStore.currentAgent}
+          sessionTitle={chatStore.sessionTitle}
+          contextInfo={chatStore.contextInfo}
+        />
+      </MessageList>
 
       {#if chatStore.pendingUserInput}
         <UserInputPrompt

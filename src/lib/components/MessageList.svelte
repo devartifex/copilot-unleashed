@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { ChatStore } from '$lib/stores/chat.svelte.js';
   import type { ToolCallState } from '$lib/types/index.js';
   import { renderMarkdown, highlightCodeBlocks, addCopyButtons } from '$lib/utils/markdown.js';
@@ -8,18 +9,13 @@
 
   interface Props {
     chatStore: ChatStore;
+    children?: Snippet;
   }
 
-  const { chatStore }: Props = $props();
+  const { chatStore, children }: Props = $props();
 
   let messagesEl: HTMLDivElement | undefined = $state();
   let streamContentEl: HTMLDivElement | undefined = $state();
-
-  const hasMessages = $derived(
-    chatStore.messages.length > 0 ||
-    chatStore.isStreaming ||
-    chatStore.currentStreamContent.length > 0,
-  );
 
   const streamHtml = $derived(
     chatStore.currentStreamContent
@@ -73,20 +69,9 @@
 </script>
 
 <div class="messages" bind:this={messagesEl}>
-  {#if !hasMessages}
-    <div class="empty-state">
-      <div class="empty-state-icon">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-          <path d="M24 4L4 24l20 20 20-20L24 4z" stroke="var(--purple)" stroke-width="1.5" fill="rgba(110,64,201,0.08)"/>
-          <path d="M24 12l-12 12 12 12 12-12-12-12z" stroke="var(--purple-dim)" stroke-width="1" fill="none" opacity="0.5"/>
-        </svg>
-      </div>
-      <div class="empty-state-text">
-        Start a conversation with GitHub Copilot
-      </div>
-    </div>
-  {:else}
-    {#each chatStore.messages as msg (msg.id)}
+  {@render children?.()}
+
+  {#each chatStore.messages as msg (msg.id)}
       <ChatMessage message={msg} />
     {/each}
 
@@ -110,7 +95,6 @@
         </div>
       </div>
     {/if}
-  {/if}
 </div>
 
 <style>
@@ -139,30 +123,6 @@
   .messages::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 2px;
-  }
-
-  /* ── empty state ───────────────────────────────────────────────────────── */
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    padding: var(--sp-6);
-    text-align: center;
-    gap: var(--sp-3);
-    opacity: 0.6;
-  }
-
-  .empty-state-icon {
-    color: var(--purple);
-    opacity: 0.7;
-  }
-
-  .empty-state-text {
-    color: var(--fg-muted);
-    font-size: 0.85em;
-    max-width: 280px;
   }
 
   /* ── streaming assistant message ───────────────────────────────────────── */

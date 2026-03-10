@@ -1,5 +1,4 @@
 import { createServer } from 'http';
-import { handler } from './build/handler.js';
 import session from 'express-session';
 import FileStoreFactory from 'session-file-store';
 import { setupWebSocket } from './dist/ws/handler.js';
@@ -8,6 +7,13 @@ import { registerSession, deleteSessionById } from './dist/session-store.js';
 const FileStore = FileStoreFactory(session);
 const isDev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000');
+
+// Set ORIGIN for SvelteKit adapter-node CSRF check before importing handler.
+// Without this, adapter-node defaults protocol to 'https', causing origin mismatch on plain HTTP.
+if (!process.env.ORIGIN) {
+  process.env.ORIGIN = process.env.BASE_URL || `http://localhost:${port}`;
+}
+const { handler } = await import('./build/handler.js');
 
 const sessionMiddleware = session({
   store: isDev

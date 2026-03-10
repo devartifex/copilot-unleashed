@@ -423,6 +423,10 @@ const Chat = {
       case 'exit_plan_mode_completed':
         this.addInfoMessage('Exited plan mode');
         break;
+
+      case 'context_info':
+        this.updateContextInfo(msg);
+        break;
     }
   },
 
@@ -947,13 +951,44 @@ const Chat = {
     if (msg.inputTokens) parts.push(`in: ${msg.inputTokens}`);
     if (msg.outputTokens) parts.push(`out: ${msg.outputTokens}`);
     if (msg.reasoningTokens) parts.push(`reasoning: ${msg.reasoningTokens}`);
+    if (msg.cost != null) parts.push(`cost: ${msg.cost}×`);
     if (parts.length === 0) return;
 
     const messagesEl = document.getElementById('messages');
     const el = document.createElement('div');
     el.className = 'usage-line';
     el.textContent = 'tokens — ' + parts.join(' · ');
+
+    // Show premium request snapshot inline
+    if (msg.quotaSnapshots) {
+      const premium = msg.quotaSnapshots.premium_requests || msg.quotaSnapshots.copilot_premium;
+      if (premium && premium.usedRequests != null) {
+        el.textContent += ' · premium: ' + premium.usedRequests + '/' + (premium.entitlementRequests || '∞');
+      }
+    }
+
     messagesEl.appendChild(el);
+
+    // Update quota indicator from usage event
+    if (msg.quotaSnapshots) {
+      const snap = msg.quotaSnapshots.chat || msg.quotaSnapshots.copilot_premium || msg.quotaSnapshots.premium_requests;
+      if (snap && snap.remainingPercentage != null) {
+        this.updateQuotaIndicator(100 - (snap.remainingPercentage * 100), snap);
+      }
+    }
+  },
+
+  updateContextInfo(msg) {
+    const envModel = document.getElementById('env-model-text');
+    if (!envModel) return;
+    const tokenLimit = msg.tokenLimit;
+    const currentTokens = msg.currentTokens;
+    if (tokenLimit && currentTokens != null) {
+      const pct = Math.round((currentTokens / tokenLimit) * 100);
+      const limitK = Math.round(tokenLimit / 1000);
+      const currentK = (currentTokens / 1000).toFixed(1);
+      envModel.textContent = envModel.textContent.replace(/ · ctx:.*$/, '') + ' · ctx: ' + currentK + 'k/' + limitK + 'k (' + pct + '%)';
+    }
   },
 
   addWarningMessage(message) {

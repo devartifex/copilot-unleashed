@@ -61,10 +61,26 @@ function wireSessionEvents(session: any, entry: PoolEntry): void {
     poolSend(entry, { type: 'title_changed', title: event.data.title });
   });
   session.on('assistant.usage', (event: any) => {
-    poolSend(entry, { type: 'usage', inputTokens: event.data.inputTokens, outputTokens: event.data.outputTokens, totalTokens: event.data.totalTokens, reasoningTokens: event.data.reasoningTokens });
+    poolSend(entry, {
+      type: 'usage',
+      inputTokens: event.data.inputTokens,
+      outputTokens: event.data.outputTokens,
+      totalTokens: event.data.totalTokens,
+      reasoningTokens: event.data.reasoningTokens,
+      cost: event.data.cost,
+      quotaSnapshots: event.data.quotaSnapshots,
+    });
   });
   session.on('session.warning', (event: any) => {
     poolSend(entry, { type: 'warning', message: event.data.message });
+  });
+  session.on('session.usage_info', (event: any) => {
+    poolSend(entry, {
+      type: 'context_info',
+      tokenLimit: event.data.tokenLimit,
+      currentTokens: event.data.currentTokens,
+      messagesLength: event.data.messagesLength,
+    });
   });
   session.on('subagent.started', (event: any) => {
     poolSend(entry, { type: 'subagent_start', agentName: event.data.agentName });

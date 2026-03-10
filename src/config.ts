@@ -23,4 +23,6 @@ export const config = {
   // Token freshness: force re-auth after this many ms (default: 7 days)
   // 7 days balances UX (fewer re-auths) with security (token rotation)
   tokenMaxAge: parseInt(process.env.TOKEN_MAX_AGE_MS || String(7 * 24 * 60 * 60 * 1000)),
+  // How long to keep CopilotClient alive after WebSocket disconnect (default: 5 min)
+  sessionPoolTtl: parseInt(process.env.SESSION_POOL_TTL_MS || String(5 * 60 * 1000)),
 };

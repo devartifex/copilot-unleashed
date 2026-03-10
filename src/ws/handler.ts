@@ -5,6 +5,10 @@ import { createCopilotSession, getAvailableModels } from '../copilot/session.js'
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
 import { validateGitHubToken } from '../auth/github.js';
+import {
+  sessionPool, createPoolEntry, destroyPoolEntry, poolSend,
+  type PoolEntry,
+} from './session-pool.js';
 
 type SessionMiddleware = (req: any, res: any, next: () => void) => void;
 
@@ -18,91 +22,103 @@ const VALID_MESSAGE_TYPES = new Set([
 ]);
 const VALID_MODES = new Set(['interactive', 'plan', 'autopilot']);
 const VALID_REASONING = new Set(['low', 'medium', 'high', 'xhigh']);
+const HEARTBEAT_INTERVAL = 30_000;
 
-function send(ws: WebSocket, data: Record<string, unknown>): void {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
-  }
-}
-
-function wireSessionEvents(session: any, ws: WebSocket): void {
+function wireSessionEvents(session: any, entry: PoolEntry): void {
   session.on('assistant.message_delta', (event: any) => {
-    send(ws, { type: 'delta', content: event.data.deltaContent });
+    poolSend(entry, { type: 'delta', content: event.data.deltaContent });
   });
   session.on('assistant.reasoning_delta', (event: any) => {
-    send(ws, { type: 'reasoning_delta', content: event.data.deltaContent, reasoningId: event.data.reasoningId });
+    poolSend(entry, { type: 'reasoning_delta', content: event.data.deltaContent, reasoningId: event.data.reasoningId });
   });
   session.on('assistant.reasoning', (event: any) => {
-    send(ws, { type: 'reasoning_done', reasoningId: event.data.reasoningId });
+    poolSend(entry, { type: 'reasoning_done', reasoningId: event.data.reasoningId });
   });
   session.on('assistant.intent', (event: any) => {
-    send(ws, { type: 'intent', intent: event.data.intent });
+    poolSend(entry, { type: 'intent', intent: event.data.intent });
   });
-  session.on('assistant.turn_start', () => { send(ws, { type: 'turn_start' }); });
-  session.on('assistant.turn_end', () => { send(ws, { type: 'turn_end' }); });
+  session.on('assistant.turn_start', () => { poolSend(entry, { type: 'turn_start' }); });
+  session.on('assistant.turn_end', () => {
+    entry.isProcessing = false;
+    poolSend(entry, { type: 'turn_end' });
+  });
   session.on('tool.execution_start', (event: any) => {
-    send(ws, { type: 'tool_start', toolCallId: event.data.toolCallId, toolName: event.data.toolName, mcpServerName: event.data.mcpServerName, mcpToolName: event.data.mcpToolName });
+    poolSend(entry, { type: 'tool_start', toolCallId: event.data.toolCallId, toolName: event.data.toolName, mcpServerName: event.data.mcpServerName, mcpToolName: event.data.mcpToolName });
   });
   session.on('tool.execution_complete', (event: any) => {
-    send(ws, { type: 'tool_end', toolCallId: event.data.toolCallId });
+    poolSend(entry, { type: 'tool_end', toolCallId: event.data.toolCallId });
   });
   session.on('tool.execution_progress', (event: any) => {
-    send(ws, { type: 'tool_progress', toolCallId: event.data.toolCallId, message: event.data.message });
+    poolSend(entry, { type: 'tool_progress', toolCallId: event.data.toolCallId, message: event.data.message });
   });
   session.on('session.mode_changed', (event: any) => {
-    send(ws, { type: 'mode_changed', mode: event.data.newMode });
+    poolSend(entry, { type: 'mode_changed', mode: event.data.newMode });
   });
   session.on('session.error', (event: any) => {
-    send(ws, { type: 'error', message: event.data.message });
+    poolSend(entry, { type: 'error', message: event.data.message });
   });
   session.on('session.title_changed', (event: any) => {
-    send(ws, { type: 'title_changed', title: event.data.title });
+    poolSend(entry, { type: 'title_changed', title: event.data.title });
   });
   session.on('assistant.usage', (event: any) => {
-    send(ws, { type: 'usage', inputTokens: event.data.inputTokens, outputTokens: event.data.outputTokens, totalTokens: event.data.totalTokens, reasoningTokens: event.data.reasoningTokens });
+    poolSend(entry, { type: 'usage', inputTokens: event.data.inputTokens, outputTokens: event.data.outputTokens, totalTokens: event.data.totalTokens, reasoningTokens: event.data.reasoningTokens });
   });
   session.on('session.warning', (event: any) => {
-    send(ws, { type: 'warning', message: event.data.message });
+    poolSend(entry, { type: 'warning', message: event.data.message });
   });
   session.on('subagent.started', (event: any) => {
-    send(ws, { type: 'subagent_start', agentName: event.data.agentName });
+    poolSend(entry, { type: 'subagent_start', agentName: event.data.agentName });
   });
   session.on('subagent.completed', (event: any) => {
-    send(ws, { type: 'subagent_end', agentName: event.data.agentName });
+    poolSend(entry, { type: 'subagent_end', agentName: event.data.agentName });
   });
   session.on('session.info', (event: any) => {
-    send(ws, { type: 'info', message: event.data?.message || event.data });
+    poolSend(entry, { type: 'info', message: event.data?.message || event.data });
   });
   session.on('session.plan_changed', (event: any) => {
-    send(ws, { type: 'plan_changed', content: event.data?.content, path: event.data?.path });
+    poolSend(entry, { type: 'plan_changed', content: event.data?.content, path: event.data?.path });
   });
-  session.on('session.compaction_start', () => { send(ws, { type: 'compaction_start' }); });
+  session.on('session.compaction_start', () => { poolSend(entry, { type: 'compaction_start' }); });
   session.on('session.compaction_complete', (event: any) => {
-    send(ws, { type: 'compaction_complete', tokensRemoved: event.data?.tokensRemoved, messagesRemoved: event.data?.messagesRemoved });
+    poolSend(entry, { type: 'compaction_complete', tokensRemoved: event.data?.tokensRemoved, messagesRemoved: event.data?.messagesRemoved });
   });
   session.on('skill.invoked', (event: any) => {
-    send(ws, { type: 'skill_invoked', skillName: event.data?.skillName });
+    poolSend(entry, { type: 'skill_invoked', skillName: event.data?.skillName });
   });
   session.on('subagent.failed', (event: any) => {
-    send(ws, { type: 'subagent_failed', agentName: event.data?.agentName, error: event.data?.error });
+    poolSend(entry, { type: 'subagent_failed', agentName: event.data?.agentName, error: event.data?.error });
   });
   session.on('subagent.selected', (event: any) => {
-    send(ws, { type: 'subagent_selected', agentName: event.data?.agentName });
+    poolSend(entry, { type: 'subagent_selected', agentName: event.data?.agentName });
   });
   session.on('subagent.deselected', (event: any) => {
-    send(ws, { type: 'subagent_deselected', agentName: event.data?.agentName });
+    poolSend(entry, { type: 'subagent_deselected', agentName: event.data?.agentName });
   });
   session.on('session.model_change', (event: any) => {
-    send(ws, { type: 'model_changed', model: event.data?.model || event.data?.newModel, source: 'sdk' });
+    poolSend(entry, { type: 'model_changed', model: event.data?.model || event.data?.newModel, source: 'sdk' });
   });
   session.on('elicitation.requested', (event: any) => {
-    send(ws, { type: 'elicitation_requested', question: event.data?.question, choices: event.data?.choices, allowFreeform: event.data?.allowFreeform });
+    poolSend(entry, { type: 'elicitation_requested', question: event.data?.question, choices: event.data?.choices, allowFreeform: event.data?.allowFreeform });
   });
   session.on('elicitation.completed', (event: any) => {
-    send(ws, { type: 'elicitation_completed', answer: event.data?.answer });
+    poolSend(entry, { type: 'elicitation_completed', answer: event.data?.answer });
   });
-  session.on('exit_plan_mode.requested', () => { send(ws, { type: 'exit_plan_mode_requested' }); });
-  session.on('exit_plan_mode.completed', () => { send(ws, { type: 'exit_plan_mode_completed' }); });
+  session.on('exit_plan_mode.requested', () => { poolSend(entry, { type: 'exit_plan_mode_requested' }); });
+  session.on('exit_plan_mode.completed', () => { poolSend(entry, { type: 'exit_plan_mode_completed' }); });
+}
+
+function makeUserInputHandler(entry: PoolEntry) {
+  return (request: any) => {
+    return new Promise<{ answer: string; wasFreeform: boolean }>((resolve) => {
+      entry.userInputResolve = resolve;
+      poolSend(entry, {
+        type: 'user_input_request',
+        question: request.question,
+        choices: request.choices,
+        allowFreeform: request.allowFreeform ?? true,
+      });
+    });
+  };
 }
 
 export function setupWebSocket(
@@ -111,7 +127,21 @@ export function setupWebSocket(
 ): void {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
+  // Heartbeat — detect dead connections
+  const heartbeat = setInterval(() => {
+    wss.clients.forEach((ws: WebSocket & { isAlive?: boolean }) => {
+      if (ws.isAlive === false) return ws.terminate();
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, HEARTBEAT_INTERVAL);
+
+  wss.on('close', () => clearInterval(heartbeat));
+
   wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
+    (ws as any).isAlive = true;
+    ws.on('pong', () => { (ws as any).isAlive = true; });
+
     // Validate WebSocket origin
     const origin = req.headers.origin;
     if (origin && !config.isDev) {
@@ -153,37 +183,75 @@ export function setupWebSocket(
     }
 
     const githubToken: string = session.githubToken;
-    const client = createCopilotClient(githubToken);
-    let copilotSession: any = null;
-    let userInputResolve: ((response: { answer: string; wasFreeform: boolean }) => void) | null = null;
+    const userLogin: string = session.githubUser?.login || 'unknown';
+    let entry = sessionPool.get(userLogin);
 
-    const cleanup = async () => {
-      if (copilotSession) {
-        try { await copilotSession.destroy(); } catch { /* ignore */ }
-        copilotSession = null;
+    if (entry) {
+      // Reattach to existing pool entry
+      if (entry.ws && entry.ws !== ws && entry.ws.readyState === WebSocket.OPEN) {
+        entry.ws.close(4002, 'Replaced by new connection');
       }
-      userInputResolve = null;
-      try { await client.stop(); } catch { /* ignore */ }
-    };
+      if (entry.ttlTimer) {
+        clearTimeout(entry.ttlTimer);
+        entry.ttlTimer = null;
+      }
+      entry.ws = ws;
 
-    ws.on('close', () => { cleanup(); });
+      // Replay buffered messages
+      const buffer = entry.messageBuffer.splice(0);
+      for (const msg of buffer) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(msg));
+        }
+      }
+
+      poolSend(entry, {
+        type: 'session_reconnected',
+        user: userLogin,
+        hasSession: !!entry.session,
+        isProcessing: entry.isProcessing,
+      });
+    } else {
+      // Create new pool entry
+      const client = createCopilotClient(githubToken);
+      entry = createPoolEntry(client, ws);
+      sessionPool.set(userLogin, entry);
+
+      poolSend(entry, {
+        type: 'connected',
+        user: userLogin,
+      });
+    }
+
+    // Capture entry reference for this connection's handlers
+    const connectionEntry = entry;
+
+    ws.on('close', () => {
+      if (connectionEntry.ws === ws) {
+        connectionEntry.ws = null;
+        connectionEntry.ttlTimer = setTimeout(async () => {
+          await destroyPoolEntry(connectionEntry);
+          sessionPool.delete(userLogin);
+        }, config.sessionPoolTtl);
+      }
+    });
 
     ws.on('message', async (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
 
         if (!msg.type || !VALID_MESSAGE_TYPES.has(msg.type)) {
-          send(ws, { type: 'error', message: 'Unknown message type' });
+          poolSend(connectionEntry, { type: 'error', message: 'Unknown message type' });
           return;
         }
 
         switch (msg.type) {
           case 'new_session': {
-            if (copilotSession) {
-              try { await copilotSession.destroy(); } catch { /* ignore */ }
-              copilotSession = null;
+            if (connectionEntry.session) {
+              try { await connectionEntry.session.destroy(); } catch { /* ignore */ }
+              connectionEntry.session = null;
             }
-            userInputResolve = null;
+            connectionEntry.userInputResolve = null;
 
             try {
               const customInstructions = typeof msg.customInstructions === 'string'
@@ -194,30 +262,20 @@ export function setupWebSocket(
                 ? msg.excludedTools.filter((t: unknown) => typeof t === 'string')
                 : undefined;
 
-              copilotSession = await createCopilotSession(client, githubToken, {
+              connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, {
                 model: msg.model,
                 reasoningEffort: msg.reasoningEffort,
                 customInstructions,
                 excludedTools,
-                onUserInputRequest: (request) => {
-                  return new Promise((resolve) => {
-                    userInputResolve = resolve;
-                    send(ws, {
-                      type: 'user_input_request',
-                      question: request.question,
-                      choices: request.choices,
-                      allowFreeform: request.allowFreeform ?? true,
-                    });
-                  });
-                },
+                onUserInputRequest: makeUserInputHandler(connectionEntry),
               });
 
-              wireSessionEvents(copilotSession, ws);
+              wireSessionEvents(connectionEntry.session, connectionEntry);
 
-              send(ws, { type: 'session_created', model: msg.model });
+              poolSend(connectionEntry, { type: 'session_created', model: msg.model });
             } catch (err: any) {
               console.error('Session creation error:', err.message);
-              send(ws, {
+              poolSend(connectionEntry, {
                 type: 'error',
                 message: `Failed to create session: ${err.message}`,
               });
@@ -228,60 +286,63 @@ export function setupWebSocket(
           case 'message': {
             const content = typeof msg.content === 'string' ? msg.content : '';
             if (!content.trim() || content.length > MAX_MESSAGE_LENGTH) {
-              send(ws, { type: 'error', message: `Message must be 1-${MAX_MESSAGE_LENGTH} characters` });
+              poolSend(connectionEntry, { type: 'error', message: `Message must be 1-${MAX_MESSAGE_LENGTH} characters` });
               return;
             }
 
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
 
-            await copilotSession.sendAndWait({ prompt: content });
-            send(ws, { type: 'done' });
+            connectionEntry.isProcessing = true;
+            await connectionEntry.session.sendAndWait({ prompt: content });
+            connectionEntry.isProcessing = false;
+            poolSend(connectionEntry, { type: 'done' });
             break;
           }
 
           case 'list_models': {
-            const models = await getAvailableModels(client);
+            const models = await getAvailableModels(connectionEntry.client);
             const modelArray = Array.isArray(models) ? models : [];
-            send(ws, { type: 'models', models: modelArray });
+            poolSend(connectionEntry, { type: 'models', models: modelArray });
             break;
           }
 
           case 'set_mode': {
             const mode = msg.mode;
             if (!mode || !VALID_MODES.has(mode)) {
-              send(ws, { type: 'error', message: 'Invalid mode. Use: interactive, plan, or autopilot' });
+              poolSend(connectionEntry, { type: 'error', message: 'Invalid mode. Use: interactive, plan, or autopilot' });
               return;
             }
 
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
 
             try {
-              const result = await copilotSession.rpc.mode.set({ mode });
-              send(ws, { type: 'mode_changed', mode: result.mode });
+              const result = await connectionEntry.session.rpc.mode.set({ mode });
+              poolSend(connectionEntry, { type: 'mode_changed', mode: result.mode });
             } catch (err: any) {
               console.error('Mode switch error:', err.message);
-              send(ws, { type: 'error', message: `Failed to switch mode: ${err.message}` });
+              poolSend(connectionEntry, { type: 'error', message: `Failed to switch mode: ${err.message}` });
             }
             break;
           }
 
           case 'abort': {
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session.' });
               return;
             }
             try {
-              await copilotSession.abort();
-              send(ws, { type: 'aborted' });
+              await connectionEntry.session.abort();
+              connectionEntry.isProcessing = false;
+              poolSend(connectionEntry, { type: 'aborted' });
             } catch (err: any) {
               console.error('Abort error:', err.message);
-              send(ws, { type: 'error', message: `Failed to abort: ${err.message}` });
+              poolSend(connectionEntry, { type: 'error', message: `Failed to abort: ${err.message}` });
             }
             break;
           }
@@ -289,47 +350,45 @@ export function setupWebSocket(
           case 'set_model': {
             const newModel = typeof msg.model === 'string' ? msg.model.trim() : '';
             if (!newModel) {
-              send(ws, { type: 'error', message: 'Model ID is required' });
+              poolSend(connectionEntry, { type: 'error', message: 'Model ID is required' });
               return;
             }
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
             try {
-              await copilotSession.setModel(newModel);
-              send(ws, { type: 'model_changed', model: newModel });
+              await connectionEntry.session.setModel(newModel);
+              poolSend(connectionEntry, { type: 'model_changed', model: newModel });
             } catch (err: any) {
               console.error('Model change error:', err.message);
-              send(ws, { type: 'error', message: `Failed to change model: ${err.message}` });
+              poolSend(connectionEntry, { type: 'error', message: `Failed to change model: ${err.message}` });
             }
             break;
           }
 
           case 'set_reasoning': {
-            // Reasoning effort can only be set at session creation.
-            // Store it so the next new_session picks it up.
             const effort = msg.effort as string;
             if (!effort || !VALID_REASONING.has(effort)) {
-              send(ws, { type: 'error', message: 'Invalid reasoning effort. Use: low, medium, high, or xhigh' });
+              poolSend(connectionEntry, { type: 'error', message: 'Invalid reasoning effort. Use: low, medium, high, or xhigh' });
               return;
             }
-            send(ws, { type: 'reasoning_changed', effort });
+            poolSend(connectionEntry, { type: 'reasoning_changed', effort });
             break;
           }
 
           case 'user_input_response': {
-            if (!userInputResolve) {
-              send(ws, { type: 'error', message: 'No pending input request' });
+            if (!connectionEntry.userInputResolve) {
+              poolSend(connectionEntry, { type: 'error', message: 'No pending input request' });
               return;
             }
             const answer = typeof msg.answer === 'string' ? msg.answer : '';
             if (!answer.trim()) {
-              send(ws, { type: 'error', message: 'Answer is required' });
+              poolSend(connectionEntry, { type: 'error', message: 'Answer is required' });
               return;
             }
-            const resolve = userInputResolve;
-            userInputResolve = null;
+            const resolve = connectionEntry.userInputResolve;
+            connectionEntry.userInputResolve = null;
             resolve({ answer, wasFreeform: msg.wasFreeform ?? true });
             break;
           }
@@ -337,108 +396,108 @@ export function setupWebSocket(
           case 'list_tools': {
             try {
               const model = typeof msg.model === 'string' ? msg.model : undefined;
-              const result = await client.rpc.tools.list({ model });
-              send(ws, { type: 'tools', tools: result?.tools || [] });
+              const result = await connectionEntry.client.rpc.tools.list({ model });
+              poolSend(connectionEntry, { type: 'tools', tools: result?.tools || [] });
             } catch (err: any) {
               console.error('List tools error:', err.message);
-              send(ws, { type: 'tools', tools: [] });
+              poolSend(connectionEntry, { type: 'tools', tools: [] });
             }
             break;
           }
 
           case 'list_agents': {
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
             try {
-              const agents = await copilotSession.rpc.agent.list();
+              const agents = await connectionEntry.session.rpc.agent.list();
               let current = null;
               try {
-                current = await copilotSession.rpc.agent.getCurrent();
+                current = await connectionEntry.session.rpc.agent.getCurrent();
               } catch { /* no current agent */ }
-              send(ws, { type: 'agents', agents: agents?.agents || [], current: current?.agent || null });
+              poolSend(connectionEntry, { type: 'agents', agents: agents?.agents || [], current: current?.agent || null });
             } catch (err: any) {
               console.error('List agents error:', err.message);
-              send(ws, { type: 'agents', agents: [], current: null });
+              poolSend(connectionEntry, { type: 'agents', agents: [], current: null });
             }
             break;
           }
 
           case 'select_agent': {
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
             const agentName = typeof msg.name === 'string' ? msg.name.trim() : '';
             if (!agentName) {
-              send(ws, { type: 'error', message: 'Agent name is required' });
+              poolSend(connectionEntry, { type: 'error', message: 'Agent name is required' });
               return;
             }
             try {
-              await copilotSession.rpc.agent.select({ name: agentName });
-              send(ws, { type: 'agent_changed', agent: agentName });
+              await connectionEntry.session.rpc.agent.select({ name: agentName });
+              poolSend(connectionEntry, { type: 'agent_changed', agent: agentName });
             } catch (err: any) {
               console.error('Select agent error:', err.message);
-              send(ws, { type: 'error', message: `Failed to select agent: ${err.message}` });
+              poolSend(connectionEntry, { type: 'error', message: `Failed to select agent: ${err.message}` });
             }
             break;
           }
 
           case 'deselect_agent': {
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
             try {
-              await copilotSession.rpc.agent.deselect();
-              send(ws, { type: 'agent_changed', agent: null });
+              await connectionEntry.session.rpc.agent.deselect();
+              poolSend(connectionEntry, { type: 'agent_changed', agent: null });
             } catch (err: any) {
               console.error('Deselect agent error:', err.message);
-              send(ws, { type: 'error', message: `Failed to deselect agent: ${err.message}` });
+              poolSend(connectionEntry, { type: 'error', message: `Failed to deselect agent: ${err.message}` });
             }
             break;
           }
 
           case 'get_quota': {
             try {
-              const result = await client.rpc.account.getQuota();
-              send(ws, { type: 'quota', ...result });
+              const result = await connectionEntry.client.rpc.account.getQuota();
+              poolSend(connectionEntry, { type: 'quota', ...result });
             } catch (err: any) {
               console.error('Get quota error:', err.message);
-              send(ws, { type: 'error', message: `Failed to get quota: ${err.message}` });
+              poolSend(connectionEntry, { type: 'error', message: `Failed to get quota: ${err.message}` });
             }
             break;
           }
 
           case 'compact': {
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
             try {
-              const result = await copilotSession.rpc.compaction.compact();
-              send(ws, { type: 'compaction_result', ...result });
+              const result = await connectionEntry.session.rpc.compaction.compact();
+              poolSend(connectionEntry, { type: 'compaction_result', ...result });
             } catch (err: any) {
               console.error('Compaction error:', err.message);
-              send(ws, { type: 'error', message: `Failed to compact: ${err.message}` });
+              poolSend(connectionEntry, { type: 'error', message: `Failed to compact: ${err.message}` });
             }
             break;
           }
 
           case 'list_sessions': {
             try {
-              const sessions = await client.listSessions();
+              const sessions = await connectionEntry.client.listSessions();
               const list = Array.isArray(sessions) ? sessions.map((s: any) => ({
                 id: s.sessionId ?? s.id,
                 title: s.summary ?? s.title,
                 updatedAt: s.modifiedTime ?? s.updatedAt,
                 model: s.model,
               })) : [];
-              send(ws, { type: 'sessions', sessions: list });
+              poolSend(connectionEntry, { type: 'sessions', sessions: list });
             } catch (err: any) {
               console.error('List sessions error:', err.message);
-              send(ws, { type: 'sessions', sessions: [] });
+              poolSend(connectionEntry, { type: 'sessions', sessions: [] });
             }
             break;
           }
@@ -446,102 +505,87 @@ export function setupWebSocket(
           case 'resume_session': {
             const sessionId = typeof msg.sessionId === 'string' ? msg.sessionId.trim() : '';
             if (!sessionId) {
-              send(ws, { type: 'error', message: 'Session ID is required' });
+              poolSend(connectionEntry, { type: 'error', message: 'Session ID is required' });
               return;
             }
 
-            if (copilotSession) {
-              try { await copilotSession.destroy(); } catch { /* ignore */ }
-              copilotSession = null;
+            if (connectionEntry.session) {
+              try { await connectionEntry.session.destroy(); } catch { /* ignore */ }
+              connectionEntry.session = null;
             }
-            userInputResolve = null;
+            connectionEntry.userInputResolve = null;
 
             try {
-              copilotSession = await client.resumeSession(sessionId, {
+              connectionEntry.session = await connectionEntry.client.resumeSession(sessionId, {
                 onPermissionRequest: (await import('@github/copilot-sdk')).approveAll,
                 streaming: true,
-                onUserInputRequest: (request: any) => {
-                  return new Promise((resolve) => {
-                    userInputResolve = resolve;
-                    send(ws, {
-                      type: 'user_input_request',
-                      question: request.question,
-                      choices: request.choices,
-                      allowFreeform: request.allowFreeform ?? true,
-                    });
-                  });
-                },
+                onUserInputRequest: makeUserInputHandler(connectionEntry),
               });
 
-              wireSessionEvents(copilotSession, ws);
+              wireSessionEvents(connectionEntry.session, connectionEntry);
 
-              send(ws, { type: 'session_resumed', sessionId });
+              poolSend(connectionEntry, { type: 'session_resumed', sessionId });
             } catch (err: any) {
               console.error('Resume session error:', err.message);
-              send(ws, { type: 'error', message: `Failed to resume session: ${err.message}` });
+              poolSend(connectionEntry, { type: 'error', message: `Failed to resume session: ${err.message}` });
             }
             break;
           }
 
           case 'get_plan': {
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
             try {
-              const result = await copilotSession.rpc.plan.read();
-              send(ws, { type: 'plan', exists: result?.exists ?? false, content: result?.content, path: result?.path });
+              const result = await connectionEntry.session.rpc.plan.read();
+              poolSend(connectionEntry, { type: 'plan', exists: result?.exists ?? false, content: result?.content, path: result?.path });
             } catch (err: any) {
               console.error('Get plan error:', err.message);
-              send(ws, { type: 'plan', exists: false });
+              poolSend(connectionEntry, { type: 'plan', exists: false });
             }
             break;
           }
 
           case 'update_plan': {
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
             const planContent = typeof msg.content === 'string' ? msg.content : '';
             try {
-              await copilotSession.rpc.plan.update({ content: planContent });
-              send(ws, { type: 'plan_updated' });
+              await connectionEntry.session.rpc.plan.update({ content: planContent });
+              poolSend(connectionEntry, { type: 'plan_updated' });
             } catch (err: any) {
               console.error('Update plan error:', err.message);
-              send(ws, { type: 'error', message: `Failed to update plan: ${err.message}` });
+              poolSend(connectionEntry, { type: 'error', message: `Failed to update plan: ${err.message}` });
             }
             break;
           }
 
           case 'delete_plan': {
-            if (!copilotSession) {
-              send(ws, { type: 'error', message: 'No active session. Send new_session first.' });
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
               return;
             }
             try {
-              await copilotSession.rpc.plan.delete();
-              send(ws, { type: 'plan_deleted' });
+              await connectionEntry.session.rpc.plan.delete();
+              poolSend(connectionEntry, { type: 'plan_deleted' });
             } catch (err: any) {
               console.error('Delete plan error:', err.message);
-              send(ws, { type: 'error', message: `Failed to delete plan: ${err.message}` });
+              poolSend(connectionEntry, { type: 'error', message: `Failed to delete plan: ${err.message}` });
             }
             break;
           }
         }
       } catch (err: any) {
         console.error('WS message error:', err.message);
-        send(ws, { type: 'error', message: 'An internal error occurred' });
+        poolSend(connectionEntry, { type: 'error', message: 'An internal error occurred' });
       }
     });
 
     ws.on('error', (err) => {
       console.error('WS error:', err.message);
-    });
-
-    send(ws, {
-      type: 'connected',
-      user: session.githubUser?.login,
     });
   });
 }

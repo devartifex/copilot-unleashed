@@ -1,6 +1,7 @@
 import http from 'http';
 import { app, sessionMiddleware } from './server.js';
 import { setupWebSocket } from './ws/handler.js';
+import { cleanupAllSessions } from './ws/session-pool.js';
 import { config } from './config.js';
 
 const server = http.createServer(app);
@@ -25,3 +26,13 @@ server.listen(config.port, () => {
   console.log(`  Port:  ${config.port}`);
   console.log('');
 });
+
+// Graceful shutdown — destroy all pooled CopilotClient sessions
+async function shutdown() {
+  console.log('\nShutting down — cleaning up sessions...');
+  await cleanupAllSessions();
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 5000);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

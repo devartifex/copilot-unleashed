@@ -20,6 +20,47 @@ const Chat = {
   modelsMap: new Map(),
   currentAgent: null,
 
+  // --- Notifications & visibility ---
+  _notificationsEnabled: false,
+  _tabHidden: false,
+
+  initNotifications() {
+    document.addEventListener('visibilitychange', () => {
+      this._tabHidden = document.hidden;
+      // Reconnect immediately when tab becomes visible again
+      if (!document.hidden && this.ws && this.ws.readyState !== WebSocket.OPEN) {
+        if (this.reconnectTimer) {
+          clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = null;
+        }
+        this.connect();
+      }
+    });
+
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      this._notificationsEnabled = true;
+    } else if (Notification.permission === 'default') {
+      // Defer permission request until first user interaction
+      const requestOnce = () => {
+        Notification.requestPermission().then((perm) => {
+          this._notificationsEnabled = perm === 'granted';
+        });
+        document.removeEventListener('click', requestOnce);
+      };
+      document.addEventListener('click', requestOnce);
+    }
+  },
+
+  _notify(title, body) {
+    if (!this._notificationsEnabled || !this._tabHidden) return;
+    try {
+      const n = new Notification(title, { body });
+      n.onclick = () => { window.focus(); n.close(); };
+      setTimeout(() => n.close(), 5000);
+    } catch { /* ignore */ }
+  },
+
   // --- localStorage persistence ---
   _storageKey: 'copilot-cli-settings',
 
@@ -65,6 +106,10 @@ const Chat = {
   connect() {
     if (this.ws) {
       try { this.ws.close(); } catch (e) { /* ignore */ }
+    }
+    if (!this._notificationsInitialized) {
+      this.initNotifications();
+      this._notificationsInitialized = true;
     }
 
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -116,6 +161,24 @@ const Chat = {
         this.sessionReady = true;
         this.setStatus('connected');
         this.enableInput();
+        break;
+
+      case 'session_reconnected':
+        document.getElementById('user-badge').textContent = '@' + (msg.user || '');
+        if (msg.hasSession) {
+          this.sessionReady = true;
+          this.setStatus('connected');
+          this.enableInput();
+          this.addInfoMessage('Session reconnected');
+          // Re-fetch models to keep UI in sync
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type: 'list_models' }));
+          }
+        } else {
+          this.sessionReady = false;
+          this.disableInput();
+          this.requestNewSession();
+        }
         break;
 
       case 'turn_start':
@@ -191,6 +254,7 @@ const Chat = {
         this.activeTools.clear();
         this.hideStopButton();
         if (msg.type === 'done') this.enableInput();
+        this._notify('Copilot', 'Response ready');
         break;
 
       case 'models':

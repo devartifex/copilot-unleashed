@@ -10,5 +10,5 @@ services:
       - BASE_URL=http://localhost:3000
       - SESSION_STORE_PATH=/tmp/.sessions
     volumes:
-      - ./public:/app/public:ro
+      - ./static:/app/static:ro
     restart: unless-stopped

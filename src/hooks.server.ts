@@ -1,0 +1,55 @@
+import type { Handle } from '@sveltejs/kit';
+import { sequence } from '@sveltejs/kit/hooks';
+
+const securityHeaders: Handle = async ({ event, resolve }) => {
+  const response = await resolve(event);
+
+  // CSP
+  response.headers.set('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    "connect-src 'self' ws: wss:",
+    "img-src 'self' data: https://avatars.githubusercontent.com",
+    "font-src 'self'",
+    "frame-ancestors 'none'",
+  ].join('; '));
+
+  // Security headers
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+
+  if (process.env.NODE_ENV === 'production') {
+    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+
+  return response;
+};
+
+// Rate limiting with Map-based IP tracking
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_MAX = 200;
+
+const rateLimit: Handle = async ({ event, resolve }) => {
+  const ip = event.getClientAddress();
+  const now = Date.now();
+
+  let entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetTime) {
+    entry = { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
+    rateLimitMap.set(ip, entry);
+  }
+
+  entry.count++;
+
+  if (entry.count > RATE_LIMIT_MAX) {
+    return new Response('Too Many Requests', { status: 429 });
+  }
+
+  return resolve(event);
+};
+
+export const handle: Handle = sequence(securityHeaders, rateLimit);

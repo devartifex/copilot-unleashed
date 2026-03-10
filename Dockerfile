@@ -1,4 +1,4 @@
-FROM node:24-slim AS builder
+FROM node:25-slim AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY scripts/ scripts/
@@ -6,7 +6,7 @@ RUN npm ci
 COPY . .
 RUN npm run build && npm prune --omit=dev
 
-FROM node:24-slim
+FROM node:25-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 

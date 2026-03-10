@@ -177,7 +177,7 @@
     if (!viewport) return;
 
     function onResize() {
-      const vh = (viewport?.height ?? window.innerHeight) * 0.01;
+      const vh = viewport?.height ?? window.innerHeight;
       document.documentElement.style.setProperty('--vh', `${vh}px`);
     }
 

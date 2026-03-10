@@ -197,6 +197,7 @@ export function setupWebSocket(
   wss.on('close', () => clearInterval(heartbeat));
 
   wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
+    console.log('[WS-SERVER] New connection attempt from', req.socket.remoteAddress);
     (ws as any).isAlive = true;
     ws.on('pong', () => { (ws as any).isAlive = true; });
 
@@ -217,7 +218,9 @@ export function setupWebSocket(
     });
 
     const session = (req as any).session;
+    console.log('[WS-SERVER] Session extracted:', !!session, 'token:', !!session?.githubToken, 'user:', session?.githubUser?.login);
     const auth = checkAuth(session);
+    console.log('[WS-SERVER] Auth check result:', auth.authenticated, auth.error || 'ok');
     if (!auth.authenticated) {
       logSecurity('warn', 'ws_unauthorized', {
         ip: req.socket.remoteAddress,
@@ -243,9 +246,11 @@ export function setupWebSocket(
 
     const githubToken: string = session.githubToken;
     const userLogin: string = session.githubUser?.login || 'unknown';
+    console.log('[WS-SERVER] Authenticated user:', userLogin, 'checking pool...');
     let entry = sessionPool.get(userLogin);
 
     if (entry) {
+      console.log('[WS-SERVER] Existing pool entry found for', userLogin);
       // Reattach to existing pool entry
       if (entry.ws && entry.ws !== ws && entry.ws.readyState === WebSocket.OPEN) {
         entry.ws.close(4002, 'Replaced by new connection');
@@ -264,6 +269,7 @@ export function setupWebSocket(
         }
       }
 
+      console.log('[WS-SERVER] Sending session_reconnected to', userLogin, 'hasSession:', !!entry.session);
       poolSend(entry, {
         type: 'session_reconnected',
         user: userLogin,
@@ -272,10 +278,12 @@ export function setupWebSocket(
       });
     } else {
       // Create new pool entry
+      console.log('[WS-SERVER] Creating new pool entry for', userLogin);
       const client = createCopilotClient(githubToken);
       entry = createPoolEntry(client, ws);
       sessionPool.set(userLogin, entry);
 
+      console.log('[WS-SERVER] Sending connected to', userLogin);
       poolSend(entry, {
         type: 'connected',
         user: userLogin,
@@ -285,7 +293,8 @@ export function setupWebSocket(
     // Capture entry reference for this connection's handlers
     const connectionEntry = entry;
 
-    ws.on('close', () => {
+    ws.on('close', (code: number, reason: Buffer) => {
+      console.log('[WS-SERVER] Client disconnected:', userLogin, 'code:', code, 'reason:', reason?.toString());
       if (connectionEntry.ws === ws) {
         connectionEntry.ws = null;
         connectionEntry.ttlTimer = setTimeout(async () => {
@@ -298,6 +307,7 @@ export function setupWebSocket(
     ws.on('message', async (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
+        console.log('[WS-SERVER] Message from', userLogin, ':', msg.type);
 
         if (!msg.type || !VALID_MESSAGE_TYPES.has(msg.type)) {
           poolSend(connectionEntry, { type: 'error', message: 'Unknown message type' });

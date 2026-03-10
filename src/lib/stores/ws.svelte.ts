@@ -110,9 +110,11 @@ export function createWsStore(): WsStore {
 
   function connect(): void {
     if (typeof window === 'undefined') return;
+    console.log(`[WS-STORE] connect() called, existing ws=${!!ws}, readyState=${ws?.readyState}`);
 
     // Close existing connection
     if (ws) {
+      console.log('[WS-STORE] Closing existing connection before reconnect');
       try { ws.close(); } catch { /* ignore */ }
       ws = null;
     }
@@ -130,6 +132,7 @@ export function createWsStore(): WsStore {
     socket.onmessage = (event: MessageEvent) => {
       try {
         const msg = JSON.parse(event.data as string) as ServerMessage;
+        console.log(`[WS-STORE] Received message: type=${msg.type}`);
         dispatchMessage(msg);
       } catch {
         console.error('WS: failed to parse message');
@@ -159,6 +162,7 @@ export function createWsStore(): WsStore {
   }
 
   function disconnect(): void {
+    console.log(`[WS-STORE] disconnect() called, ws=${!!ws}`);
     clearReconnectTimer();
     if (visibilityCleanup) {
       visibilityCleanup();

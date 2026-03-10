@@ -35,9 +35,15 @@
     new Set(chatStore.tools.filter(t => t.mcpServerName).map(t => t.mcpServerName)).size
   );
 
+  // ── Debug: trace data.authenticated changes ──────────────────────────
+  $effect(() => {
+    console.log(`[PAGE] data.authenticated=${data.authenticated} user=${JSON.stringify(data.user)}`);
+  });
+
   // ── Lifecycle ──────────────────────────────────────────────────────────
   $effect(() => {
     if (data.authenticated) {
+      console.log(`[PAGE] authenticated=true, loading settings & connecting WS`);
       settings.load();
       wsStore.connect();
 
@@ -62,9 +68,12 @@
       });
 
       return () => {
+        console.log(`[PAGE] effect cleanup: disconnecting WS`);
         unsub();
         wsStore.disconnect();
       };
+    } else {
+      console.log(`[PAGE] authenticated=false, showing login screen`);
     }
   });
 

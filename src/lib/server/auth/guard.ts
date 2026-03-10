@@ -1,19 +1,28 @@
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
 
+export interface GitHubUser {
+  login: string;
+  name: string;
+}
+
 export interface SessionData {
   githubToken?: string;
-  githubUser?: { login: string; name: string };
+  githubUser?: GitHubUser;
   githubAuthTime?: number;
   githubDeviceCode?: string;
   githubDeviceExpiry?: number;
+  save(callback: (err?: Error) => void): void;
+  destroy(callback: (err?: Error) => void): void;
 }
 
-export function checkAuth(session: SessionData | undefined): {
+export interface AuthResult {
   authenticated: boolean;
-  user: { login: string; name: string } | null;
+  user: GitHubUser | null;
   error?: string;
-} {
+}
+
+export function checkAuth(session: SessionData | null | undefined): AuthResult {
   if (!session?.githubToken) {
     return { authenticated: false, user: null, error: 'GitHub authentication required' };
   }
@@ -27,5 +36,5 @@ export function checkAuth(session: SessionData | undefined): {
     return { authenticated: false, user: null, error: 'Session expired. Please sign in again.' };
   }
 
-  return { authenticated: true, user: session.githubUser || null };
+  return { authenticated: true, user: session.githubUser ?? null };
 }

@@ -110,11 +110,11 @@ export function createAuthStore() {
           const pollData = (await result.json()) as PollResponse;
 
           if (pollData.status === 'authorized') {
+            console.log(`[AUTH-STORE] poll returned authorized, user=${pollData.user?.login ?? pollData.githubUser ?? 'unknown'}`);
             clearTimers();
             authStatus = 'authorized';
             user = pollData.user ?? null;
             authenticated = true;
-            setTimeout(() => window.location.reload(), 800);
             return;
           }
 

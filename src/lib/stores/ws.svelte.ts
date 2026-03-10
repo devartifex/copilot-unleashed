@@ -121,6 +121,7 @@ export function createWsStore(): WsStore {
     const socket = new WebSocket(buildWsUrl());
 
     socket.onopen = () => {
+      console.log(`[WS-STORE] WebSocket connected`);
       connectionState = 'connected';
       reconnectDelay = INITIAL_RECONNECT_DELAY;
       clearReconnectTimer();
@@ -136,6 +137,7 @@ export function createWsStore(): WsStore {
     };
 
     socket.onclose = (event: CloseEvent) => {
+      console.log(`[WS-STORE] WebSocket closed code=${event.code} reason=${event.reason}`);
       connectionState = 'disconnected';
       sessionReady = false;
       ws = null;
@@ -148,6 +150,7 @@ export function createWsStore(): WsStore {
     };
 
     socket.onerror = () => {
+      console.error(`[WS-STORE] WebSocket error`);
       connectionState = 'error';
     };
 

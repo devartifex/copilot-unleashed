@@ -52,17 +52,29 @@ export async function pollForToken(
   return { status: 'authorized', token: data.access_token };
 }
 
+export type TokenValidationResult =
+  | { valid: true; user: { login: string; name: string } }
+  | { valid: false; reason: 'invalid_token' | 'api_error' };
+
 export async function validateGitHubToken(
   token: string
-): Promise<{ login: string; name: string } | null> {
+): Promise<TokenValidationResult> {
   try {
     const res = await fetch(`${GITHUB_API_URL}/user`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) return null;
+
+    if (res.status === 401 || res.status === 403) {
+      return { valid: false, reason: 'invalid_token' };
+    }
+
+    if (!res.ok) {
+      return { valid: false, reason: 'api_error' };
+    }
+
     const user = (await res.json()) as Record<string, string>;
-    return { login: user.login, name: user.name || user.login };
+    return { valid: true, user: { login: user.login, name: user.name || user.login } };
   } catch {
-    return null;
+    return { valid: false, reason: 'api_error' };
   }
 }

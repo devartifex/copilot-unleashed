@@ -5,7 +5,7 @@ import { createCopilotClient } from '$lib/server/copilot/client';
 import { getAvailableModels } from '$lib/server/copilot/session';
 
 export const GET: RequestHandler = async ({ locals }) => {
-	const auth = checkAuth(locals.session ?? undefined);
+	const auth = checkAuth(locals.session);
 	if (!auth.authenticated) {
 		return json({ error: auth.error }, { status: 401 });
 	}
@@ -16,8 +16,9 @@ export const GET: RequestHandler = async ({ locals }) => {
 		const modelArray = Array.isArray(models) ? models : [];
 		await client.stop();
 		return json({ models: modelArray });
-	} catch (err: any) {
-		console.error('Models error:', err.message);
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : 'Unknown error';
+		console.error('Models error:', message);
 		return json({ error: 'Failed to list models', models: [] }, { status: 500 });
 	}
 };

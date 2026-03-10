@@ -5,6 +5,8 @@ import { createCopilotSession, getAvailableModels } from '../copilot/session.js'
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
 import { validateGitHubToken } from '../auth/github.js';
+import { checkAuth } from '../auth/guard.js';
+import { clearAuth } from '../auth/session-utils.js';
 import {
   sessionPool, createPoolEntry, destroyPoolEntry, poolSend,
   type PoolEntry,
@@ -215,27 +217,28 @@ export function setupWebSocket(
     });
 
     const session = (req as any).session;
-    if (!session?.githubToken) {
-      logSecurity('warn', 'ws_unauthorized', { ip: req.socket.remoteAddress });
-      ws.close(4001, 'Unauthorized');
-      return;
-    }
-
-    // Token freshness check for WebSocket connections
-    const authTime = session.githubAuthTime;
-    if (authTime && Date.now() - authTime > config.tokenMaxAge) {
-      logSecurity('info', 'ws_token_expired', { user: session.githubUser?.login });
-      ws.close(4001, 'Session expired');
+    const auth = checkAuth(session);
+    if (!auth.authenticated) {
+      logSecurity('warn', 'ws_unauthorized', {
+        ip: req.socket.remoteAddress,
+        reason: auth.error,
+      });
+      ws.close(4001, auth.error ?? 'Unauthorized');
       return;
     }
 
     // Validate token is still valid with GitHub (catches revoked tokens)
-    const tokenUser = await validateGitHubToken(session.githubToken);
-    if (!tokenUser) {
-      logSecurity('warn', 'ws_token_revoked', { user: session.githubUser?.login });
-      session.destroy(() => {});
-      ws.close(4001, 'Token revoked');
-      return;
+    // Skip for tokens authenticated within the last 30 seconds (just validated by poll endpoint)
+    const authAge = session.githubAuthTime ? Date.now() - session.githubAuthTime : Infinity;
+    if (authAge > 30_000) {
+      const validation = await validateGitHubToken(session.githubToken);
+      if (!validation.valid && validation.reason === 'invalid_token') {
+        logSecurity('warn', 'ws_token_revoked', { user: session.githubUser?.login });
+        await clearAuth(session);
+        ws.close(4001, 'Token revoked');
+        return;
+      }
+      // Transient API errors are not treated as revocation — allow connection
     }
 
     const githubToken: string = session.githubToken;

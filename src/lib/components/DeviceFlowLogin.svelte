@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createAuthStore } from '$lib/stores/auth.svelte';
+  import { invalidateAll } from '$app/navigation';
 
   const auth = createAuthStore();
 
@@ -13,6 +14,19 @@
       auth.destroy();
       if (copyTimeout) clearTimeout(copyTimeout);
     };
+  });
+
+  // Re-run layout load when auth succeeds (avoids full page reload)
+  $effect(() => {
+    console.log(`[LOGIN] authStatus changed: ${auth.authStatus}`);
+    if (auth.authStatus === 'authorized') {
+      console.log(`[LOGIN] authorized! calling invalidateAll()...`);
+      invalidateAll().then(() => {
+        console.log(`[LOGIN] invalidateAll() resolved`);
+      }).catch((err) => {
+        console.error(`[LOGIN] invalidateAll() FAILED:`, err);
+      });
+    }
   });
 
   function copyCode(): void {

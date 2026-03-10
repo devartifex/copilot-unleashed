@@ -55,4 +55,22 @@ export default defineConfig({
 	server: {
 		port: 5173,
 	},
+	build: {
+		rollupOptions: {
+			output: {
+				manualChunks(id) {
+					// Keep Svelte runtime in one chunk to avoid circular deps
+					if (id.includes('node_modules/svelte')) {
+						return 'svelte';
+					}
+					// Group markdown rendering libs together
+					if (id.includes('node_modules/highlight.js') ||
+						id.includes('node_modules/marked') ||
+						id.includes('node_modules/dompurify')) {
+						return 'markdown-vendor';
+					}
+				},
+			},
+		},
+	},
 });

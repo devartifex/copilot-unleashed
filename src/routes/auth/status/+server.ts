@@ -1,24 +1,18 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { config } from '$lib/server/config';
-import { logSecurity } from '$lib/server/security-log';
+import { checkAuth } from '$lib/server/auth/guard';
+import { clearAuth } from '$lib/server/auth/session-utils';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	const session = locals.session;
+	const auth = checkAuth(session);
 
-	if (session?.githubToken) {
-		const authTime = session.githubAuthTime;
-		if (authTime && Date.now() - authTime > config.tokenMaxAge) {
-			logSecurity('info', 'status_check_expired', {
-				user: session.githubUser?.login,
-			});
-			await new Promise<void>((resolve) => session.destroy(() => resolve()));
-			return json({ authenticated: false, githubUser: null });
-		}
+	if (session?.githubToken && !auth.authenticated) {
+		await clearAuth(session);
 	}
 
 	return json({
-		authenticated: !!session?.githubToken,
-		githubUser: session?.githubUser?.login || null,
+		authenticated: auth.authenticated,
+		githubUser: auth.user?.login ?? null,
 	});
 };

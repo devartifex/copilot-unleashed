@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requestDeviceCode } from '$lib/server/auth/github';
+import { saveSession } from '$lib/server/auth/session-utils';
 
 export const POST: RequestHandler = async ({ locals }) => {
 	if (!locals.session) {
@@ -12,9 +13,7 @@ export const POST: RequestHandler = async ({ locals }) => {
 
 		locals.session.githubDeviceCode = deviceData.device_code;
 		locals.session.githubDeviceExpiry = Date.now() + deviceData.expires_in * 1000;
-		await new Promise<void>((resolve, reject) =>
-			locals.session!.save((err?) => (err ? reject(err) : resolve()))
-		);
+		await saveSession(locals.session);
 
 		return json({
 			user_code: deviceData.user_code,

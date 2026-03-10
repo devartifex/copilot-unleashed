@@ -21,7 +21,7 @@ const sessionMiddleware = session({
     httpOnly: true,
     secure: !isDev,
     sameSite: 'lax',
-    maxAge: 30 * 24 * 60 * 60 * 1000,
+    maxAge: parseInt(process.env.TOKEN_MAX_AGE_MS || String(7 * 24 * 60 * 60 * 1000)),
   },
 });
 

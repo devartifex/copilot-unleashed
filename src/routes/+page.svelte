@@ -103,9 +103,6 @@
         console.log('[PAGE] effect cleanup: unsubscribing and disconnecting WS');
         unsub();
         wsStore.disconnect();
-        console.log(`[PAGE] effect cleanup: disconnecting WS`);
-        unsub();
-        wsStore.disconnect();
       };
     } else {
       console.log(`[PAGE] authenticated=false, showing login screen`);
@@ -308,10 +305,12 @@
     <SessionsSheet
       open={sessionsOpen}
       sessions={chatStore.sessions}
+      sessionDetail={chatStore.sessionDetail}
       loading={sessionsLoading}
       onClose={() => sessionsOpen = false}
       onResume={handleResumeSession}
       onDelete={(id) => wsStore.deleteSession(id)}
+      onRequestDetail={(id) => wsStore.getSessionDetail(id)}
     />
   </div>
 {:else}

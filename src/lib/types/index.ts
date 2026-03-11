@@ -102,6 +102,33 @@ export interface SessionSummary {
   title?: string;
   model?: string;
   updatedAt?: string;
+  cwd?: string;
+  repository?: string;
+  branch?: string;
+  checkpointCount?: number;
+  hasPlan?: boolean;
+  isRemote?: boolean;
+  /** Where the session was found: 'sdk' = indexed by Copilot CLI, 'filesystem' = on-disk only (bundled) */
+  source?: 'sdk' | 'filesystem';
+}
+
+export interface CheckpointEntry {
+  number: number;
+  title: string;
+  filename: string;
+}
+
+export interface SessionDetail {
+  id: string;
+  cwd?: string;
+  repository?: string;
+  branch?: string;
+  summary?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  checkpoints: CheckpointEntry[];
+  plan?: string;
+  isRemote?: boolean;
 }
 
 // ─── Incoming server messages (discriminated union on `type`) ────────────────
@@ -262,6 +289,11 @@ export interface SessionsMessage {
   sessions: SessionSummary[];
 }
 
+export interface SessionDetailMessage {
+  type: 'session_detail';
+  detail: SessionDetail;
+}
+
 export interface SessionResumedMessage {
   type: 'session_resumed';
   sessionId: string;
@@ -406,6 +438,7 @@ export type ServerMessage =
   | AgentChangedMessage
   | QuotaMessage
   | SessionsMessage
+  | SessionDetailMessage
   | SessionResumedMessage
   | SessionDeletedMessage
   | PlanMessage
@@ -533,6 +566,11 @@ export interface DeleteSessionMessage {
   sessionId: string;
 }
 
+export interface GetSessionDetailMessage {
+  type: 'get_session_detail';
+  sessionId: string;
+}
+
 export interface GetPlanMessage {
   type: 'get_plan';
 }
@@ -565,6 +603,7 @@ export type ClientMessage =
   | ListSessionsMessage
   | ResumeSessionMessage
   | DeleteSessionMessage
+  | GetSessionDetailMessage
   | GetPlanMessage
   | UpdatePlanMessage
   | DeletePlanMessage;

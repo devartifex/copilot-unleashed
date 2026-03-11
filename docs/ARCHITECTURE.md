@@ -159,6 +159,23 @@ interface PoolEntry {
 
 On disconnect, a TTL timer starts. On reconnect, buffered messages are replayed.
 
+### Session State & CLI Interop
+
+Sessions are persisted by the SDK to `~/.copilot/session-state/{sessionId}/` (configurable via `COPILOT_CONFIG_DIR`):
+
+```
+session-state/{UUID}/
+├── workspace.yaml       # Metadata: id, cwd, git context, summary, timestamps
+├── checkpoints/
+│   ├── index.md         # Checkpoint history table
+│   └── 001-{title}.md   # Numbered checkpoint files
+├── plan.md              # Execution plan (optional)
+├── files/               # Workspace artifacts
+└── events.jsonl         # Full conversation event log
+```
+
+Both the **Copilot CLI** and **Copilot Unleashed** share this directory. Sessions created in either interface can be resumed in the other — the SDK's `resumeSession()` automatically restores checkpoints and plan context. The session listing is enriched with filesystem metadata (checkpoint count, plan status, git context) for the UI.
+
 ## Component Architecture
 
 ### Store Pattern

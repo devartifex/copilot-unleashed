@@ -12,3 +12,5 @@ test-results/
 playwright-report/
 .azure/
 public/
+bundled-sessions/
+bundled-session-store.db

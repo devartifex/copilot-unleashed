@@ -3,6 +3,7 @@ import { Server, IncomingMessage } from 'http';
 import { approveAll } from '@github/copilot-sdk';
 import { createCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
+import { enrichSessionMetadata, getSessionDetail, listSessionsFromFilesystem, buildSessionContext } from '../copilot/session-metadata.js';
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
 import { validateGitHubToken } from '../auth/github.js';
@@ -22,7 +23,7 @@ const VALID_MESSAGE_TYPES = new Set([
   'permission_response',
   'list_tools', 'list_agents', 'select_agent', 'deselect_agent',
   'get_quota', 'compact', 'list_sessions', 'resume_session',
-  'delete_session', 'get_plan', 'update_plan', 'delete_plan',
+  'delete_session', 'get_session_detail', 'get_plan', 'update_plan', 'delete_plan',
 ]);
 const VALID_MODES = new Set(['interactive', 'plan', 'autopilot']);
 const VALID_REASONING = new Set(['low', 'medium', 'high', 'xhigh']);
@@ -301,7 +302,7 @@ export function setupWebSocket(
     } else {
       // Create new pool entry
       console.log('[WS-SERVER] Creating new pool entry for', userLogin);
-      const client = createCopilotClient(githubToken);
+      const client = createCopilotClient(githubToken, config.copilotConfigDir);
       entry = createPoolEntry(client, ws);
       sessionPool.set(userLogin, entry);
 
@@ -407,6 +408,7 @@ export function setupWebSocket(
                 permissionMode,
                 onPermissionRequest: makePermissionHandler(connectionEntry),
                 mcpServers,
+                configDir: config.copilotConfigDir,
               });
 
               wireSessionEvents(connectionEntry.session, connectionEntry);
@@ -704,17 +706,52 @@ export function setupWebSocket(
 
           case 'list_sessions': {
             try {
+              // start() is idempotent — no-op if already connected
+              console.log('[DEBUG list_sessions] Starting client…');
+              await connectionEntry.client.start();
+              console.log('[DEBUG list_sessions] client.listSessions()…');
               const sessions = await connectionEntry.client.listSessions();
-              const list = Array.isArray(sessions) ? sessions.map((s: any) => ({
-                id: s.sessionId ?? s.id,
-                title: s.summary ?? s.title,
-                updatedAt: s.modifiedTime ?? s.updatedAt,
-                model: s.model,
-              })) : [];
+              const rawList = Array.isArray(sessions) ? sessions : [];
+              console.log('[DEBUG list_sessions] SDK returned', rawList.length, 'sessions');
+
+              // Enrich each session with filesystem metadata in parallel
+              const sdkSessions = await Promise.all(
+                rawList.map(async (s: any) => {
+                  const id = s.sessionId ?? s.id;
+                  const enriched = await enrichSessionMetadata(id, s.context, s.isRemote);
+                  return {
+                    id,
+                    title: s.summary ?? s.title,
+                    updatedAt: s.modifiedTime ?? s.updatedAt,
+                    model: s.model,
+                    source: 'sdk' as const,
+                    ...enriched,
+                  };
+                }),
+              );
+
+              // Merge with filesystem sessions the SDK may not know about
+              // (e.g. bundled sessions copied into a fresh container)
+              console.log('[DEBUG list_sessions] Scanning filesystem…');
+              const fsSessions = await listSessionsFromFilesystem();
+              console.log('[DEBUG list_sessions] Filesystem found', fsSessions.length, 'sessions');
+              const sdkIds = new Set(sdkSessions.map((s) => s.id));
+              const extraSessions = fsSessions.filter((s) => !sdkIds.has(s.id)).map((s) => ({ ...s, source: 'filesystem' as const }));
+              const list = [...sdkSessions, ...extraSessions];
+              console.log('[DEBUG list_sessions] Sending', list.length, 'total (SDK:', sdkSessions.length, '+ FS extra:', extraSessions.length, ')');
+
               poolSend(connectionEntry, { type: 'sessions', sessions: list });
             } catch (err: any) {
-              console.error('List sessions error:', err.message);
-              poolSend(connectionEntry, { type: 'sessions', sessions: [] });
+              console.error('[DEBUG list_sessions] SDK error:', err.message);
+              // SDK failed — fall back to filesystem-only listing
+              try {
+                const fsSessions = await listSessionsFromFilesystem();
+                console.log('[DEBUG list_sessions] Fallback: filesystem found', fsSessions.length, 'sessions');
+                poolSend(connectionEntry, { type: 'sessions', sessions: fsSessions.map((s) => ({ ...s, source: 'filesystem' as const })) });
+              } catch (fsErr: any) {
+                console.error('[DEBUG list_sessions] Filesystem fallback also failed:', fsErr.message);
+                poolSend(connectionEntry, { type: 'sessions', sessions: [] });
+              }
             }
             break;
           }
@@ -742,6 +779,32 @@ export function setupWebSocket(
             break;
           }
 
+          case 'get_session_detail': {
+            const detailId = typeof msg.sessionId === 'string' ? msg.sessionId.trim() : '';
+            console.log('[DEBUG get_session_detail] Requested:', JSON.stringify(detailId));
+            if (!detailId) {
+              console.log('[DEBUG get_session_detail] Empty ID, sending error');
+              poolSend(connectionEntry, { type: 'error', message: 'Session ID is required' });
+              return;
+            }
+
+            try {
+              console.log('[DEBUG get_session_detail] Calling getSessionDetail…');
+              const detail = await getSessionDetail(detailId);
+              console.log('[DEBUG get_session_detail] Result:', detail ? `found (id=${detail.id})` : 'null');
+              if (!detail) {
+                poolSend(connectionEntry, { type: 'error', message: 'Session not found' });
+                return;
+              }
+              poolSend(connectionEntry, { type: 'session_detail', detail });
+              console.log('[DEBUG get_session_detail] Sent session_detail response');
+            } catch (err: any) {
+              console.error('[DEBUG get_session_detail] Error:', err.message, err.stack);
+              poolSend(connectionEntry, { type: 'error', message: `Failed to get session detail: ${err.message}` });
+            }
+            break;
+          }
+
           case 'resume_session': {
             const sessionId = typeof msg.sessionId === 'string' ? msg.sessionId.trim() : '';
             if (!sessionId) {
@@ -757,11 +820,42 @@ export function setupWebSocket(
             connectionEntry.permissionResolve = null;
 
             try {
-              connectionEntry.session = await connectionEntry.client.resumeSession(sessionId, {
-                onPermissionRequest: (await import('@github/copilot-sdk')).approveAll,
-                streaming: true,
-                onUserInputRequest: makeUserInputHandler(connectionEntry),
-              });
+              // start() is idempotent — ensures the SDK has indexed all local sessions
+              await connectionEntry.client.start();
+
+              const resolvedConfigDir = config.copilotConfigDir || (await import('node:path')).join((await import('node:os')).homedir(), '.copilot');
+
+              let resumed = false;
+
+              // Try native SDK resume first
+              try {
+                connectionEntry.session = await connectionEntry.client.resumeSession(sessionId, {
+                  onPermissionRequest: (await import('@github/copilot-sdk')).approveAll,
+                  streaming: true,
+                  onUserInputRequest: makeUserInputHandler(connectionEntry),
+                  configDir: resolvedConfigDir,
+                });
+                resumed = true;
+              } catch (resumeErr: any) {
+                console.log(`[RESUME] SDK resumeSession failed for ${sessionId}: ${resumeErr.message}`);
+              }
+
+              // Fallback: create a new session with context from the filesystem session
+              if (!resumed) {
+                console.log(`[RESUME] Attempting context-based fallback for ${sessionId}…`);
+                const context = await buildSessionContext(sessionId);
+                if (!context) {
+                  throw new Error(`Session not found: ${sessionId}`);
+                }
+
+                connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, {
+                  customInstructions: context,
+                  onUserInputRequest: makeUserInputHandler(connectionEntry),
+                  permissionMode: 'approve_all',
+                  configDir: resolvedConfigDir,
+                });
+                console.log(`[RESUME] Fallback session created for ${sessionId} with context injection`);
+              }
 
               wireSessionEvents(connectionEntry.session, connectionEntry);
 
@@ -784,6 +878,7 @@ export function setupWebSocket(
               poolSend(connectionEntry, { type: 'session_resumed', sessionId });
             } catch (err: any) {
               console.error('Resume session error:', err.message);
+              console.error('Resume session stack:', err.stack);
               poolSend(connectionEntry, { type: 'error', message: `Failed to resume session: ${err.message}` });
             }
             break;

@@ -10,6 +10,7 @@ import type {
 const INITIAL_RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_DELAY = 60_000;
 const UNAUTHORIZED_CODE = 4001;
+const REPLACED_CODE = 4002;
 
 export interface WsStore {
   readonly connectionState: ConnectionState;
@@ -35,6 +36,7 @@ export interface WsStore {
   selectAgent(name: string): void;
   deselectAgent(): void;
   deleteSession(sessionId: string): void;
+  getSessionDetail(sessionId: string): void;
   getQuota(): void;
   getPlan(): void;
   updatePlan(content: string): void;
@@ -112,9 +114,10 @@ export function createWsStore(): WsStore {
     if (typeof window === 'undefined') return;
     console.log(`[WS-STORE] connect() called, existing ws=${!!ws}, readyState=${ws?.readyState}`);
 
-    // Close existing connection
+    // Close existing connection without triggering reconnect logic
     if (ws) {
       console.log('[WS-STORE] Closing existing connection before reconnect');
+      ws.onclose = null;
       try { ws.close(); } catch { /* ignore */ }
       ws = null;
     }
@@ -149,6 +152,13 @@ export function createWsStore(): WsStore {
         window.location.reload();
         return;
       }
+
+      // 4002 = replaced by a newer connection we opened — don't reconnect
+      // (the newer socket is already active)
+      if (event.code === REPLACED_CODE) {
+        return;
+      }
+
       scheduleReconnect();
     };
 
@@ -169,6 +179,7 @@ export function createWsStore(): WsStore {
       visibilityCleanup = null;
     }
     if (ws) {
+      ws.onclose = null; // prevent onclose from scheduling a reconnect
       try { ws.close(); } catch { /* ignore */ }
       ws = null;
     }
@@ -254,6 +265,10 @@ export function createWsStore(): WsStore {
     send({ type: 'delete_session', sessionId });
   }
 
+  function getSessionDetail(sessionId: string): void {
+    send({ type: 'get_session_detail', sessionId });
+  }
+
   function selectAgent(name: string): void {
     send({ type: 'select_agent', name });
   }
@@ -309,6 +324,7 @@ export function createWsStore(): WsStore {
     listAgents,
     listSessions,
     deleteSession,
+    getSessionDetail,
     selectAgent,
     deselectAgent,
     getQuota,

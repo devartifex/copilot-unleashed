@@ -707,9 +707,12 @@ export function setupWebSocket(
           case 'list_sessions': {
             try {
               // start() is idempotent — no-op if already connected
+              console.log('[DEBUG list_sessions] Starting client…');
               await connectionEntry.client.start();
+              console.log('[DEBUG list_sessions] client.listSessions()…');
               const sessions = await connectionEntry.client.listSessions();
               const rawList = Array.isArray(sessions) ? sessions : [];
+              console.log('[DEBUG list_sessions] SDK returned', rawList.length, 'sessions');
 
               // Enrich each session with filesystem metadata in parallel
               const sdkSessions = await Promise.all(
@@ -728,19 +731,24 @@ export function setupWebSocket(
 
               // Merge with filesystem sessions the SDK may not know about
               // (e.g. bundled sessions copied into a fresh container)
+              console.log('[DEBUG list_sessions] Scanning filesystem…');
               const fsSessions = await listSessionsFromFilesystem();
+              console.log('[DEBUG list_sessions] Filesystem found', fsSessions.length, 'sessions');
               const sdkIds = new Set(sdkSessions.map((s) => s.id));
               const extraSessions = fsSessions.filter((s) => !sdkIds.has(s.id));
               const list = [...sdkSessions, ...extraSessions];
+              console.log('[DEBUG list_sessions] Sending', list.length, 'total (SDK:', sdkSessions.length, '+ FS extra:', extraSessions.length, ')');
 
               poolSend(connectionEntry, { type: 'sessions', sessions: list });
             } catch (err: any) {
-              console.error('List sessions error:', err.message);
+              console.error('[DEBUG list_sessions] SDK error:', err.message);
               // SDK failed — fall back to filesystem-only listing
               try {
                 const fsSessions = await listSessionsFromFilesystem();
+                console.log('[DEBUG list_sessions] Fallback: filesystem found', fsSessions.length, 'sessions');
                 poolSend(connectionEntry, { type: 'sessions', sessions: fsSessions });
-              } catch {
+              } catch (fsErr: any) {
+                console.error('[DEBUG list_sessions] Filesystem fallback also failed:', fsErr.message);
                 poolSend(connectionEntry, { type: 'sessions', sessions: [] });
               }
             }
@@ -772,20 +780,25 @@ export function setupWebSocket(
 
           case 'get_session_detail': {
             const detailId = typeof msg.sessionId === 'string' ? msg.sessionId.trim() : '';
+            console.log('[DEBUG get_session_detail] Requested:', JSON.stringify(detailId));
             if (!detailId) {
+              console.log('[DEBUG get_session_detail] Empty ID, sending error');
               poolSend(connectionEntry, { type: 'error', message: 'Session ID is required' });
               return;
             }
 
             try {
+              console.log('[DEBUG get_session_detail] Calling getSessionDetail…');
               const detail = await getSessionDetail(detailId);
+              console.log('[DEBUG get_session_detail] Result:', detail ? `found (id=${detail.id})` : 'null');
               if (!detail) {
                 poolSend(connectionEntry, { type: 'error', message: 'Session not found' });
                 return;
               }
               poolSend(connectionEntry, { type: 'session_detail', detail });
+              console.log('[DEBUG get_session_detail] Sent session_detail response');
             } catch (err: any) {
-              console.error('Get session detail error:', err.message);
+              console.error('[DEBUG get_session_detail] Error:', err.message, err.stack);
               poolSend(connectionEntry, { type: 'error', message: `Failed to get session detail: ${err.message}` });
             }
             break;

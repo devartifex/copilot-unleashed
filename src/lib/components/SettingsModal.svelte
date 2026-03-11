@@ -191,6 +191,8 @@
       return { label: 'Premium Usage', snapshot: quotaSnapshots.copilot_premium };
     if (quotaSnapshots.premium_requests)
       return { label: 'Premium Requests', snapshot: quotaSnapshots.premium_requests };
+    if (quotaSnapshots.premium_interactions)
+      return { label: 'Premium Interactions', snapshot: quotaSnapshots.premium_interactions };
     if (quotaSnapshots.chat)
       return { label: 'Chat Usage', snapshot: quotaSnapshots.chat };
     return null;

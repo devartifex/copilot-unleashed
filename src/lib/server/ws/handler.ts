@@ -28,6 +28,22 @@ const VALID_MODES = new Set(['interactive', 'plan', 'autopilot']);
 const VALID_REASONING = new Set(['low', 'medium', 'high', 'xhigh']);
 const HEARTBEAT_INTERVAL = 30_000;
 
+/** Normalize SDK quota snapshots: convert remainingPercentage from 0.0–1.0 to 0–100 and add percentageUsed */
+function normalizeQuotaSnapshots(raw: Record<string, any> | undefined): Record<string, any> | undefined {
+  if (!raw) return raw;
+  const result: Record<string, any> = {};
+  for (const [key, snap] of Object.entries(raw)) {
+    const remaining = snap.remainingPercentage;
+    const normalizedRemaining = remaining != null && remaining <= 1 ? remaining * 100 : remaining;
+    result[key] = {
+      ...snap,
+      remainingPercentage: normalizedRemaining,
+      percentageUsed: normalizedRemaining != null ? 100 - normalizedRemaining : undefined,
+    };
+  }
+  return result;
+}
+
 function wireSessionEvents(session: any, entry: PoolEntry): void {
   session.on('assistant.message_delta', (event: any) => {
     poolSend(entry, { type: 'delta', content: event.data.deltaContent });
@@ -76,7 +92,7 @@ function wireSessionEvents(session: any, entry: PoolEntry): void {
       totalTokens: event.data.totalTokens,
       reasoningTokens: event.data.reasoningTokens,
       cost: event.data.cost,
-      quotaSnapshots: event.data.quotaSnapshots,
+      quotaSnapshots: normalizeQuotaSnapshots(event.data.quotaSnapshots),
     });
   });
   session.on('session.warning', (event: any) => {
@@ -659,7 +675,10 @@ export function setupWebSocket(
           case 'get_quota': {
             try {
               const result = await connectionEntry.client.rpc.account.getQuota();
-              poolSend(connectionEntry, { type: 'quota', ...result });
+              poolSend(connectionEntry, {
+                type: 'quota',
+                quotaSnapshots: normalizeQuotaSnapshots(result.quotaSnapshots),
+              });
             } catch (err: any) {
               console.error('Get quota error:', err.message);
               poolSend(connectionEntry, { type: 'error', message: `Failed to get quota: ${err.message}` });

@@ -10,7 +10,7 @@
     "dev": "docker compose up --build",
     "dev:local": "npm run build:server && vite dev",
     "dev:down": "docker compose down",
-    "preview": "npm run build && node server.js",
+    "preview": "npm run build && node --env-file=.env server.js",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "npx playwright test",
     "test:ui": "npx playwright test --ui",

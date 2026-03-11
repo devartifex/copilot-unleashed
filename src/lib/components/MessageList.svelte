@@ -5,6 +5,8 @@
   import ChatMessage from '$lib/components/ChatMessage.svelte';
   import ReasoningBlock from '$lib/components/ReasoningBlock.svelte';
 
+  const BRAILLE_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
   interface Props {
     chatStore: ChatStore;
     username?: string;
@@ -15,6 +17,7 @@
 
   let messagesEl: HTMLDivElement | undefined = $state();
   let streamContentEl: HTMLDivElement | undefined = $state();
+  let spinnerIndex = $state(0);
 
   const streamHtml = $derived(
     chatStore.currentStreamContent
@@ -22,8 +25,12 @@
       : '',
   );
 
-
   const hasReasoningContent = $derived(chatStore.currentReasoningContent.length > 0);
+  const showWaiting = $derived(
+    chatStore.isWaiting &&
+    !chatStore.currentStreamContent &&
+    !chatStore.currentReasoningContent,
+  );
 
   function isNearBottom(): boolean {
     const el = messagesEl;
@@ -57,6 +64,15 @@
     highlightCodeBlocks(streamContentEl);
     addCopyButtons(streamContentEl);
   });
+
+  // Braille spinner for waiting state
+  $effect(() => {
+    if (!showWaiting) return;
+    const interval = setInterval(() => {
+      spinnerIndex = (spinnerIndex + 1) % BRAILLE_FRAMES.length;
+    }, 80);
+    return () => clearInterval(interval);
+  });
 </script>
 
 <div class="messages" bind:this={messagesEl}>
@@ -69,8 +85,15 @@
     {#if hasReasoningContent}
       <ReasoningBlock
         content={chatStore.currentReasoningContent}
-        isStreaming={chatStore.isStreaming}
+        isStreaming={chatStore.isReasoningStreaming}
       />
+    {/if}
+
+    {#if showWaiting}
+      <div class="waiting-indicator">
+        <span class="waiting-spinner">{BRAILLE_FRAMES[spinnerIndex]}</span>
+        <span class="waiting-label">Thinking</span>
+      </div>
     {/if}
 
     {#if chatStore.currentStreamContent}
@@ -216,5 +239,27 @@
   @keyframes blink-cursor {
     0%, 100% { opacity: 1; }
     50% { opacity: 0; }
+  }
+
+  /* ── waiting indicator (before first token/tool) ─────────────────────── */
+  .waiting-indicator {
+    padding: var(--sp-2) var(--sp-3);
+    padding-left: calc(var(--sp-3) + 3px);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    animation: msg-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .waiting-spinner {
+    color: var(--yellow);
+    font-size: 0.85em;
+    width: 1em;
+    text-align: center;
+  }
+
+  .waiting-label {
+    color: var(--fg-muted);
+    font-size: 0.82em;
   }
 </style>

@@ -565,7 +565,8 @@ export type ChatMessageRole =
   | 'intent'
   | 'usage'
   | 'skill'
-  | 'subagent';
+  | 'subagent'
+  | 'reasoning';
 
 export interface ChatMessage {
   id: string;
@@ -575,6 +576,7 @@ export interface ChatMessage {
   toolCallId?: string;
   toolName?: string;
   toolStatus?: ToolCallStatus;
+  toolProgressMessage?: string;
   mcpServerName?: string;
   mcpToolName?: string;
   agentName?: string;

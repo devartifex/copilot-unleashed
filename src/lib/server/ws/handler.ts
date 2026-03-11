@@ -813,7 +813,15 @@ export function setupWebSocket(
         }
       } catch (err: any) {
         console.error('WS message error:', err.message);
-        poolSend(connectionEntry, { type: 'error', message: 'An internal error occurred' });
+        connectionEntry.isProcessing = false;
+        const errMsg = err?.message || 'An internal error occurred';
+        const isTimeout = typeof errMsg === 'string' && errMsg.toLowerCase().includes('timeout');
+        poolSend(connectionEntry, {
+          type: 'error',
+          message: isTimeout
+            ? `Request timed out. The model took too long to respond — try again or start a new session. (${errMsg})`
+            : errMsg,
+        });
       }
     });
 

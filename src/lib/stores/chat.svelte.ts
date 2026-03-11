@@ -22,6 +22,8 @@ export interface ChatStore {
   // Message state
   readonly messages: ChatMessage[];
   readonly isStreaming: boolean;
+  readonly isWaiting: boolean;
+  readonly isReasoningStreaming: boolean;
   readonly currentStreamContent: string;
   readonly currentReasoningContent: string;
   readonly activeToolCalls: Map<string, ToolCallState>;
@@ -69,6 +71,8 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   // ── Message state ───────────────────────────────────────────────────────
   let messages = $state<ChatMessage[]>([]);
   let isStreaming = $state(false);
+  let isWaiting = $state(false);
+  let isReasoningStreaming = $state(false);
   let currentStreamContent = $state('');
   let currentReasoningContent = $state('');
   let activeToolCalls = $state(new Map<string, ToolCallState>());
@@ -123,6 +127,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       addMessage('assistant', currentStreamContent);
     }
     isStreaming = false;
+    isWaiting = false;
     currentStreamContent = '';
     currentReasoningContent = '';
     activeToolCalls = new Map();
@@ -148,14 +153,22 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
       case 'turn_start':
         currentReasoningContent = '';
+        isReasoningStreaming = false;
+        isWaiting = true;
         activeToolCalls = new Map();
         break;
 
       case 'reasoning_delta':
+        isWaiting = false;
+        isReasoningStreaming = true;
         currentReasoningContent += msg.content;
         break;
 
       case 'reasoning_done':
+        if (currentReasoningContent.trim()) {
+          addMessage('reasoning', currentReasoningContent);
+        }
+        isReasoningStreaming = false;
         currentReasoningContent = '';
         break;
 
@@ -164,6 +177,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'tool_start':
+        isWaiting = false;
         addMessage('tool', msg.toolName, {
           toolCallId: msg.toolCallId,
           toolName: msg.toolName,
@@ -175,7 +189,9 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
       case 'tool_progress':
         messages = messages.map(m =>
-          m.toolCallId === msg.toolCallId ? { ...m, toolStatus: 'progress' as const } : m,
+          m.toolCallId === msg.toolCallId
+            ? { ...m, toolStatus: 'progress' as const, toolProgressMessage: msg.message }
+            : m,
         );
         break;
 
@@ -186,6 +202,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'delta':
+        isWaiting = false;
         if (!isStreaming) {
           isStreaming = true;
           currentStreamContent = '';
@@ -261,6 +278,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       case 'error':
         addMessage('error', msg.message);
         isStreaming = false;
+        isWaiting = false;
         currentStreamContent = '';
         // Don't clear pendingUserInput — the error may be unrelated to the ask_user flow
         pendingPermission = null;
@@ -268,6 +286,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
       case 'aborted':
         isStreaming = false;
+        isWaiting = false;
         currentStreamContent = '';
         pendingUserInput = null;
         pendingPermission = null;
@@ -443,6 +462,8 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   function clearMessages(): void {
     messages = [];
     isStreaming = false;
+    isWaiting = false;
+    isReasoningStreaming = false;
     currentStreamContent = '';
     currentReasoningContent = '';
     activeToolCalls = new Map();
@@ -469,6 +490,8 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   return {
     get messages() { return messages; },
     get isStreaming() { return isStreaming; },
+    get isWaiting() { return isWaiting; },
+    get isReasoningStreaming() { return isReasoningStreaming; },
     get currentStreamContent() { return currentStreamContent; },
     get currentReasoningContent() { return currentReasoningContent; },
     get activeToolCalls() { return activeToolCalls; },

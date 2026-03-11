@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { ChatMessage } from '$lib/types/index.js';
+import type { ChatMessage } from '$lib/types/index.js';
   import { renderMarkdown, highlightCodeBlocks, addCopyButtons } from '$lib/utils/markdown.js';
   import ToolCall from '$lib/components/ToolCall.svelte';
+  import ReasoningBlock from '$lib/components/ReasoningBlock.svelte';
 
   interface Props {
     message: ChatMessage;
@@ -43,6 +44,7 @@
       mcpServerName: message.mcpServerName,
       mcpToolName: message.mcpToolName,
       status: message.toolStatus ?? 'running',
+      message: message.toolProgressMessage,
     };
   });
 
@@ -102,6 +104,9 @@
 
 {:else if message.role === 'tool' && toolState}
   <ToolCall tool={toolState} />
+
+{:else if message.role === 'reasoning'}
+  <ReasoningBlock content={message.content} isStreaming={false} />
 {/if}
 
 <style>

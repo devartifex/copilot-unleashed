@@ -1,5 +1,6 @@
-import { CopilotClient, approveAll, defineTool } from '@github/copilot-sdk';
+import { CopilotClient, defineTool } from '@github/copilot-sdk';
 import type { SessionConfig } from '@github/copilot-sdk';
+import { config } from '../config.js';
 import { z } from 'zod';
 
 export interface CustomToolDefinition {
@@ -143,6 +144,7 @@ export async function createCopilotSession(
     model: options.model || 'gpt-4.1',
     streaming: true,
     onPermissionRequest: permissionHandler,
+    ...(config.copilotConfigDir && { configDir: config.copilotConfigDir }),
     mcpServers: {
       github: {
         type: 'http',

@@ -40,6 +40,7 @@ The only open-source web UI built on the official [`@github/copilot-sdk`](https:
 - **Custom webhook tools** — connect any API (Jira, Slack, internal services)
 - **File attachments** — drop in code, images, CSVs
 - **Persistent sessions** — resume any conversation, on any device
+- **CLI ↔ Browser sync** — sessions started in the Copilot CLI work seamlessly in the browser (and vice versa)
 - **Mobile-first dark UI** — touch-optimized, works everywhere
 - **Self-hosted** — your data never leaves your server
 
@@ -188,7 +189,7 @@ That's it. Container Apps, ACR, managed identity, TLS, monitoring — all provis
 | `TOKEN_MAX_AGE_MS` | `86400000` | Force re-auth interval (24h) |
 | `SESSION_STORE_PATH` | `/data/sessions` | Persistent session directory |
 | `SETTINGS_STORE_PATH` | `/data/settings` | Per-user settings directory |
-| `COPILOT_CONFIG_DIR` | — | Copilot CLI config/session-state directory — set to share sessions with the CLI (e.g. `~/.copilot`) |
+| `COPILOT_CONFIG_DIR` | `~/.copilot` | Copilot session-state directory (share with CLI for bidirectional sync) |
 
 </details>
 

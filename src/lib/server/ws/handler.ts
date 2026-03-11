@@ -3,6 +3,7 @@ import { Server, IncomingMessage } from 'http';
 import { approveAll } from '@github/copilot-sdk';
 import { createCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
+import { enrichSessionMetadata, getSessionDetail } from '../copilot/session-metadata.js';
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
 import { validateGitHubToken } from '../auth/github.js';
@@ -22,7 +23,7 @@ const VALID_MESSAGE_TYPES = new Set([
   'permission_response',
   'list_tools', 'list_agents', 'select_agent', 'deselect_agent',
   'get_quota', 'compact', 'list_sessions', 'resume_session',
-  'delete_session', 'get_plan', 'update_plan', 'delete_plan',
+  'delete_session', 'get_session_detail', 'get_plan', 'update_plan', 'delete_plan',
 ]);
 const VALID_MODES = new Set(['interactive', 'plan', 'autopilot']);
 const VALID_REASONING = new Set(['low', 'medium', 'high', 'xhigh']);
@@ -706,12 +707,23 @@ export function setupWebSocket(
           case 'list_sessions': {
             try {
               const sessions = await connectionEntry.client.listSessions();
-              const list = Array.isArray(sessions) ? sessions.map((s: any) => ({
-                id: s.sessionId ?? s.id,
-                title: s.summary ?? s.title,
-                updatedAt: s.modifiedTime ?? s.updatedAt,
-                model: s.model,
-              })) : [];
+              const rawList = Array.isArray(sessions) ? sessions : [];
+
+              // Enrich each session with filesystem metadata in parallel
+              const list = await Promise.all(
+                rawList.map(async (s: any) => {
+                  const id = s.sessionId ?? s.id;
+                  const enriched = await enrichSessionMetadata(id, s.context, s.isRemote);
+                  return {
+                    id,
+                    title: s.summary ?? s.title,
+                    updatedAt: s.modifiedTime ?? s.updatedAt,
+                    model: s.model,
+                    ...enriched,
+                  };
+                }),
+              );
+
               poolSend(connectionEntry, { type: 'sessions', sessions: list });
             } catch (err: any) {
               console.error('List sessions error:', err.message);
@@ -743,6 +755,27 @@ export function setupWebSocket(
             break;
           }
 
+          case 'get_session_detail': {
+            const detailId = typeof msg.sessionId === 'string' ? msg.sessionId.trim() : '';
+            if (!detailId) {
+              poolSend(connectionEntry, { type: 'error', message: 'Session ID is required' });
+              return;
+            }
+
+            try {
+              const detail = await getSessionDetail(detailId);
+              if (!detail) {
+                poolSend(connectionEntry, { type: 'error', message: 'Session not found' });
+                return;
+              }
+              poolSend(connectionEntry, { type: 'session_detail', detail });
+            } catch (err: any) {
+              console.error('Get session detail error:', err.message);
+              poolSend(connectionEntry, { type: 'error', message: `Failed to get session detail: ${err.message}` });
+            }
+            break;
+          }
+
           case 'resume_session': {
             const sessionId = typeof msg.sessionId === 'string' ? msg.sessionId.trim() : '';
             if (!sessionId) {
@@ -762,7 +795,7 @@ export function setupWebSocket(
                 onPermissionRequest: (await import('@github/copilot-sdk')).approveAll,
                 streaming: true,
                 onUserInputRequest: makeUserInputHandler(connectionEntry),
-                configDir: config.copilotConfigDir,
+                ...(config.copilotConfigDir && { configDir: config.copilotConfigDir }),
               });
 
               wireSessionEvents(connectionEntry.session, connectionEntry);

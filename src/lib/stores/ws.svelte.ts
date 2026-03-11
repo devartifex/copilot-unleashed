@@ -35,6 +35,7 @@ export interface WsStore {
   selectAgent(name: string): void;
   deselectAgent(): void;
   deleteSession(sessionId: string): void;
+  getSessionDetail(sessionId: string): void;
   getQuota(): void;
   getPlan(): void;
   updatePlan(content: string): void;
@@ -254,6 +255,10 @@ export function createWsStore(): WsStore {
     send({ type: 'delete_session', sessionId });
   }
 
+  function getSessionDetail(sessionId: string): void {
+    send({ type: 'get_session_detail', sessionId });
+  }
+
   function selectAgent(name: string): void {
     send({ type: 'select_agent', name });
   }
@@ -309,6 +314,7 @@ export function createWsStore(): WsStore {
     listAgents,
     listSessions,
     deleteSession,
+    getSessionDetail,
     selectAgent,
     deselectAgent,
     getQuota,

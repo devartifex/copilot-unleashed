@@ -9,6 +9,7 @@ import type {
   ToolInfo,
   AgentInfo,
   SessionSummary,
+  SessionDetail,
   UserInputState,
   PermissionRequestState,
   ContextInfo,
@@ -42,6 +43,7 @@ export interface ChatStore {
   readonly tools: ToolInfo[];
   readonly agents: (AgentInfo | string)[];
   readonly sessions: SessionSummary[];
+  readonly sessionDetail: SessionDetail | null;
 
   // Context & quota
   readonly contextInfo: ContextInfo | null;
@@ -92,6 +94,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   let tools = $state<ToolInfo[]>([]);
   let agents = $state<(AgentInfo | string)[]>([]);
   let sessions = $state<SessionSummary[]>([]);
+  let sessionDetail = $state<SessionDetail | null>(null);
 
   // ── Context & quota ─────────────────────────────────────────────────────
   let contextInfo = $state<ContextInfo | null>(null);
@@ -356,6 +359,10 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         sessions = msg.sessions;
         break;
 
+      case 'session_detail':
+        sessionDetail = msg.detail;
+        break;
+
       case 'session_resumed':
         currentSessionId = msg.sessionId;
         addInfoMessage(`Session resumed: ${msg.sessionId}`);
@@ -472,6 +479,8 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     currentSessionId = null;
     pendingUserInput = null;
     pendingPermission = null;
+    contextInfo = null;
+    sessionDetail = null;
   }
 
   function addUserMessage(content: string): void {
@@ -509,6 +518,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     get tools() { return tools; },
     get agents() { return agents; },
     get sessions() { return sessions; },
+    get sessionDetail() { return sessionDetail; },
 
     get contextInfo() { return contextInfo; },
     get quotaSnapshots() { return quotaSnapshots; },

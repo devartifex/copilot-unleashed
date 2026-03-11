@@ -1,26 +1,73 @@
 <script lang="ts">
-  import type { SessionSummary } from '$lib/types/index.js';
+  import type { SessionSummary, SessionDetail } from '$lib/types/index.js';
+  import SessionPreview from './SessionPreview.svelte';
 
   interface Props {
     open: boolean;
     sessions: SessionSummary[];
+    sessionDetail: SessionDetail | null;
     loading?: boolean;
     onClose: () => void;
     onResume: (sessionId: string) => void;
     onDelete?: (sessionId: string) => void;
+    onRequestDetail?: (sessionId: string) => void;
   }
 
-  const { open, sessions, loading = false, onClose, onResume, onDelete }: Props = $props();
+  const { open, sessions, sessionDetail = null, loading = false, onClose, onResume, onDelete, onRequestDetail }: Props = $props();
+
+  let searchQuery = $state('');
+  let selectedSessionId = $state<string | null>(null);
+
+  const filteredSessions = $derived.by(() => {
+    if (!searchQuery.trim()) return sessions;
+    const q = searchQuery.toLowerCase();
+    return sessions.filter((s) =>
+      (s.title ?? s.id).toLowerCase().includes(q) ||
+      s.repository?.toLowerCase().includes(q) ||
+      s.branch?.toLowerCase().includes(q) ||
+      s.cwd?.toLowerCase().includes(q),
+    );
+  });
+
+  // Group sessions by repository
+  const groupedSessions = $derived.by(() => {
+    const groups = new Map<string, SessionSummary[]>();
+    for (const s of filteredSessions) {
+      const key = s.repository ?? 'Other';
+      const group = groups.get(key);
+      if (group) {
+        group.push(s);
+      } else {
+        groups.set(key, [s]);
+      }
+    }
+    return groups;
+  });
+
+  // Determine whether to show groups (only if multiple repos exist)
+  const showGroups = $derived(groupedSessions.size > 1 || (groupedSessions.size === 1 && !groupedSessions.has('Other')));
 
   function handleBackdropClick(e: MouseEvent) {
     if (e.target === e.currentTarget) {
-      onClose();
+      handleClose();
     }
+  }
+
+  function handleClose() {
+    selectedSessionId = null;
+    searchQuery = '';
+    onClose();
+  }
+
+  function handleSessionClick(sessionId: string) {
+    selectedSessionId = sessionId;
+    onRequestDetail?.(sessionId);
   }
 
   function handleResume(sessionId: string) {
     const confirmed = window.confirm('Resume this session? Current conversation will end.');
     if (confirmed) {
+      selectedSessionId = null;
       onResume(sessionId);
     }
   }
@@ -28,8 +75,13 @@
   function handleDelete(e: MouseEvent, sessionId: string, title: string) {
     e.stopPropagation();
     if (window.confirm(`Delete session "${title}"? This cannot be undone.`)) {
+      if (selectedSessionId === sessionId) selectedSessionId = null;
       onDelete?.(sessionId);
     }
+  }
+
+  function handleBackToList() {
+    selectedSessionId = null;
   }
 
   function formatRelativeTime(dateStr: string | undefined): string {
@@ -57,6 +109,13 @@
     if (diffDay < 30) return `${Math.floor(diffDay / 7)}w ago`;
     return `${Math.floor(diffDay / 30)}mo ago`;
   }
+
+  function formatPath(cwd: string | undefined): string {
+    if (!cwd) return '';
+    // Show last 2 path segments
+    const parts = cwd.split('/').filter(Boolean);
+    return parts.length > 2 ? `…/${parts.slice(-2).join('/')}` : cwd;
+  }
 </script>
 
 {#if open}
@@ -65,61 +124,122 @@
     <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
     <div class="sheet-panel" role="presentation" onclick={(e: MouseEvent) => e.stopPropagation()}>
       <div class="sheet-header">
-        <span class="sheet-title">Sessions</span>
-        <button class="sheet-close" onclick={onClose}>✕</button>
+        {#if selectedSessionId}
+          <button class="sheet-back" onclick={handleBackToList}>← Sessions</button>
+        {:else}
+          <span class="sheet-title">Sessions</span>
+        {/if}
+        <button class="sheet-close" onclick={handleClose}>✕</button>
       </div>
 
-      <div class="sheet-body">
-        {#if loading}
-          <div class="session-list">
-            {#each Array(4) as _, i (i)}
-              <div class="session-skeleton">
-                <div class="skeleton skeleton-title"></div>
-                <div class="session-skeleton-meta">
-                  <div class="skeleton skeleton-meta-item"></div>
-                  <div class="skeleton skeleton-meta-time"></div>
+      {#if selectedSessionId}
+        <SessionPreview
+          detail={sessionDetail?.id === selectedSessionId ? sessionDetail : null}
+          onResume={() => handleResume(selectedSessionId!)}
+        />
+      {:else}
+        <div class="sheet-body">
+          {#if !loading && sessions.length > 5}
+            <div class="search-bar">
+              <input
+                class="search-input"
+                type="text"
+                placeholder="Search sessions…"
+                bind:value={searchQuery}
+              />
+            </div>
+          {/if}
+
+          {#if loading}
+            <div class="session-list">
+              {#each Array(4) as _, i (i)}
+                <div class="session-skeleton">
+                  <div class="skeleton skeleton-title"></div>
+                  <div class="session-skeleton-meta">
+                    <div class="skeleton skeleton-meta-item"></div>
+                    <div class="skeleton skeleton-meta-time"></div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {:else if filteredSessions.length === 0}
+            <p class="sheet-empty">{searchQuery ? 'No matching sessions.' : 'No previous sessions found.'}</p>
+          {:else if showGroups}
+            {#each [...groupedSessions.entries()] as [repo, groupSessions] (repo)}
+              <div class="session-group">
+                <div class="session-group-header">
+                  <span class="session-group-name">{repo}</span>
+                  <span class="session-group-count">{groupSessions.length}</span>
+                </div>
+                <div class="session-list">
+                  {#each groupSessions as session (session.id)}
+                    {@render sessionItem(session)}
+                  {/each}
                 </div>
               </div>
             {/each}
-          </div>
-        {:else if sessions.length === 0}
-          <p class="sheet-empty">No previous sessions found.</p>
-        {:else}
-          <div class="session-list">
-            {#each sessions as session (session.id)}
-              <button
-                class="session-item"
-                onclick={() => handleResume(session.id)}
-              >
-                <span class="session-item-info">
-                  <span class="session-item-title">{session.title ?? session.id}</span>
-                  <span class="session-item-meta">
-                    {#if session.model}<span>{session.model}</span>{/if}
-                    {#if session.updatedAt}<span>{formatRelativeTime(session.updatedAt)}</span>{/if}
-                  </span>
-                </span>
-                {#if onDelete}
-                  <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-                  <span
-                    class="session-delete-btn"
-                    role="button"
-                    tabindex="0"
-                    onclick={(e: MouseEvent) => handleDelete(e, session.id, session.title ?? 'Untitled')}
-                    onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleDelete(e as unknown as MouseEvent, session.id, session.title ?? 'Untitled'); } }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"/>
-                    </svg>
-                  </span>
-                {/if}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
+          {:else}
+            <div class="session-list">
+              {#each filteredSessions as session (session.id)}
+                {@render sessionItem(session)}
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
   </div>
 {/if}
+
+{#snippet sessionItem(session: SessionSummary)}
+  <button
+    class="session-item"
+    onclick={() => handleSessionClick(session.id)}
+  >
+    <span class="session-item-info">
+      <span class="session-item-title">{session.title ?? session.id}</span>
+      <span class="session-item-meta">
+        {#if session.repository}
+          <span class="meta-badge">{session.repository}</span>
+        {/if}
+        {#if session.branch}
+          <span class="meta-badge meta-branch">{session.branch}</span>
+        {:else if session.cwd}
+          <span class="meta-path">{formatPath(session.cwd)}</span>
+        {/if}
+        {#if session.model}<span>{session.model}</span>{/if}
+        {#if session.updatedAt}<span>{formatRelativeTime(session.updatedAt)}</span>{/if}
+      </span>
+      <span class="session-item-indicators">
+        {#if session.checkpointCount && session.checkpointCount > 0}
+          <span class="indicator" title="{session.checkpointCount} checkpoint{session.checkpointCount > 1 ? 's' : ''}">
+            🔖 {session.checkpointCount}
+          </span>
+        {/if}
+        {#if session.hasPlan}
+          <span class="indicator" title="Has plan">📋</span>
+        {/if}
+        {#if session.isRemote}
+          <span class="indicator" title="Remote session">☁️</span>
+        {/if}
+      </span>
+    </span>
+    {#if onDelete}
+      <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+      <span
+        class="session-delete-btn"
+        role="button"
+        tabindex="0"
+        onclick={(e: MouseEvent) => handleDelete(e, session.id, session.title ?? 'Untitled')}
+        onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleDelete(e as unknown as MouseEvent, session.id, session.title ?? 'Untitled'); } }}
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"/>
+        </svg>
+      </span>
+    {/if}
+  </button>
+{/snippet}
 
 <style>
   .sheet-overlay {
@@ -165,6 +285,22 @@
     color: var(--fg);
   }
 
+  .sheet-back {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    min-height: 36px;
+  }
+
+  .sheet-back:active {
+    opacity: 0.7;
+  }
+
   .sheet-close {
     background: none;
     border: none;
@@ -206,6 +342,67 @@
     padding: var(--sp-4);
   }
 
+  /* ── Search ──────────────────────────────────────────────────── */
+  .search-bar {
+    padding: var(--sp-2) 0;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 1;
+  }
+
+  .search-input {
+    width: 100%;
+    background: var(--bg-secondary, var(--border));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+    padding: var(--sp-2) var(--sp-3);
+    outline: none;
+  }
+
+  .search-input::placeholder {
+    color: var(--fg-dim);
+  }
+
+  .search-input:focus {
+    border-color: var(--accent);
+  }
+
+  /* ── Session groups ──────────────────────────────────────────── */
+  .session-group {
+    margin-bottom: var(--sp-2);
+  }
+
+  .session-group-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    padding-top: var(--sp-3);
+  }
+
+  .session-group-name {
+    font-family: var(--font-mono);
+    font-size: 0.75em;
+    font-weight: 600;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .session-group-count {
+    font-family: var(--font-mono);
+    font-size: 0.7em;
+    color: var(--fg-dim);
+    background: var(--border);
+    padding: 1px 6px;
+    border-radius: 8px;
+  }
+
+  /* ── Session list ────────────────────────────────────────────── */
   .session-list {
     display: flex;
     flex-direction: column;
@@ -251,9 +448,43 @@
 
   .session-item-meta {
     display: flex;
-    gap: var(--sp-2);
+    flex-wrap: wrap;
+    gap: var(--sp-1);
     font-size: 0.78em;
     color: var(--fg-dim);
+  }
+
+  .meta-badge {
+    background: var(--border);
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+  }
+
+  .meta-branch {
+    color: var(--accent);
+  }
+
+  .meta-path {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+  }
+
+  .session-item-indicators {
+    display: flex;
+    gap: var(--sp-1);
+    font-size: 0.75em;
+    color: var(--fg-dim);
+  }
+
+  .indicator {
+    white-space: nowrap;
   }
 
   .session-delete-btn {

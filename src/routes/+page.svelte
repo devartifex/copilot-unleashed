@@ -307,10 +307,12 @@
     <SessionsSheet
       open={sessionsOpen}
       sessions={chatStore.sessions}
+      sessionDetail={chatStore.sessionDetail}
       loading={sessionsLoading}
       onClose={() => sessionsOpen = false}
       onResume={handleResumeSession}
       onDelete={(id) => wsStore.deleteSession(id)}
+      onRequestDetail={(id) => wsStore.getSessionDetail(id)}
     />
   </div>
 {:else}

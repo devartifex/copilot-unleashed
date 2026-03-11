@@ -207,6 +207,61 @@ That's it. Container Apps, ACR, managed identity, TLS, monitoring — all provis
 
 ---
 
+## CLI ↔ Browser session sync
+
+Copilot Unleashed and the GitHub Copilot CLI share the same session-state directory (`~/.copilot/session-state/`). By default, the app reads from the same location the CLI uses — so any session started in the terminal is available in the browser the moment you open the Sessions panel.
+
+### How it works
+
+The `@github/copilot-sdk` stores each session as a folder on disk:
+
+```
+~/.copilot/session-state/{session-uuid}/
+  workspace.yaml       ← project metadata (cwd, repo, branch, summary)
+  plan.md              ← living task list updated as the agent works
+  checkpoints/
+    index.md           ← checkpoint table of contents
+    001_*.md           ← compressed conversation snapshots
+    002_*.md
+    …
+```
+
+When you resume a session from the browser, the SDK's native `resumeSession()` restores the full conversation history and checkpoint context automatically. If the session is only available on disk (e.g. bundled into a Docker image without an active SDK index), the app falls back to reading `workspace.yaml`, `plan.md`, and the last three checkpoint files directly and injecting them as context into a new session — so nothing is lost.
+
+### Sessions panel
+
+The Sessions panel (bottom-left icon) lets you:
+
+- Browse all sessions grouped by repository
+- See metadata badges — branch, checkpoint count, plan indicator
+- Preview a session before resuming: checkpoint timeline, full `plan.md` content, project path
+- Search and filter by title, repository, branch, or directory
+- Resume any session with one tap, on any device
+
+### Custom session-state directory
+
+If you want to use a separate directory (e.g. a shared network path or a custom mount in Docker):
+
+```bash
+COPILOT_CONFIG_DIR=/data/copilot-state
+```
+
+The CLI and Copilot Unleashed will read from and write to the same path. Sessions started in either interface appear in both.
+
+### Docker / Azure deployment
+
+When deploying to a container, mount or copy your local session-state into the image:
+
+```yaml
+# docker-compose.yml
+volumes:
+  - ~/.copilot:/home/node/.copilot:ro   # read-only mirror of local CLI sessions
+```
+
+Or set `COPILOT_CONFIG_DIR` to a shared volume that both your server and the container can access.
+
+---
+
 ## How it works
 
 ```

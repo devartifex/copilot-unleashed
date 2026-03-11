@@ -301,7 +301,7 @@ export function setupWebSocket(
     } else {
       // Create new pool entry
       console.log('[WS-SERVER] Creating new pool entry for', userLogin);
-      const client = createCopilotClient(githubToken);
+      const client = createCopilotClient(githubToken, config.copilotConfigDir);
       entry = createPoolEntry(client, ws);
       sessionPool.set(userLogin, entry);
 
@@ -407,6 +407,7 @@ export function setupWebSocket(
                 permissionMode,
                 onPermissionRequest: makePermissionHandler(connectionEntry),
                 mcpServers,
+                configDir: config.copilotConfigDir,
               });
 
               wireSessionEvents(connectionEntry.session, connectionEntry);
@@ -761,6 +762,7 @@ export function setupWebSocket(
                 onPermissionRequest: (await import('@github/copilot-sdk')).approveAll,
                 streaming: true,
                 onUserInputRequest: makeUserInputHandler(connectionEntry),
+                ...(config.copilotConfigDir && { configDir: config.copilotConfigDir }),
               });
 
               wireSessionEvents(connectionEntry.session, connectionEntry);

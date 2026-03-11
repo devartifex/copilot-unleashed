@@ -39,6 +39,7 @@ export interface CreateSessionOptions {
   permissionMode?: 'approve_all' | 'prompt';
   onPermissionRequest?: SessionConfig['onPermissionRequest'];
   mcpServers?: McpServerInput[];
+  configDir?: string;
 }
 
 const BLOCKED_RANGES = ['10.', '172.16.', '172.17.', '172.18.', '172.19.',
@@ -192,6 +193,10 @@ export async function createCopilotSession(
 
   if (options.customTools && options.customTools.length > 0) {
     sessionConfig.tools = buildCustomTools(options.customTools);
+  }
+
+  if (options.configDir) {
+    sessionConfig.configDir = options.configDir;
   }
 
   return client.createSession(sessionConfig);

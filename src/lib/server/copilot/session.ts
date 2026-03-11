@@ -122,13 +122,26 @@ export async function createCopilotSession(
   githubToken: string,
   options: CreateSessionOptions = {}
 ) {
+  // Wrap the permission handler to log calls for diagnostics
+  const wrappedApproveAll: SessionConfig['onPermissionRequest'] = (request: any, context) => {
+    console.log('[PERMISSION] approveAll called:', JSON.stringify({
+      toolName: request?.toolName ?? request?.tool?.name,
+      sessionId: context?.sessionId,
+    }));
+    return { kind: 'approved' as const };
+  };
+
+  const permissionHandler = options.permissionMode === 'prompt' && options.onPermissionRequest
+    ? options.onPermissionRequest
+    : wrappedApproveAll;
+
+  console.log('[SESSION] Creating session with permissionMode:', options.permissionMode || 'approve_all (default)');
+
   const sessionConfig: SessionConfig = {
     clientName: 'copilot-unleashed',
     model: options.model || 'gpt-4.1',
     streaming: true,
-    onPermissionRequest: options.permissionMode === 'prompt' && options.onPermissionRequest
-      ? options.onPermissionRequest
-      : approveAll,
+    onPermissionRequest: permissionHandler,
     mcpServers: {
       github: {
         type: 'http',

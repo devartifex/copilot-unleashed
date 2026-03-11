@@ -12,9 +12,11 @@
 
   let secondsLeft = $state(COUNTDOWN_SECONDS);
   let argsExpanded = $state(false);
+  let promptEl: HTMLDivElement | undefined = $state();
 
   const argsJson = $derived(JSON.stringify(toolArgs, null, 2));
   const isLargeArgs = $derived(argsJson.length > 120);
+  const isUrgent = $derived(secondsLeft <= 10);
 
   $effect(() => {
     const interval = setInterval(() => {
@@ -27,9 +29,16 @@
 
     return () => clearInterval(interval);
   });
+
+  // Auto-scroll into view when the prompt appears
+  $effect(() => {
+    if (promptEl) {
+      promptEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
 </script>
 
-<div class="permission-prompt">
+<div class="permission-prompt" class:urgent={isUrgent} bind:this={promptEl}>
   <div class="permission-tool-name">🔐 {toolName}</div>
 
   {#if isLargeArgs}
@@ -66,10 +75,18 @@
     border: 1px solid var(--yellow);
     border-radius: var(--radius-sm);
     padding: var(--sp-3);
-    animation: msg-in 0.3s ease;
+    margin: var(--sp-2) var(--sp-3);
+    animation: permission-in 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 12px rgba(210, 153, 34, 0.15);
   }
 
-  @keyframes msg-in {
+  .permission-prompt.urgent {
+    border-color: var(--red);
+    box-shadow: 0 0 16px rgba(248, 81, 73, 0.25);
+    animation: permission-pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes permission-in {
     from {
       opacity: 0;
       transform: translateY(8px);
@@ -78,6 +95,11 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  @keyframes permission-pulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(248, 81, 73, 0.15); }
+    50% { box-shadow: 0 0 20px rgba(248, 81, 73, 0.35); }
   }
 
   .permission-tool-name {
@@ -146,5 +168,10 @@
     font-size: 0.75em;
     color: var(--fg-dim);
     margin-top: var(--sp-1);
+  }
+
+  .permission-prompt.urgent .permission-countdown {
+    color: var(--red);
+    font-weight: 600;
   }
 </style>

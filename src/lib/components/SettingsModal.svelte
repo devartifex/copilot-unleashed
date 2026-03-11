@@ -7,6 +7,7 @@
     CustomToolDefinition,
     McpServerDefinition,
   } from '$lib/types/index.js';
+  import { pickPrimaryQuota } from '$lib/types/index.js';
   import CustomToolsEditor from './CustomToolsEditor.svelte';
 
   interface Props {
@@ -185,18 +186,7 @@
     return groups;
   });
 
-  const primaryQuota = $derived.by((): { label: string; snapshot: QuotaSnapshot } | null => {
-    if (!quotaSnapshots) return null;
-    if (quotaSnapshots.copilot_premium)
-      return { label: 'Premium Usage', snapshot: quotaSnapshots.copilot_premium };
-    if (quotaSnapshots.premium_requests)
-      return { label: 'Premium Requests', snapshot: quotaSnapshots.premium_requests };
-    if (quotaSnapshots.premium_interactions)
-      return { label: 'Premium Interactions', snapshot: quotaSnapshots.premium_interactions };
-    if (quotaSnapshots.chat)
-      return { label: 'Chat Usage', snapshot: quotaSnapshots.chat };
-    return null;
-  });
+  const primaryQuota = $derived(pickPrimaryQuota(quotaSnapshots));
 
   const quotaPercentUsed = $derived(
     primaryQuota?.snapshot?.percentageUsed ?? 0,
@@ -537,26 +527,38 @@
             <div class="settings-accordion-body">
               {#if primaryQuota}
                 <div class="quota-label">{primaryQuota.label}</div>
-                <div class="quota-bar-container">
-                  <div
-                    class="quota-bar {quotaBarColor}"
-                    style="width: {Math.min(quotaPercentUsed, 100)}%"
-                  ></div>
-                </div>
-                <div class="quota-text">
-                  {#if primaryQuota.snapshot.usedRequests != null && primaryQuota.snapshot.entitlementRequests != null}
-                    {primaryQuota.snapshot.usedRequests} / {primaryQuota.snapshot.entitlementRequests} requests used
-                  {:else}
-                    {quotaPercentUsed.toFixed(1)}% used
-                  {/if}
-                  {#if primaryQuota.snapshot.resetDate}
-                    · Resets {formatResetDate(primaryQuota.snapshot.resetDate)}
-                  {/if}
-                </div>
-                {#if primaryQuota.snapshot.overage != null && primaryQuota.snapshot.overage > 0}
-                  <div class="quota-text" style="color: var(--red); margin-top: var(--sp-1);">
-                    ⚠ {primaryQuota.snapshot.overage} overage requests
+                {#if primaryQuota.snapshot.isUnlimitedEntitlement}
+                  <div class="quota-text">
+                    Unlimited
+                    {#if primaryQuota.snapshot.usedRequests != null}
+                      · {primaryQuota.snapshot.usedRequests} requests used
+                    {/if}
+                    {#if primaryQuota.snapshot.resetDate}
+                      · Resets {formatResetDate(primaryQuota.snapshot.resetDate)}
+                    {/if}
                   </div>
+                {:else}
+                  <div class="quota-bar-container">
+                    <div
+                      class="quota-bar {quotaBarColor}"
+                      style="width: {Math.min(quotaPercentUsed, 100)}%"
+                    ></div>
+                  </div>
+                  <div class="quota-text">
+                    {#if primaryQuota.snapshot.usedRequests != null && primaryQuota.snapshot.entitlementRequests != null}
+                      {primaryQuota.snapshot.usedRequests} / {primaryQuota.snapshot.entitlementRequests} requests used
+                    {:else}
+                      {quotaPercentUsed.toFixed(1)}% used
+                    {/if}
+                    {#if primaryQuota.snapshot.resetDate}
+                      · Resets {formatResetDate(primaryQuota.snapshot.resetDate)}
+                    {/if}
+                  </div>
+                  {#if primaryQuota.snapshot.overage != null && primaryQuota.snapshot.overage > 0}
+                    <div class="quota-text" style="color: var(--red); margin-top: var(--sp-1);">
+                      ⚠ {primaryQuota.snapshot.overage} overage requests
+                    </div>
+                  {/if}
                 {/if}
               {:else}
                 <p class="settings-hint">No quota information available.</p>

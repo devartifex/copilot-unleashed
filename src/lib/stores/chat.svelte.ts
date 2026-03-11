@@ -342,12 +342,6 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       case 'quota':
         if (msg.quotaSnapshots) {
           quotaSnapshots = msg.quotaSnapshots;
-        } else {
-          // Build from top-level fields
-          const snaps: QuotaSnapshots = {};
-          if (msg.chat) snaps.chat = msg.chat;
-          if (msg.premium_interactions) snaps.premium_interactions = msg.premium_interactions;
-          quotaSnapshots = snaps;
         }
         break;
 

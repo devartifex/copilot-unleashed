@@ -69,13 +69,30 @@ export interface QuotaSnapshot {
   usedRequests?: number;
   entitlementRequests?: number;
   overage?: number;
+  isUnlimitedEntitlement?: boolean;
 }
 
-export interface QuotaSnapshots {
-  chat?: QuotaSnapshot;
-  premium_requests?: QuotaSnapshot;
-  premium_interactions?: QuotaSnapshot;
-  copilot_premium?: QuotaSnapshot;
+export type QuotaSnapshots = Record<string, QuotaSnapshot>;
+
+/** Priority order for picking the most relevant quota snapshot */
+const QUOTA_PRIORITY = ['copilot_premium', 'premium_requests', 'premium_interactions'] as const;
+
+/** Pick the most relevant quota snapshot: premium types first, then any other key */
+export function pickPrimaryQuota(snapshots: QuotaSnapshots | null): { key: string; label: string; snapshot: QuotaSnapshot } | null {
+  if (!snapshots) return null;
+  const keys = Object.keys(snapshots);
+  if (keys.length === 0) return null;
+
+  for (const k of QUOTA_PRIORITY) {
+    if (snapshots[k]) return { key: k, label: formatQuotaLabel(k), snapshot: snapshots[k] };
+  }
+  // Fallback: first available key
+  const k = keys[0];
+  return { key: k, label: formatQuotaLabel(k), snapshot: snapshots[k] };
+}
+
+function formatQuotaLabel(key: string): string {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 // ─── Session list types ─────────────────────────────────────────────────────
@@ -237,8 +254,6 @@ export interface AgentChangedMessage {
 export interface QuotaMessage {
   type: 'quota';
   quotaSnapshots?: QuotaSnapshots;
-  chat?: QuotaSnapshot;
-  premium_interactions?: QuotaSnapshot;
 }
 
 export interface SessionsMessage {

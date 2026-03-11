@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { QuotaSnapshots } from '$lib/types/index.js';
+  import { pickPrimaryQuota, type QuotaSnapshots } from '$lib/types/index.js';
 
   interface Props {
     open: boolean;
@@ -24,25 +24,23 @@
   }: Props = $props();
 
   const quotaInfo = $derived.by(() => {
-    if (!quotaSnapshots) return null;
+    const primary = pickPrimaryQuota(quotaSnapshots);
+    if (!primary) return null;
+    const { label, snapshot } = primary;
 
-    const snapshot =
-      quotaSnapshots.copilot_premium ??
-      quotaSnapshots.premium_requests ??
-      quotaSnapshots.premium_interactions ??
-      quotaSnapshots.chat;
+    const resetLabel = snapshot.resetDate
+      ? `Resets ${new Date(snapshot.resetDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+      : null;
 
-    if (!snapshot) return null;
+    if (snapshot.isUnlimitedEntitlement) {
+      return { unlimited: true as const, label, used: snapshot.usedRequests ?? 0, resetLabel };
+    }
 
     const pct = snapshot.percentageUsed ?? (snapshot.remainingPercentage != null ? 100 - snapshot.remainingPercentage : null);
     if (pct == null) return null;
 
     const color = pct > 80 ? 'red' : pct >= 50 ? 'yellow' : 'green';
-    const resetLabel = snapshot.resetDate
-      ? `Resets ${new Date(snapshot.resetDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
-      : null;
-
-    return { pct: Math.round(pct), color, resetLabel, used: snapshot.usedRequests, total: snapshot.entitlementRequests };
+    return { unlimited: false as const, label, pct: Math.round(pct), color, resetLabel, used: snapshot.usedRequests, total: snapshot.entitlementRequests };
   });
 
   function handleBackdropClick(e: MouseEvent) {
@@ -88,16 +86,25 @@
 
         {#if quotaInfo}
           <div class="sidebar-section">
-            <span class="sidebar-label">Premium Quota</span>
-            <div class="quota-bar-track">
-              <div class="quota-bar-fill {quotaInfo.color}" style="width: {quotaInfo.pct}%"></div>
-            </div>
-            <div class="quota-details">
-              <span class="quota-pct">{quotaInfo.pct}% used</span>
-              {#if quotaInfo.used != null && quotaInfo.total != null}
-                <span class="quota-counts">{quotaInfo.used}/{quotaInfo.total}</span>
-              {/if}
-            </div>
+            <span class="sidebar-label">{quotaInfo.label}</span>
+            {#if quotaInfo.unlimited}
+              <div class="quota-details">
+                <span class="quota-pct">Unlimited</span>
+                {#if quotaInfo.used != null}
+                  <span class="quota-counts">{quotaInfo.used} used</span>
+                {/if}
+              </div>
+            {:else}
+              <div class="quota-bar-track">
+                <div class="quota-bar-fill {quotaInfo.color}" style="width: {quotaInfo.pct}%"></div>
+              </div>
+              <div class="quota-details">
+                <span class="quota-pct">{quotaInfo.pct}% used</span>
+                {#if quotaInfo.used != null && quotaInfo.total != null}
+                  <span class="quota-counts">{quotaInfo.used}/{quotaInfo.total}</span>
+                {/if}
+              </div>
+            {/if}
             {#if quotaInfo.resetLabel}
               <span class="quota-reset">{quotaInfo.resetLabel}</span>
             {/if}

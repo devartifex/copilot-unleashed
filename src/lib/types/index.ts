@@ -133,6 +133,7 @@ export interface ReasoningDeltaMessage {
 export interface ReasoningDoneMessage {
   type: 'reasoning_done';
   reasoningId: string;
+  content?: string;
 }
 
 export interface IntentMessage {

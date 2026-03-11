@@ -164,13 +164,15 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         currentReasoningContent += msg.content;
         break;
 
-      case 'reasoning_done':
-        if (currentReasoningContent.trim()) {
-          addMessage('reasoning', currentReasoningContent);
+      case 'reasoning_done': {
+        const reasoningText = currentReasoningContent.trim() || msg.content?.trim() || '';
+        if (reasoningText) {
+          addMessage('reasoning', reasoningText);
         }
         isReasoningStreaming = false;
         currentReasoningContent = '';
         break;
+      }
 
       case 'intent':
         addMessage('intent', msg.intent);

@@ -53,7 +53,7 @@ function wireSessionEvents(session: any, entry: PoolEntry): void {
     poolSend(entry, { type: 'reasoning_delta', content: event.data.deltaContent, reasoningId: event.data.reasoningId });
   });
   session.on('assistant.reasoning', (event: any) => {
-    poolSend(entry, { type: 'reasoning_done', reasoningId: event.data.reasoningId });
+    poolSend(entry, { type: 'reasoning_done', reasoningId: event.data.reasoningId, content: event.data.content });
   });
   session.on('assistant.intent', (event: any) => {
     poolSend(entry, { type: 'intent', intent: event.data.intent });

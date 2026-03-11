@@ -150,6 +150,7 @@ export interface ReasoningDeltaMessage {
 export interface ReasoningDoneMessage {
   type: 'reasoning_done';
   reasoningId: string;
+  content?: string;
 }
 
 export interface IntentMessage {
@@ -592,6 +593,7 @@ export interface ChatMessage {
   toolName?: string;
   toolStatus?: ToolCallStatus;
   toolProgressMessage?: string;
+  toolProgressMessages?: string[];
   mcpServerName?: string;
   mcpToolName?: string;
   agentName?: string;
@@ -614,6 +616,7 @@ export interface ToolCallState {
   mcpToolName?: string;
   status: ToolCallStatus;
   message?: string;
+  progressMessages?: string[];
 }
 
 // ─── User input request state ───────────────────────────────────────────────

@@ -260,3 +260,75 @@ export async function listSessionsFromFilesystem(): Promise<FilesystemSession[]>
 
   return results.filter((s): s is FilesystemSession => s !== null);
 }
+
+/**
+ * Build a context string from a session's filesystem data (workspace.yaml,
+ * checkpoints, plan) for injection into a new session's systemMessage.
+ * Used as a fallback when resumeSession() fails for bundled/filesystem-only sessions.
+ */
+export async function buildSessionContext(sessionId: string): Promise<string | null> {
+  const sessionDir = join(getSessionStateDir(), sessionId);
+  if (!await pathExists(sessionDir)) return null;
+
+  const parts: string[] = [];
+
+  // 1. Read workspace.yaml metadata
+  let metadata: Record<string, string> = {};
+  try {
+    const yamlContent = await readFile(join(sessionDir, 'workspace.yaml'), 'utf-8');
+    metadata = parseWorkspaceYaml(yamlContent);
+  } catch {
+    // No metadata available
+  }
+
+  if (metadata.summary) {
+    parts.push(`## Previous Session Summary\n${metadata.summary}`);
+  }
+  if (metadata.repository) {
+    parts.push(`Repository: ${metadata.repository}${metadata.branch ? ` (branch: ${metadata.branch})` : ''}`);
+  }
+
+  // 2. Read plan.md if it exists
+  try {
+    const planContent = await readFile(join(sessionDir, 'plan.md'), 'utf-8');
+    if (planContent.trim()) {
+      parts.push(`## Previous Plan\n${planContent.trim()}`);
+    }
+  } catch {
+    // No plan
+  }
+
+  // 3. Read checkpoint content (numbered .md files, not index.md)
+  try {
+    const checkpointsDir = join(sessionDir, 'checkpoints');
+    const checkpointFiles = await readdir(checkpointsDir);
+    const numbered = checkpointFiles
+      .filter((f) => f.endsWith('.md') && f !== 'index.md')
+      .sort();
+
+    // Read up to the last 3 checkpoint files to stay within token limits
+    const recentFiles = numbered.slice(-3);
+    for (const file of recentFiles) {
+      try {
+        const content = await readFile(join(checkpointsDir, file), 'utf-8');
+        if (content.trim()) {
+          parts.push(`## Checkpoint: ${file}\n${content.trim()}`);
+        }
+      } catch {
+        // Skip unreadable files
+      }
+    }
+  } catch {
+    // No checkpoints directory
+  }
+
+  if (parts.length === 0) return null;
+
+  return [
+    'You are continuing a previous coding session. Here is the context from that session:',
+    '',
+    ...parts,
+    '',
+    'Continue from where the previous session left off. The user wants to resume this work.',
+  ].join('\n');
+}

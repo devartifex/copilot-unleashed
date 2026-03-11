@@ -3,10 +3,9 @@
 
   interface Props {
     detail: SessionDetail | null;
-    onResume: () => void;
   }
 
-  const { detail, onResume }: Props = $props();
+  const { detail }: Props = $props();
 
   function formatDate(dateStr: string | undefined): string {
     if (!dateStr) return '';
@@ -89,12 +88,6 @@
           <div class="plan-preview">{detail.plan.length > 500 ? detail.plan.slice(0, 500) + '…' : detail.plan}</div>
         </div>
       {/if}
-    </div>
-
-    <div class="preview-footer">
-      <button class="resume-btn" onclick={onResume}>
-        Resume Session
-      </button>
     </div>
   {/if}
 </div>
@@ -241,33 +234,5 @@
     padding: var(--sp-2) var(--sp-3);
   }
 
-  .preview-footer {
-    padding: var(--sp-3) var(--sp-4);
-    padding-bottom: calc(var(--sp-3) + var(--safe-bottom));
-    border-top: 1px solid var(--border);
-    flex-shrink: 0;
-    position: sticky;
-    bottom: 0;
-    background: var(--bg);
-    z-index: 1;
-  }
 
-  .resume-btn {
-    width: 100%;
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-mono);
-    font-size: 0.85em;
-    font-weight: 600;
-    padding: var(--sp-2) var(--sp-3);
-    min-height: 44px;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .resume-btn:active {
-    opacity: 0.85;
-  }
 </style>

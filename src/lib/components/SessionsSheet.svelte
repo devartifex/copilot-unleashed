@@ -47,6 +47,8 @@
   // Determine whether to show groups (only if multiple repos exist)
   const showGroups = $derived(groupedSessions.size > 1 || (groupedSessions.size === 1 && !groupedSessions.has('Other')));
 
+  const selectedSession = $derived(selectedSessionId ? sessions.find((s) => s.id === selectedSessionId) : undefined);
+
   function handleBackdropClick(e: MouseEvent) {
     if (e.target === e.currentTarget) {
       handleClose();
@@ -136,8 +138,12 @@
         <div class="sheet-detail">
           <SessionPreview
             detail={sessionDetail?.id === selectedSessionId ? sessionDetail : null}
-            onResume={() => handleResume(selectedSessionId!)}
           />
+          <div class="sheet-resume-footer">
+            <button class="resume-btn" onclick={() => handleResume(selectedSessionId!)}>
+              {selectedSession?.source === 'filesystem' ? 'Continue from Context' : 'Resume Session'}
+            </button>
+          </div>
         </div>
       {:else}
         <div class="sheet-body">
@@ -223,6 +229,9 @@
         {/if}
         {#if session.isRemote}
           <span class="indicator" title="Remote session">☁️</span>
+        {/if}
+        {#if session.source === 'filesystem'}
+          <span class="indicator" title="Bundled session — will resume with context">📦</span>
         {/if}
       </span>
     </span>
@@ -338,6 +347,33 @@
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
+  }
+
+  .sheet-resume-footer {
+    padding: var(--sp-3) var(--sp-4);
+    padding-bottom: calc(var(--sp-3) + var(--safe-bottom));
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+
+  .resume-btn {
+    width: 100%;
+    background: var(--blue);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    font-weight: 600;
+    padding: var(--sp-2) var(--sp-3);
+    min-height: 44px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .resume-btn:active {
+    opacity: 0.85;
   }
   .sheet-body::-webkit-scrollbar { width: 4px; }
   .sheet-body::-webkit-scrollbar-track { background: transparent; }

@@ -108,6 +108,8 @@ export interface SessionSummary {
   checkpointCount?: number;
   hasPlan?: boolean;
   isRemote?: boolean;
+  /** Where the session was found: 'sdk' = indexed by Copilot CLI, 'filesystem' = on-disk only (bundled) */
+  source?: 'sdk' | 'filesystem';
 }
 
 export interface CheckpointEntry {

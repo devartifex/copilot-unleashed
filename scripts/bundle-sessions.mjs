@@ -56,4 +56,12 @@ for (const sessionId of sessions) {
 }
 
 console.log(`✓ Bundled ${copied} sessions to ./bundled-sessions/`);
+
+// Also copy session-store.db so the SDK can find sessions without re-indexing
+const sessionStoreDb = join(configDir, 'session-store.db');
+if (existsSync(sessionStoreDb)) {
+  await cp(sessionStoreDb, join(destDir, '..', 'bundled-session-store.db'));
+  console.log('✓ Copied session-store.db');
+}
+
 console.log('  Run `npm run build` or `azd deploy` to include them in the container.');

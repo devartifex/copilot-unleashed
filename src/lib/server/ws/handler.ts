@@ -3,7 +3,7 @@ import { Server, IncomingMessage } from 'http';
 import { approveAll } from '@github/copilot-sdk';
 import { createCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
-import { enrichSessionMetadata, getSessionDetail, listSessionsFromFilesystem } from '../copilot/session-metadata.js';
+import { enrichSessionMetadata, getSessionDetail, listSessionsFromFilesystem, buildSessionContext } from '../copilot/session-metadata.js';
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
 import { validateGitHubToken } from '../auth/github.js';
@@ -724,6 +724,7 @@ export function setupWebSocket(
                     title: s.summary ?? s.title,
                     updatedAt: s.modifiedTime ?? s.updatedAt,
                     model: s.model,
+                    source: 'sdk' as const,
                     ...enriched,
                   };
                 }),
@@ -735,7 +736,7 @@ export function setupWebSocket(
               const fsSessions = await listSessionsFromFilesystem();
               console.log('[DEBUG list_sessions] Filesystem found', fsSessions.length, 'sessions');
               const sdkIds = new Set(sdkSessions.map((s) => s.id));
-              const extraSessions = fsSessions.filter((s) => !sdkIds.has(s.id));
+              const extraSessions = fsSessions.filter((s) => !sdkIds.has(s.id)).map((s) => ({ ...s, source: 'filesystem' as const }));
               const list = [...sdkSessions, ...extraSessions];
               console.log('[DEBUG list_sessions] Sending', list.length, 'total (SDK:', sdkSessions.length, '+ FS extra:', extraSessions.length, ')');
 
@@ -746,7 +747,7 @@ export function setupWebSocket(
               try {
                 const fsSessions = await listSessionsFromFilesystem();
                 console.log('[DEBUG list_sessions] Fallback: filesystem found', fsSessions.length, 'sessions');
-                poolSend(connectionEntry, { type: 'sessions', sessions: fsSessions });
+                poolSend(connectionEntry, { type: 'sessions', sessions: fsSessions.map((s) => ({ ...s, source: 'filesystem' as const })) });
               } catch (fsErr: any) {
                 console.error('[DEBUG list_sessions] Filesystem fallback also failed:', fsErr.message);
                 poolSend(connectionEntry, { type: 'sessions', sessions: [] });
@@ -819,12 +820,42 @@ export function setupWebSocket(
             connectionEntry.permissionResolve = null;
 
             try {
-              connectionEntry.session = await connectionEntry.client.resumeSession(sessionId, {
-                onPermissionRequest: (await import('@github/copilot-sdk')).approveAll,
-                streaming: true,
-                onUserInputRequest: makeUserInputHandler(connectionEntry),
-                ...(config.copilotConfigDir && { configDir: config.copilotConfigDir }),
-              });
+              // start() is idempotent — ensures the SDK has indexed all local sessions
+              await connectionEntry.client.start();
+
+              const resolvedConfigDir = config.copilotConfigDir || (await import('node:path')).join((await import('node:os')).homedir(), '.copilot');
+
+              let resumed = false;
+
+              // Try native SDK resume first
+              try {
+                connectionEntry.session = await connectionEntry.client.resumeSession(sessionId, {
+                  onPermissionRequest: (await import('@github/copilot-sdk')).approveAll,
+                  streaming: true,
+                  onUserInputRequest: makeUserInputHandler(connectionEntry),
+                  configDir: resolvedConfigDir,
+                });
+                resumed = true;
+              } catch (resumeErr: any) {
+                console.log(`[RESUME] SDK resumeSession failed for ${sessionId}: ${resumeErr.message}`);
+              }
+
+              // Fallback: create a new session with context from the filesystem session
+              if (!resumed) {
+                console.log(`[RESUME] Attempting context-based fallback for ${sessionId}…`);
+                const context = await buildSessionContext(sessionId);
+                if (!context) {
+                  throw new Error(`Session not found: ${sessionId}`);
+                }
+
+                connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, {
+                  customInstructions: context,
+                  onUserInputRequest: makeUserInputHandler(connectionEntry),
+                  permissionMode: 'approve_all',
+                  configDir: resolvedConfigDir,
+                });
+                console.log(`[RESUME] Fallback session created for ${sessionId} with context injection`);
+              }
 
               wireSessionEvents(connectionEntry.session, connectionEntry);
 
@@ -847,6 +878,7 @@ export function setupWebSocket(
               poolSend(connectionEntry, { type: 'session_resumed', sessionId });
             } catch (err: any) {
               console.error('Resume session error:', err.message);
+              console.error('Resume session stack:', err.stack);
               poolSend(connectionEntry, { type: 'error', message: `Failed to resume session: ${err.message}` });
             }
             break;

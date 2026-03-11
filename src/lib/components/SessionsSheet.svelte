@@ -133,10 +133,12 @@
       </div>
 
       {#if selectedSessionId}
-        <SessionPreview
-          detail={sessionDetail?.id === selectedSessionId ? sessionDetail : null}
-          onResume={() => handleResume(selectedSessionId!)}
-        />
+        <div class="sheet-detail">
+          <SessionPreview
+            detail={sessionDetail?.id === selectedSessionId ? sessionDetail : null}
+            onResume={() => handleResume(selectedSessionId!)}
+          />
+        </div>
       {:else}
         <div class="sheet-body">
           {#if !loading && sessions.length > 5}
@@ -328,6 +330,14 @@
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
     min-height: 0;
+  }
+
+  .sheet-detail {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
   }
   .sheet-body::-webkit-scrollbar { width: 4px; }
   .sheet-body::-webkit-scrollbar-track { background: transparent; }

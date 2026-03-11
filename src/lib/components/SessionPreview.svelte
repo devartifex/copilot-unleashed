@@ -246,6 +246,10 @@
     padding-bottom: calc(var(--sp-3) + var(--safe-bottom));
     border-top: 1px solid var(--border);
     flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: var(--bg);
+    z-index: 1;
   }
 
   .resume-btn {

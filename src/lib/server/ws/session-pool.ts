@@ -1,9 +1,9 @@
 import { WebSocket } from 'ws';
 import type { CopilotClient } from '@github/copilot-sdk';
+import { config } from '../config.js';
 
 const MAX_BUFFER_SIZE = 500;
 const TAB_ID_PATTERN = /^[a-f0-9-]{1,36}$/i;
-export const MAX_SESSIONS_PER_USER = 5;
 
 export interface PoolEntry {
   client: CopilotClient;

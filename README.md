@@ -199,6 +199,8 @@ That's it. Container Apps, ACR, managed identity, TLS, monitoring — all provis
 |----------|---------|-------------|
 | `NODE_ENV` | `development` | `production` enables secure cookies |
 | `TOKEN_MAX_AGE_MS` | `86400000` | Force re-auth interval (24h) |
+| `SESSION_POOL_TTL_MS` | `300000` | Session TTL when disconnected (5 min) |
+| `MAX_SESSIONS_PER_USER` | `5` | Max concurrent tabs/devices per user (evicts oldest when exceeded) |
 | `SESSION_STORE_PATH` | `/data/sessions` | Persistent session directory |
 | `SETTINGS_STORE_PATH` | `/data/settings` | Per-user settings directory |
 | `COPILOT_CONFIG_DIR` | `~/.copilot` | Copilot session-state directory (share with CLI for bidirectional sync) |

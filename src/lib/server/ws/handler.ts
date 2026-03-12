@@ -14,7 +14,6 @@ import { clearAuth } from '../auth/session-utils.js';
 import {
   sessionPool, createPoolEntry, destroyPoolEntry, poolSend,
   isValidTabId, countUserSessions, evictOldestUserSession,
-  MAX_SESSIONS_PER_USER,
   type PoolEntry,
 } from './session-pool.js';
 
@@ -320,7 +319,7 @@ export function setupWebSocket(
       });
     } else {
       // Create new pool entry — enforce per-user session cap
-      if (countUserSessions(userLogin) >= MAX_SESSIONS_PER_USER) {
+      if (countUserSessions(userLogin) >= config.maxSessionsPerUser) {
         console.log('[WS-SERVER] Session cap reached for', userLogin, '— evicting oldest');
         await evictOldestUserSession(userLogin);
       }

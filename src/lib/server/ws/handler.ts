@@ -1,9 +1,11 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { approveAll } from '@github/copilot-sdk';
 import { createCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
-import { enrichSessionMetadata, getSessionDetail, listSessionsFromFilesystem, buildSessionContext } from '../copilot/session-metadata.js';
+import { enrichSessionMetadata, getSessionDetail, getSessionStateDir, listSessionsFromFilesystem, buildSessionContext } from '../copilot/session-metadata.js';
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
 import { validateGitHubToken } from '../auth/github.js';
@@ -46,7 +48,7 @@ function normalizeQuotaSnapshots(raw: Record<string, any> | undefined): Record<s
   return result;
 }
 
-function wireSessionEvents(session: any, entry: PoolEntry): void {
+function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: string): void {
   session.on('assistant.message_delta', (event: any) => {
     poolSend(entry, { type: 'delta', content: event.data.deltaContent });
   });
@@ -119,6 +121,17 @@ function wireSessionEvents(session: any, entry: PoolEntry): void {
   });
   session.on('session.plan_changed', (event: any) => {
     poolSend(entry, { type: 'plan_changed', content: event.data?.content, path: event.data?.path });
+    // Persist plan changes to disk for CLI bidirectional sync
+    if (sessionId) {
+      session.rpc.plan.read()
+        .then((plan: { exists?: boolean; content?: string }) => {
+          if (plan?.exists && plan.content != null) {
+            const sessionDir = join(getSessionStateDir(), sessionId);
+            return writeFile(join(sessionDir, 'plan.md'), plan.content, 'utf-8');
+          }
+        })
+        .catch((err: Error) => console.warn(`[PLAN] Failed to sync plan.md for ${sessionId}:`, err.message));
+    }
   });
   session.on('session.compaction_start', () => { poolSend(entry, { type: 'compaction_start' }); });
   session.on('session.compaction_complete', (event: any) => {
@@ -411,7 +424,7 @@ export function setupWebSocket(
                 configDir: config.copilotConfigDir,
               });
 
-              wireSessionEvents(connectionEntry.session, connectionEntry);
+              wireSessionEvents(connectionEntry.session, connectionEntry, connectionEntry.session?.sessionId);
 
               // Set initial mode on the SDK session
               if (msg.mode && VALID_MODES.has(msg.mode)) {
@@ -823,7 +836,10 @@ export function setupWebSocket(
               // start() is idempotent — ensures the SDK has indexed all local sessions
               await connectionEntry.client.start();
 
-              const resolvedConfigDir = config.copilotConfigDir || (await import('node:path')).join((await import('node:os')).homedir(), '.copilot');
+              const resolvedConfigDir = config.copilotConfigDir || join((await import('node:os')).homedir(), '.copilot');
+
+              // Read filesystem plan for injection into resumed session context
+              const detail = await getSessionDetail(sessionId);
 
               let resumed = false;
 
@@ -834,6 +850,12 @@ export function setupWebSocket(
                   streaming: true,
                   onUserInputRequest: makeUserInputHandler(connectionEntry),
                   configDir: resolvedConfigDir,
+                  ...(detail?.plan && {
+                    systemMessage: {
+                      mode: 'append' as const,
+                      content: `## Current Plan\n${detail.plan}`,
+                    },
+                  }),
                 });
                 resumed = true;
               } catch (resumeErr: any) {
@@ -857,7 +879,7 @@ export function setupWebSocket(
                 console.log(`[RESUME] Fallback session created for ${sessionId} with context injection`);
               }
 
-              wireSessionEvents(connectionEntry.session, connectionEntry);
+              wireSessionEvents(connectionEntry.session, connectionEntry, sessionId);
 
               // Read and send the restored session's mode to the client
               try {

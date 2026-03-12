@@ -269,14 +269,11 @@ export function setupWebSocket(
 
     const githubToken: string = session.githubToken;
     const userLogin: string = session.githubUser?.login || 'unknown';
-    const reqUrl = new URL(req.url || '/', `http://${req.headers.host}`);
-    const tabId = reqUrl.searchParams.get('tabId') || 'default';
-    const poolKey = `${userLogin}:${tabId}`;
-    console.log('[WS-SERVER] Authenticated user:', userLogin, 'tab:', tabId, 'checking pool...');
-    let entry = sessionPool.get(poolKey);
+    console.log('[WS-SERVER] Authenticated user:', userLogin, 'checking pool...');
+    let entry = sessionPool.get(userLogin);
 
     if (entry) {
-      console.log('[WS-SERVER] Existing pool entry found for', poolKey);
+      console.log('[WS-SERVER] Existing pool entry found for', userLogin);
       // Reattach to existing pool entry
       if (entry.ws && entry.ws !== ws && entry.ws.readyState === WebSocket.OPEN) {
         entry.ws.close(4002, 'Replaced by new connection');
@@ -295,7 +292,7 @@ export function setupWebSocket(
         }
       }
 
-      console.log('[WS-SERVER] Sending session_reconnected to', poolKey, 'hasSession:', !!entry.session);
+      console.log('[WS-SERVER] Sending session_reconnected to', userLogin, 'hasSession:', !!entry.session);
       poolSend(entry, {
         type: 'session_reconnected',
         user: userLogin,
@@ -304,12 +301,12 @@ export function setupWebSocket(
       });
     } else {
       // Create new pool entry
-      console.log('[WS-SERVER] Creating new pool entry for', poolKey);
+      console.log('[WS-SERVER] Creating new pool entry for', userLogin);
       const client = createCopilotClient(githubToken, config.copilotConfigDir);
       entry = createPoolEntry(client, ws);
-      sessionPool.set(poolKey, entry);
+      sessionPool.set(userLogin, entry);
 
-      console.log('[WS-SERVER] Sending connected to', poolKey);
+      console.log('[WS-SERVER] Sending connected to', userLogin);
       poolSend(entry, {
         type: 'connected',
         user: userLogin,
@@ -320,12 +317,12 @@ export function setupWebSocket(
     const connectionEntry = entry;
 
     ws.on('close', (code: number, reason: Buffer) => {
-      console.log('[WS-SERVER] Client disconnected:', poolKey, 'code:', code, 'reason:', reason?.toString());
+      console.log('[WS-SERVER] Client disconnected:', userLogin, 'code:', code, 'reason:', reason?.toString());
       if (connectionEntry.ws === ws) {
         connectionEntry.ws = null;
         connectionEntry.ttlTimer = setTimeout(async () => {
           await destroyPoolEntry(connectionEntry);
-          sessionPool.delete(poolKey);
+          sessionPool.delete(userLogin);
         }, config.sessionPoolTtl);
       }
     });

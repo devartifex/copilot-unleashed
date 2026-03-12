@@ -14,3 +14,6 @@ playwright-report/
 public/
 bundled-sessions/
 bundled-session-store.db
+
+bundled-session-store.db-shm
+bundled-session-store.db-wal

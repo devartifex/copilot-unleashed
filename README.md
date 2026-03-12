@@ -52,7 +52,7 @@ The only open-source web UI built on the official [`@github/copilot-sdk`](https:
 - **Custom webhook tools** — connect any API (Jira, Slack, internal services)
 - **File attachments** — drop in code, images, CSVs
 - **Persistent sessions** — resume any conversation, on any device
-- **CLI ↔ Browser sync** — sessions started in the Copilot CLI work seamlessly in the browser (and vice versa)
+- **CLI ↔ Browser sync** — sessions started in the Copilot CLI appear in the browser when sharing the same `COPILOT_CONFIG_DIR`
 - **Mobile-first dark UI** — touch-optimized, works everywhere
 - **Self-hosted** — your data never leaves your server
 
@@ -212,6 +212,8 @@ That's it. Container Apps, ACR, managed identity, TLS, monitoring — all provis
 ## CLI ↔ Browser session sync
 
 Copilot Unleashed and the GitHub Copilot CLI share the same session-state directory (`~/.copilot/session-state/`). By default, the app reads from the same location the CLI uses — so any session started in the terminal is available in the browser the moment you open the Sessions panel.
+
+> **Note:** When running via Docker (`npm run dev`), the `docker-compose.yml` mounts `~/.copilot` read-only into the container. If you use `npm run dev:local` (no Docker), the app reads directly from your host `~/.copilot` with no extra config needed.
 
 ### How it works
 

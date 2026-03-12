@@ -10,10 +10,10 @@ services:
       - BASE_URL=http://localhost:3000
       - SESSION_STORE_PATH=/data/sessions
       - SETTINGS_STORE_PATH=/data/settings
+      - COPILOT_CONFIG_DIR=/home/node/.copilot
     volumes:
       - copilot-data:/data
-      # Uncomment to enable bidirectional plan sync with local Copilot CLI sessions:
-      # - ~/.copilot:/home/node/.copilot
+      - ~/.copilot:/home/node/.copilot  # sync host CLI sessions into container
     restart: unless-stopped
 
 volumes:

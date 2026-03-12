@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { approveAll } from '@github/copilot-sdk';
 import { createCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
-import { enrichSessionMetadata, getSessionDetail, getSessionStateDir, listSessionsFromFilesystem, buildSessionContext } from '../copilot/session-metadata.js';
+import { enrichSessionMetadata, getSessionDetail, getSessionStateDir, listSessionsFromFilesystem, buildSessionContext, deleteSessionFromFilesystem } from '../copilot/session-metadata.js';
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
 import { validateGitHubToken } from '../auth/github.js';
@@ -871,8 +871,19 @@ export function setupWebSocket(
               await connectionEntry.client.deleteSession(deleteId);
               poolSend(connectionEntry, { type: 'session_deleted', sessionId: deleteId });
             } catch (err: any) {
-              console.error('Delete session error:', err.message);
-              poolSend(connectionEntry, { type: 'error', message: `Failed to delete session: ${err.message}` });
+              // SDK doesn't know this session — try filesystem deletion
+              // (e.g. bundled or filesystem-only sessions)
+              try {
+                const deleted = await deleteSessionFromFilesystem(deleteId);
+                if (deleted) {
+                  poolSend(connectionEntry, { type: 'session_deleted', sessionId: deleteId });
+                } else {
+                  poolSend(connectionEntry, { type: 'error', message: `Session not found: ${deleteId}` });
+                }
+              } catch (fsErr: any) {
+                console.error('Delete session error:', err.message, '| Filesystem fallback:', fsErr.message);
+                poolSend(connectionEntry, { type: 'error', message: `Failed to delete session: ${err.message}` });
+              }
             }
             break;
           }

@@ -2,6 +2,8 @@ import { WebSocket } from 'ws';
 import type { CopilotClient } from '@github/copilot-sdk';
 
 const MAX_BUFFER_SIZE = 500;
+const TAB_ID_PATTERN = /^[a-f0-9-]{1,36}$/i;
+export const MAX_SESSIONS_PER_USER = 5;
 
 export interface PoolEntry {
   client: CopilotClient;
@@ -64,4 +66,57 @@ export async function cleanupAllSessions(): Promise<void> {
     sessionPool.delete(key);
   }
   await Promise.allSettled(promises);
+}
+
+/** Validate that a tabId is a UUID-like string (max 36 chars, alphanumeric + hyphens) */
+export function isValidTabId(tabId: string): boolean {
+  return TAB_ID_PATTERN.test(tabId);
+}
+
+/** Destroy all pool entries for a specific user (e.g., on logout or token revocation) */
+export async function cleanupUserSessions(username: string): Promise<void> {
+  const prefix = `${username}:`;
+  const promises: Promise<void>[] = [];
+  for (const [key, entry] of sessionPool) {
+    if (key.startsWith(prefix)) {
+      promises.push(destroyPoolEntry(entry));
+      sessionPool.delete(key);
+    }
+  }
+  await Promise.allSettled(promises);
+}
+
+/** Count active pool entries for a specific user */
+export function countUserSessions(username: string): number {
+  const prefix = `${username}:`;
+  let count = 0;
+  for (const key of sessionPool.keys()) {
+    if (key.startsWith(prefix)) count++;
+  }
+  return count;
+}
+
+/** Find and destroy the oldest pool entry for a user (the one with no active WS or earliest TTL) */
+export async function evictOldestUserSession(username: string): Promise<void> {
+  const prefix = `${username}:`;
+  let oldestKey: string | null = null;
+  let oldestHasWs = true;
+
+  for (const [key, entry] of sessionPool) {
+    if (!key.startsWith(prefix)) continue;
+    // Prefer evicting entries without an active WebSocket
+    const hasWs = entry.ws !== null && entry.ws.readyState === WebSocket.OPEN;
+    if (oldestKey === null || (!hasWs && oldestHasWs)) {
+      oldestKey = key;
+      oldestHasWs = hasWs;
+    }
+  }
+
+  if (oldestKey) {
+    const entry = sessionPool.get(oldestKey);
+    if (entry) {
+      await destroyPoolEntry(entry);
+      sessionPool.delete(oldestKey);
+    }
+  }
 }

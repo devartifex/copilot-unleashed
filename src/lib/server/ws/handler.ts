@@ -13,6 +13,8 @@ import { checkAuth } from '../auth/guard.js';
 import { clearAuth } from '../auth/session-utils.js';
 import {
   sessionPool, createPoolEntry, destroyPoolEntry, poolSend,
+  isValidTabId, countUserSessions, evictOldestUserSession,
+  MAX_SESSIONS_PER_USER,
   type PoolEntry,
 } from './session-pool.js';
 
@@ -282,11 +284,15 @@ export function setupWebSocket(
 
     const githubToken: string = session.githubToken;
     const userLogin: string = session.githubUser?.login || 'unknown';
-    console.log('[WS-SERVER] Authenticated user:', userLogin, 'checking pool...');
-    let entry = sessionPool.get(userLogin);
+    const reqUrl = new URL(req.url || '/', `http://${req.headers.host}`);
+    const rawTabId = reqUrl.searchParams.get('tabId') || 'default';
+    const tabId = isValidTabId(rawTabId) ? rawTabId : 'default';
+    const poolKey = `${userLogin}:${tabId}`;
+    console.log('[WS-SERVER] Authenticated user:', userLogin, 'tab:', tabId, 'checking pool...');
+    let entry = sessionPool.get(poolKey);
 
     if (entry) {
-      console.log('[WS-SERVER] Existing pool entry found for', userLogin);
+      console.log('[WS-SERVER] Existing pool entry found for', poolKey);
       // Reattach to existing pool entry
       if (entry.ws && entry.ws !== ws && entry.ws.readyState === WebSocket.OPEN) {
         entry.ws.close(4002, 'Replaced by new connection');
@@ -305,7 +311,7 @@ export function setupWebSocket(
         }
       }
 
-      console.log('[WS-SERVER] Sending session_reconnected to', userLogin, 'hasSession:', !!entry.session);
+      console.log('[WS-SERVER] Sending session_reconnected to', poolKey, 'hasSession:', !!entry.session);
       poolSend(entry, {
         type: 'session_reconnected',
         user: userLogin,
@@ -313,13 +319,17 @@ export function setupWebSocket(
         isProcessing: entry.isProcessing,
       });
     } else {
-      // Create new pool entry
-      console.log('[WS-SERVER] Creating new pool entry for', userLogin);
+      // Create new pool entry — enforce per-user session cap
+      if (countUserSessions(userLogin) >= MAX_SESSIONS_PER_USER) {
+        console.log('[WS-SERVER] Session cap reached for', userLogin, '— evicting oldest');
+        await evictOldestUserSession(userLogin);
+      }
+      console.log('[WS-SERVER] Creating new pool entry for', poolKey);
       const client = createCopilotClient(githubToken, config.copilotConfigDir);
       entry = createPoolEntry(client, ws);
-      sessionPool.set(userLogin, entry);
+      sessionPool.set(poolKey, entry);
 
-      console.log('[WS-SERVER] Sending connected to', userLogin);
+      console.log('[WS-SERVER] Sending connected to', poolKey);
       poolSend(entry, {
         type: 'connected',
         user: userLogin,
@@ -330,12 +340,12 @@ export function setupWebSocket(
     const connectionEntry = entry;
 
     ws.on('close', (code: number, reason: Buffer) => {
-      console.log('[WS-SERVER] Client disconnected:', userLogin, 'code:', code, 'reason:', reason?.toString());
+      console.log('[WS-SERVER] Client disconnected:', poolKey, 'code:', code, 'reason:', reason?.toString());
       if (connectionEntry.ws === ws) {
         connectionEntry.ws = null;
         connectionEntry.ttlTimer = setTimeout(async () => {
           await destroyPoolEntry(connectionEntry);
-          sessionPool.delete(userLogin);
+          sessionPool.delete(poolKey);
         }, config.sessionPoolTtl);
       }
     });

@@ -176,6 +176,8 @@ session-state/{UUID}/
 
 Both the **Copilot CLI** and **Copilot Unleashed** share this directory. Sessions created in either interface can be resumed in the other — the SDK's `resumeSession()` automatically restores checkpoints and plan context. The session listing is enriched with filesystem metadata (checkpoint count, plan status, git context) for the UI.
 
+**Bidirectional plan sync**: On resume, the filesystem `plan.md` is injected as a `systemMessage` (append mode) so the agent has full plan context. When the agent modifies the plan during a session, the `session.plan_changed` event triggers a read via `session.rpc.plan.read()` and the content is written back to `plan.md` on disk — enabling the CLI to pick up changes made in the browser.
+
 ## Component Architecture
 
 ### Store Pattern

@@ -228,6 +228,15 @@ The `@github/copilot-sdk` stores each session as a folder on disk:
 
 When you resume a session from the browser, the SDK's native `resumeSession()` restores the full conversation history and checkpoint context automatically. If the session is only available on disk (e.g. bundled into a Docker image without an active SDK index), the app falls back to reading `workspace.yaml`, `plan.md`, and the last three checkpoint files directly and injecting them as context into a new session — so nothing is lost.
 
+### Bidirectional plan sync
+
+Plan changes flow in both directions between the CLI and the browser:
+
+- **CLI → Browser**: When you resume a session, the filesystem `plan.md` is injected into the agent's context as a system message, so the agent knows the current plan even if it was last modified in the terminal.
+- **Browser → CLI**: When the agent updates the plan during a browser session, the change is automatically written back to `plan.md` on disk. The next time you run `copilot resume` in the terminal, the CLI picks up the latest plan.
+
+This sync is always active and requires no configuration — as long as the CLI and Copilot Unleashed share the same `~/.copilot/session-state/` directory (which is the default when running locally). In Docker, you need a bind-mount to enable it (see below).
+
 ### Sessions panel
 
 The Sessions panel (bottom-left icon) lets you:
@@ -250,12 +259,19 @@ The CLI and Copilot Unleashed will read from and write to the same path. Session
 
 ### Docker / Azure deployment
 
-When deploying to a container, mount or copy your local session-state into the image:
+When deploying to a container, mount your local session-state into the image. For full bidirectional plan sync (so plan changes in the browser are written back to disk for the CLI), use a read-write mount:
 
 ```yaml
 # docker-compose.yml
 volumes:
-  - ~/.copilot:/home/node/.copilot:ro   # read-only mirror of local CLI sessions
+  - ~/.copilot:/home/node/.copilot        # read-write: full bidirectional sync
+```
+
+For read-only access (browse and resume sessions, but plan changes won't persist to your host):
+
+```yaml
+volumes:
+  - ~/.copilot:/home/node/.copilot:ro     # read-only: browse sessions only
 ```
 
 Or set `COPILOT_CONFIG_DIR` to a shared volume that both your server and the container can access.

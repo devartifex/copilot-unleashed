@@ -328,6 +328,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       case 'permission_request':
         pendingPermission = {
           requestId: msg.requestId,
+          kind: msg.kind,
           toolName: msg.toolName,
           toolArgs: msg.toolArgs,
         };

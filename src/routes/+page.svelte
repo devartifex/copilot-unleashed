@@ -185,8 +185,9 @@
   }
 
   function handlePermissionResponse(requestId: string, decision: 'allow' | 'deny' | 'always_allow'): void {
+    const kind = chatStore.pendingPermission?.kind ?? '';
     const toolName = chatStore.pendingPermission?.toolName ?? '';
-    wsStore.respondToPermission(requestId, toolName, decision);
+    wsStore.respondToPermission(requestId, kind, toolName, decision);
     chatStore.clearPendingPermission();
   }
 </script>
@@ -232,6 +233,7 @@
       {#if chatStore.pendingPermission}
         <PermissionPrompt
           requestId={chatStore.pendingPermission.requestId}
+          kind={chatStore.pendingPermission.kind}
           toolName={chatStore.pendingPermission.toolName}
           toolArgs={chatStore.pendingPermission.toolArgs}
           onRespond={handlePermissionResponse}

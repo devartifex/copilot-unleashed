@@ -259,6 +259,7 @@ export interface UserInputRequestMessage {
 export interface PermissionRequestMessage {
   type: 'permission_request';
   requestId: string;
+  kind: string;
   toolName: string;
   toolArgs: Record<string, unknown>;
 }
@@ -522,6 +523,7 @@ export interface UserInputResponseMessage {
 export interface PermissionResponseMessage {
   type: 'permission_response';
   requestId: string;
+  kind: string;
   toolName: string;
   decision: 'allow' | 'deny' | 'always_allow' | 'always_deny';
 }
@@ -671,6 +673,7 @@ export interface UserInputState {
 
 export interface PermissionRequestState {
   requestId: string;
+  kind: string;
   toolName: string;
   toolArgs: Record<string, unknown>;
 }

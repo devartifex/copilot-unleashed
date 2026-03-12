@@ -179,13 +179,87 @@ function makeUserInputHandler(entry: PoolEntry) {
 
 const PERMISSION_TIMEOUT_MS = 30_000;
 
+function extractPermissionDisplay(request: any): {
+  kind: string;
+  toolName: string;
+  toolArgs: Record<string, unknown>;
+} {
+  const kind: string = request.kind ?? 'unknown';
+
+  switch (kind) {
+    case 'shell':
+      return {
+        kind,
+        toolName: request.fullCommandText ?? 'shell command',
+        toolArgs: {
+          ...(request.intention && { intention: request.intention }),
+          ...(request.possiblePaths?.length && { paths: request.possiblePaths }),
+          ...(request.possibleUrls?.length && { urls: request.possibleUrls.map((u: any) => u.url) }),
+          ...(request.warning && { warning: request.warning }),
+        },
+      };
+    case 'write':
+      return {
+        kind,
+        toolName: request.fileName ?? 'file',
+        toolArgs: {
+          ...(request.intention && { intention: request.intention }),
+          ...(request.diff && { diff: request.diff }),
+        },
+      };
+    case 'read':
+      return {
+        kind,
+        toolName: request.path ?? 'file',
+        toolArgs: {
+          ...(request.intention && { intention: request.intention }),
+        },
+      };
+    case 'mcp':
+      return {
+        kind,
+        toolName: request.toolName ?? request.toolTitle ?? request.serverName ?? 'mcp tool',
+        toolArgs: request.args ?? {},
+      };
+    case 'url':
+      return {
+        kind,
+        toolName: request.url ?? 'url',
+        toolArgs: {
+          ...(request.intention && { intention: request.intention }),
+        },
+      };
+    case 'custom-tool':
+      return {
+        kind,
+        toolName: request.toolName ?? 'custom tool',
+        toolArgs: request.args ?? {},
+      };
+    case 'memory':
+      return {
+        kind,
+        toolName: request.subject ?? 'memory',
+        toolArgs: {
+          ...(request.fact && { fact: request.fact }),
+          ...(request.citations && { citations: request.citations }),
+        },
+      };
+    default:
+      return {
+        kind,
+        toolName: request.toolName ?? request.tool?.name ?? kind,
+        toolArgs: request.args ?? request.tool?.args ?? {},
+      };
+  }
+}
+
 function makePermissionHandler(entry: PoolEntry) {
   return (request: any) => {
-    const toolName = request.toolName ?? request.tool?.name ?? 'unknown';
-    const toolArgs = request.args ?? request.tool?.args ?? {};
+    const { kind, toolName, toolArgs } = extractPermissionDisplay(request);
 
-    // Check remembered preferences
-    const remembered = entry.permissionPreferences.get(toolName);
+    // Check remembered preferences keyed by kind (so "always allow shell" covers all shell cmds)
+    const prefKey = kind;
+    const remembered = entry.permissionPreferences.get(prefKey);
     if (remembered === 'allow') return Promise.resolve({ kind: 'approved' as const });
     if (remembered === 'deny') return Promise.resolve({ kind: 'denied-interactively-by-user' as const });
 
@@ -209,6 +283,7 @@ function makePermissionHandler(entry: PoolEntry) {
       poolSend(entry, {
         type: 'permission_request',
         requestId,
+        kind,
         toolName,
         toolArgs,
       });
@@ -619,11 +694,13 @@ export function setupWebSocket(
               poolSend(connectionEntry, { type: 'error', message: 'Invalid decision' });
               return;
             }
+            // Key preferences by kind so "always allow shell" covers all shell commands
+            const prefKey = msg.kind ?? msg.toolName;
             if (decision === 'always_allow') {
-              connectionEntry.permissionPreferences.set(msg.toolName, 'allow');
+              connectionEntry.permissionPreferences.set(prefKey, 'allow');
             }
             if (decision === 'always_deny') {
-              connectionEntry.permissionPreferences.set(msg.toolName, 'deny');
+              connectionEntry.permissionPreferences.set(prefKey, 'deny');
             }
             const permResolve = connectionEntry.permissionResolve;
             connectionEntry.permissionResolve = null;

@@ -51,7 +51,7 @@ export interface WsStore {
   updatePlan(content: string): void;
   deletePlan(): void;
   respondToUserInput(answer: string, wasFreeform: boolean): void;
-  respondToPermission(requestId: string, toolName: string, decision: 'allow' | 'deny' | 'always_allow' | 'always_deny'): void;
+  respondToPermission(requestId: string, kind: string, toolName: string, decision: 'allow' | 'deny' | 'always_allow' | 'always_deny'): void;
 }
 
 export function createWsStore(): WsStore {
@@ -306,8 +306,8 @@ export function createWsStore(): WsStore {
     send({ type: 'user_input_response', answer, wasFreeform });
   }
 
-  function respondToPermission(requestId: string, toolName: string, decision: 'allow' | 'deny' | 'always_allow' | 'always_deny'): void {
-    send({ type: 'permission_response', requestId, toolName, decision });
+  function respondToPermission(requestId: string, kind: string, toolName: string, decision: 'allow' | 'deny' | 'always_allow' | 'always_deny'): void {
+    send({ type: 'permission_response', requestId, kind, toolName, decision });
   }
 
   // ── Return public interface ─────────────────────────────────────────────

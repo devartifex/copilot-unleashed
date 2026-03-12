@@ -1,12 +1,13 @@
 <script lang="ts">
   interface Props {
     requestId: string;
+    kind: string;
     toolName: string;
     toolArgs: Record<string, unknown>;
     onRespond: (requestId: string, decision: 'allow' | 'deny' | 'always_allow') => void;
   }
 
-  const { requestId, toolName, toolArgs, onRespond }: Props = $props();
+  const { requestId, kind, toolName, toolArgs, onRespond }: Props = $props();
 
   const COUNTDOWN_SECONDS = 30;
 
@@ -15,8 +16,20 @@
   let promptEl: HTMLDivElement | undefined = $state();
 
   const argsJson = $derived(JSON.stringify(toolArgs, null, 2));
+  const hasArgs = $derived(Object.keys(toolArgs).length > 0);
   const isLargeArgs = $derived(argsJson.length > 120);
   const isUrgent = $derived(secondsLeft <= 10);
+
+  const kindIcon: Record<string, string> = {
+    shell: '💻',
+    write: '✏️',
+    read: '📖',
+    mcp: '🔌',
+    url: '🌐',
+    'custom-tool': '🔧',
+    memory: '🧠',
+  };
+  const icon = $derived(kindIcon[kind] ?? '🔐');
 
   $effect(() => {
     const interval = setInterval(() => {
@@ -39,19 +52,24 @@
 </script>
 
 <div class="permission-prompt" class:urgent={isUrgent} bind:this={promptEl}>
-  <div class="permission-tool-name">🔐 {toolName}</div>
+  <div class="permission-header">
+    <span class="permission-kind-badge">{icon} {kind}</span>
+    <span class="permission-tool-name">{toolName}</span>
+  </div>
 
-  {#if isLargeArgs}
-    <button
-      class="permission-toggle"
-      onclick={() => argsExpanded = !argsExpanded}
-    >
-      {argsExpanded ? '▾ Hide arguments' : '▸ Show arguments'}
-    </button>
-  {/if}
+  {#if hasArgs}
+    {#if isLargeArgs}
+      <button
+        class="permission-toggle"
+        onclick={() => argsExpanded = !argsExpanded}
+      >
+        {argsExpanded ? '▾ Hide details' : '▸ Show details'}
+      </button>
+    {/if}
 
-  {#if !isLargeArgs || argsExpanded}
-    <pre class="permission-args">{argsJson}</pre>
+    {#if !isLargeArgs || argsExpanded}
+      <pre class="permission-args">{argsJson}</pre>
+    {/if}
   {/if}
 
   <div class="permission-actions">
@@ -102,10 +120,30 @@
     50% { box-shadow: 0 0 20px rgba(248, 81, 73, 0.35); }
   }
 
-  .permission-tool-name {
+  .permission-header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-1);
+    flex-wrap: wrap;
+  }
+
+  .permission-kind-badge {
+    background: rgba(210, 153, 34, 0.15);
     color: var(--yellow);
     font-weight: 600;
-    font-size: 0.9em;
+    font-size: 0.8em;
+    font-family: var(--font-mono);
+    padding: 1px 7px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+
+  .permission-tool-name {
+    color: var(--fg);
+    font-size: 0.88em;
+    font-family: var(--font-mono);
+    word-break: break-all;
   }
 
   .permission-toggle {

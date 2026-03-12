@@ -12,6 +12,8 @@ services:
       - SETTINGS_STORE_PATH=/data/settings
     volumes:
       - copilot-data:/data
+      # Uncomment to enable bidirectional plan sync with local Copilot CLI sessions:
+      # - ~/.copilot:/home/node/.copilot
     restart: unless-stopped
 
 volumes:

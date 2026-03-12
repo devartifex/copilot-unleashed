@@ -1,9 +1,11 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { approveAll } from '@github/copilot-sdk';
 import { createCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
-import { enrichSessionMetadata, getSessionDetail, listSessionsFromFilesystem, buildSessionContext } from '../copilot/session-metadata.js';
+import { enrichSessionMetadata, getSessionDetail, getSessionStateDir, listSessionsFromFilesystem, buildSessionContext } from '../copilot/session-metadata.js';
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
 import { validateGitHubToken } from '../auth/github.js';
@@ -11,6 +13,7 @@ import { checkAuth } from '../auth/guard.js';
 import { clearAuth } from '../auth/session-utils.js';
 import {
   sessionPool, createPoolEntry, destroyPoolEntry, poolSend,
+  isValidTabId, countUserSessions, evictOldestUserSession,
   type PoolEntry,
 } from './session-pool.js';
 
@@ -46,7 +49,7 @@ function normalizeQuotaSnapshots(raw: Record<string, any> | undefined): Record<s
   return result;
 }
 
-function wireSessionEvents(session: any, entry: PoolEntry): void {
+function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: string): void {
   session.on('assistant.message_delta', (event: any) => {
     poolSend(entry, { type: 'delta', content: event.data.deltaContent });
   });
@@ -119,6 +122,17 @@ function wireSessionEvents(session: any, entry: PoolEntry): void {
   });
   session.on('session.plan_changed', (event: any) => {
     poolSend(entry, { type: 'plan_changed', content: event.data?.content, path: event.data?.path });
+    // Persist plan changes to disk for CLI bidirectional sync
+    if (sessionId) {
+      session.rpc.plan.read()
+        .then((plan: { exists?: boolean; content?: string }) => {
+          if (plan?.exists && plan.content != null) {
+            const sessionDir = join(getSessionStateDir(), sessionId);
+            return writeFile(join(sessionDir, 'plan.md'), plan.content, 'utf-8');
+          }
+        })
+        .catch((err: Error) => console.warn(`[PLAN] Failed to sync plan.md for ${sessionId}:`, err.message));
+    }
   });
   session.on('session.compaction_start', () => { poolSend(entry, { type: 'compaction_start' }); });
   session.on('session.compaction_complete', (event: any) => {
@@ -269,11 +283,15 @@ export function setupWebSocket(
 
     const githubToken: string = session.githubToken;
     const userLogin: string = session.githubUser?.login || 'unknown';
-    console.log('[WS-SERVER] Authenticated user:', userLogin, 'checking pool...');
-    let entry = sessionPool.get(userLogin);
+    const reqUrl = new URL(req.url || '/', `http://${req.headers.host}`);
+    const rawTabId = reqUrl.searchParams.get('tabId') || 'default';
+    const tabId = isValidTabId(rawTabId) ? rawTabId : 'default';
+    const poolKey = `${userLogin}:${tabId}`;
+    console.log('[WS-SERVER] Authenticated user:', userLogin, 'tab:', tabId, 'checking pool...');
+    let entry = sessionPool.get(poolKey);
 
     if (entry) {
-      console.log('[WS-SERVER] Existing pool entry found for', userLogin);
+      console.log('[WS-SERVER] Existing pool entry found for', poolKey);
       // Reattach to existing pool entry
       if (entry.ws && entry.ws !== ws && entry.ws.readyState === WebSocket.OPEN) {
         entry.ws.close(4002, 'Replaced by new connection');
@@ -292,7 +310,7 @@ export function setupWebSocket(
         }
       }
 
-      console.log('[WS-SERVER] Sending session_reconnected to', userLogin, 'hasSession:', !!entry.session);
+      console.log('[WS-SERVER] Sending session_reconnected to', poolKey, 'hasSession:', !!entry.session);
       poolSend(entry, {
         type: 'session_reconnected',
         user: userLogin,
@@ -300,13 +318,17 @@ export function setupWebSocket(
         isProcessing: entry.isProcessing,
       });
     } else {
-      // Create new pool entry
-      console.log('[WS-SERVER] Creating new pool entry for', userLogin);
+      // Create new pool entry — enforce per-user session cap
+      if (countUserSessions(userLogin) >= config.maxSessionsPerUser) {
+        console.log('[WS-SERVER] Session cap reached for', userLogin, '— evicting oldest');
+        await evictOldestUserSession(userLogin);
+      }
+      console.log('[WS-SERVER] Creating new pool entry for', poolKey);
       const client = createCopilotClient(githubToken, config.copilotConfigDir);
       entry = createPoolEntry(client, ws);
-      sessionPool.set(userLogin, entry);
+      sessionPool.set(poolKey, entry);
 
-      console.log('[WS-SERVER] Sending connected to', userLogin);
+      console.log('[WS-SERVER] Sending connected to', poolKey);
       poolSend(entry, {
         type: 'connected',
         user: userLogin,
@@ -317,12 +339,12 @@ export function setupWebSocket(
     const connectionEntry = entry;
 
     ws.on('close', (code: number, reason: Buffer) => {
-      console.log('[WS-SERVER] Client disconnected:', userLogin, 'code:', code, 'reason:', reason?.toString());
+      console.log('[WS-SERVER] Client disconnected:', poolKey, 'code:', code, 'reason:', reason?.toString());
       if (connectionEntry.ws === ws) {
         connectionEntry.ws = null;
         connectionEntry.ttlTimer = setTimeout(async () => {
           await destroyPoolEntry(connectionEntry);
-          sessionPool.delete(userLogin);
+          sessionPool.delete(poolKey);
         }, config.sessionPoolTtl);
       }
     });
@@ -411,7 +433,7 @@ export function setupWebSocket(
                 configDir: config.copilotConfigDir,
               });
 
-              wireSessionEvents(connectionEntry.session, connectionEntry);
+              wireSessionEvents(connectionEntry.session, connectionEntry, connectionEntry.session?.sessionId);
 
               // Set initial mode on the SDK session
               if (msg.mode && VALID_MODES.has(msg.mode)) {
@@ -823,7 +845,10 @@ export function setupWebSocket(
               // start() is idempotent — ensures the SDK has indexed all local sessions
               await connectionEntry.client.start();
 
-              const resolvedConfigDir = config.copilotConfigDir || (await import('node:path')).join((await import('node:os')).homedir(), '.copilot');
+              const resolvedConfigDir = config.copilotConfigDir || join((await import('node:os')).homedir(), '.copilot');
+
+              // Read filesystem plan for injection into resumed session context
+              const detail = await getSessionDetail(sessionId);
 
               let resumed = false;
 
@@ -834,6 +859,12 @@ export function setupWebSocket(
                   streaming: true,
                   onUserInputRequest: makeUserInputHandler(connectionEntry),
                   configDir: resolvedConfigDir,
+                  ...(detail?.plan && {
+                    systemMessage: {
+                      mode: 'append' as const,
+                      content: `## Current Plan\n${detail.plan}`,
+                    },
+                  }),
                 });
                 resumed = true;
               } catch (resumeErr: any) {
@@ -857,7 +888,7 @@ export function setupWebSocket(
                 console.log(`[RESUME] Fallback session created for ${sessionId} with context injection`);
               }
 
-              wireSessionEvents(connectionEntry.session, connectionEntry);
+              wireSessionEvents(connectionEntry.session, connectionEntry, sessionId);
 
               // Read and send the restored session's mode to the client
               try {

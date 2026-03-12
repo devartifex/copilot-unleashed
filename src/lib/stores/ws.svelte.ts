@@ -12,6 +12,15 @@ const MAX_RECONNECT_DELAY = 60_000;
 const UNAUTHORIZED_CODE = 4001;
 const REPLACED_CODE = 4002;
 
+// Unique ID for this browser tab — persisted in sessionStorage to survive hard refreshes
+const TAB_ID = typeof sessionStorage !== 'undefined'
+  ? sessionStorage.getItem('copilot-tab-id') ?? (() => {
+      const id = crypto.randomUUID();
+      sessionStorage.setItem('copilot-tab-id', id);
+      return id;
+    })()
+  : crypto.randomUUID();
+
 export interface WsStore {
   readonly connectionState: ConnectionState;
   readonly sessionReady: boolean;
@@ -92,7 +101,7 @@ export function createWsStore(): WsStore {
   function buildWsUrl(): string {
     if (typeof window === 'undefined') return '';
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${proto}//${window.location.host}/ws`;
+    return `${proto}//${window.location.host}/ws?tabId=${TAB_ID}`;
   }
 
   function setupVisibilityHandler(): void {

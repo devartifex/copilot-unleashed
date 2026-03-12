@@ -23,7 +23,7 @@ export interface SessionDetail {
 }
 
 /** Resolve the session-state root directory */
-function getSessionStateDir(): string {
+export function getSessionStateDir(): string {
   const base = config.copilotConfigDir || join(homedir(), '.copilot');
   return join(base, 'session-state');
 }

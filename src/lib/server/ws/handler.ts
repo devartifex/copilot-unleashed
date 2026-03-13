@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { approveAll } from '@github/copilot-sdk';
 import { createCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
-import { enrichSessionMetadata, getSessionDetail, getSessionStateDir, listSessionsFromFilesystem, buildSessionContext } from '../copilot/session-metadata.js';
+import { enrichSessionMetadata, getSessionDetail, getSessionStateDir, listSessionsFromFilesystem, buildSessionContext, deleteSessionFromFilesystem } from '../copilot/session-metadata.js';
 import { config } from '../config.js';
 import { logSecurity } from '../security-log.js';
 import { validateGitHubToken } from '../auth/github.js';
@@ -123,17 +123,21 @@ function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: string): 
   });
   session.on('session.plan_changed', (event: any) => {
     poolSend(entry, { type: 'plan_changed', content: event.data?.content, path: event.data?.path });
-    // Persist plan changes to disk for CLI bidirectional sync
-    if (sessionId) {
-      session.rpc.plan.read()
-        .then((plan: { exists?: boolean; content?: string }) => {
-          if (plan?.exists && plan.content != null) {
+    // Read the full plan to sync UI + persist to disk
+    session.rpc.plan.read()
+      .then((plan: { exists?: boolean; content?: string; path?: string }) => {
+        if (plan?.exists && plan.content != null) {
+          // Send full plan to UI so the panel stays in sync
+          poolSend(entry, { type: 'plan', exists: true, content: plan.content, path: plan.path });
+          // Persist plan changes to disk for CLI bidirectional sync
+          if (sessionId) {
             const sessionDir = join(getSessionStateDir(), sessionId);
-            return writeFile(join(sessionDir, 'plan.md'), plan.content, 'utf-8');
+            writeFile(join(sessionDir, 'plan.md'), plan.content, 'utf-8')
+              .catch((err: Error) => console.warn(`[PLAN] Failed to sync plan.md for ${sessionId}:`, err.message));
           }
-        })
-        .catch((err: Error) => console.warn(`[PLAN] Failed to sync plan.md for ${sessionId}:`, err.message));
-    }
+        }
+      })
+      .catch((err: Error) => console.warn(`[PLAN] Failed to read plan:`, err.message));
   });
   session.on('session.compaction_start', () => { poolSend(entry, { type: 'compaction_start' }); });
   session.on('session.compaction_complete', (event: any) => {
@@ -871,8 +875,19 @@ export function setupWebSocket(
               await connectionEntry.client.deleteSession(deleteId);
               poolSend(connectionEntry, { type: 'session_deleted', sessionId: deleteId });
             } catch (err: any) {
-              console.error('Delete session error:', err.message);
-              poolSend(connectionEntry, { type: 'error', message: `Failed to delete session: ${err.message}` });
+              // SDK doesn't know this session — try filesystem deletion
+              // (e.g. bundled or filesystem-only sessions)
+              try {
+                const deleted = await deleteSessionFromFilesystem(deleteId);
+                if (deleted) {
+                  poolSend(connectionEntry, { type: 'session_deleted', sessionId: deleteId });
+                } else {
+                  poolSend(connectionEntry, { type: 'error', message: `Session not found: ${deleteId}` });
+                }
+              } catch (fsErr: any) {
+                console.error('Delete session error:', err.message, '| Filesystem fallback:', fsErr.message);
+                poolSend(connectionEntry, { type: 'error', message: `Failed to delete session: ${err.message}` });
+              }
             }
             break;
           }
@@ -980,6 +995,26 @@ export function setupWebSocket(
                 }
               } catch {
                 // Non-critical: mode will default to interactive on client
+              }
+
+              // Restore the plan INTO the SDK so the agent's tools can access it
+              if (detail?.plan) {
+                try {
+                  await connectionEntry.session.rpc.plan.update({ content: detail.plan });
+                  console.log(`[RESUME] Plan restored into SDK for session ${sessionId}`);
+                } catch (planErr: any) {
+                  console.warn(`[RESUME] Failed to restore plan into SDK: ${planErr.message}`);
+                }
+              }
+
+              // Read and send the restored session's plan to the client
+              try {
+                const planResult = await connectionEntry.session.rpc.plan.read();
+                if (planResult?.exists) {
+                  poolSend(connectionEntry, { type: 'plan', exists: true, content: planResult.content, path: planResult.path });
+                }
+              } catch {
+                // Non-critical: plan panel will stay hidden
               }
 
               poolSend(connectionEntry, { type: 'session_resumed', sessionId });

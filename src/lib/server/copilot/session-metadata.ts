@@ -1,4 +1,4 @@
-import { readFile, readdir, access, stat } from 'node:fs/promises';
+import { readFile, readdir, access, stat, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { config } from '../config.js';
@@ -331,4 +331,20 @@ export async function buildSessionContext(sessionId: string): Promise<string | n
     '',
     'Continue from where the previous session left off. The user wants to resume this work.',
   ].join('\n');
+}
+
+/**
+ * Delete a session's directory from the filesystem.
+ * Used as a fallback when the SDK doesn't know about the session
+ * (e.g. bundled or filesystem-only sessions).
+ */
+export async function deleteSessionFromFilesystem(sessionId: string): Promise<boolean> {
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRe.test(sessionId)) return false;
+
+  const sessionDir = join(getSessionStateDir(), sessionId);
+  if (!await pathExists(sessionDir)) return false;
+
+  await rm(sessionDir, { recursive: true, force: true });
+  return true;
 }

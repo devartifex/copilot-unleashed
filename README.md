@@ -52,7 +52,7 @@ The only open-source web UI built on the official [`@github/copilot-sdk`](https:
 - **Custom webhook tools** — connect any API (Jira, Slack, internal services)
 - **File attachments** — drop in code, images, CSVs
 - **Persistent sessions** — resume any conversation, on any device
-- **CLI ↔ Browser sync** — sessions started in the Copilot CLI work seamlessly in the browser (and vice versa)
+- **CLI ↔ Browser sync** — sessions started in the Copilot CLI appear in the browser when sharing the same `COPILOT_CONFIG_DIR`
 - **Mobile-first dark UI** — touch-optimized, works everywhere
 - **Self-hosted** — your data never leaves your server
 
@@ -213,6 +213,8 @@ That's it. Container Apps, ACR, managed identity, TLS, monitoring — all provis
 
 Copilot Unleashed and the GitHub Copilot CLI share the same session-state directory (`~/.copilot/session-state/`). By default, the app reads from the same location the CLI uses — so any session started in the terminal is available in the browser the moment you open the Sessions panel.
 
+> **Note:** When running via Docker (`npm run dev`), the `docker-compose.yml` mounts `~/.copilot` read-only into the container. If you use `npm run dev:local` (no Docker), the app reads directly from your host `~/.copilot` with no extra config needed.
+
 ### How it works
 
 The `@github/copilot-sdk` stores each session as a folder on disk:
@@ -261,7 +263,9 @@ The CLI and Copilot Unleashed will read from and write to the same path. Session
 
 ### Docker / Azure deployment
 
-When deploying to a container, mount your local session-state into the image. For full bidirectional plan sync (so plan changes in the browser are written back to disk for the CLI), use a read-write mount:
+When deploying to a container, you have several options for session availability:
+
+**Option 1: Bind-mount (Docker Compose, local development)**
 
 ```yaml
 # docker-compose.yml
@@ -269,14 +273,32 @@ volumes:
   - ~/.copilot:/home/node/.copilot        # read-write: full bidirectional sync
 ```
 
-For read-only access (browse and resume sessions, but plan changes won't persist to your host):
+**Option 2: Bundle sessions at build time (Azure / CI)**
 
-```yaml
-volumes:
-  - ~/.copilot:/home/node/.copilot:ro     # read-only: browse sessions only
+Run `npm run bundle-sessions` before building the Docker image. This snapshots your local CLI sessions into the image. When deploying with `azd up`, this happens automatically via the `predeploy` hook in `azure.yaml`.
+
+```bash
+npm run bundle-sessions   # snapshots ~/.copilot sessions into bundled-sessions/
+azd up                    # auto-runs bundle-sessions before docker build
 ```
 
-Or set `COPILOT_CONFIG_DIR` to a shared volume that both your server and the container can access.
+> **Note:** CI/CD builds (GitHub Actions) won't include your local sessions since `~/.copilot` isn't available in the runner. Use `azd up` locally or push sessions on-demand (below).
+
+**Option 3: Push sessions on-demand to a running instance**
+
+After deploying, push new sessions without redeploying:
+
+```bash
+npm run sync:push -- https://your-app.azurecontainerapps.io
+```
+
+This computes a delta (sessions in local `~/.copilot` but not on remote) and uploads only the new or updated ones. It authenticates using your GitHub token (`gh auth token` or `GH_TOKEN` env var). The remote instance must have `ALLOWED_GITHUB_USERS` set to include your username.
+
+The sync API (`GET/POST /api/sessions/sync`) is also available programmatically for custom automation.
+
+### Auto-refresh
+
+The Sessions panel auto-refreshes every 30 seconds while open, so CLI sessions created in a parallel terminal appear in the browser without manual reload.
 
 ---
 

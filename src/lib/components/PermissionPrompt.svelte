@@ -43,33 +43,6 @@
     return () => clearInterval(interval);
   });
 
-  // Browser notification when the prompt appears (user may have switched tabs)
-  $effect(() => {
-    if (typeof Notification === 'undefined') return;
-
-    const fire = () => {
-      const notif = new Notification(`Tool approval needed: ${kind}`, {
-        body: toolName,
-        icon: '/favicon.png',
-        tag: requestId,
-        requireInteraction: true,
-      });
-      notif.onclick = () => {
-        window.focus();
-        notif.close();
-      };
-      return () => notif.close();
-    };
-
-    if (Notification.permission === 'granted') {
-      return fire();
-    } else if (Notification.permission === 'default') {
-      Notification.requestPermission().then((perm) => {
-        if (perm === 'granted') fire();
-      });
-    }
-  });
-
   // Auto-scroll into view when the prompt appears
   $effect(() => {
     if (promptEl) {

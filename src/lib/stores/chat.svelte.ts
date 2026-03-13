@@ -18,6 +18,7 @@ import type {
   QuotaSnapshot,
 } from '$lib/types/index.js';
 import type { WsStore } from '$lib/stores/ws.svelte.js';
+import { notify } from '$lib/utils/notifications.js';
 
 export interface ChatStore {
   // Message state
@@ -221,10 +222,18 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'turn_end':
+        notify('Response ready', {
+          body: currentStreamContent.trim().slice(0, 100) || undefined,
+          tag: 'response-ready',
+        });
         finalizeStream();
         break;
 
       case 'done':
+        notify('Response ready', {
+          body: currentStreamContent.trim().slice(0, 100) || undefined,
+          tag: 'response-ready',
+        });
         finalizeStream();
         break;
 
@@ -292,6 +301,10 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         currentStreamContent = '';
         // Don't clear pendingUserInput — the error may be unrelated to the ask_user flow
         pendingPermission = null;
+        notify('Something went wrong', {
+          body: msg.message,
+          tag: 'error',
+        });
         break;
 
       case 'aborted':
@@ -310,6 +323,11 @@ export function createChatStore(wsStore: WsStore): ChatStore {
           choices: msg.choices,
           allowFreeform: msg.allowFreeform,
         };
+        notify('Copilot is asking you something', {
+          body: msg.question,
+          tag: 'user-input',
+          requireInteraction: true,
+        });
         break;
 
       case 'elicitation_requested':
@@ -319,6 +337,11 @@ export function createChatStore(wsStore: WsStore): ChatStore {
           choices: msg.choices,
           allowFreeform: msg.allowFreeform,
         };
+        notify('Copilot is asking you something', {
+          body: msg.question,
+          tag: 'user-input',
+          requireInteraction: true,
+        });
         break;
 
       case 'elicitation_completed':
@@ -332,6 +355,11 @@ export function createChatStore(wsStore: WsStore): ChatStore {
           toolName: msg.toolName,
           toolArgs: msg.toolArgs,
         };
+        notify(`Tool approval needed: ${msg.kind}`, {
+          body: msg.toolName,
+          tag: msg.requestId,
+          requireInteraction: true,
+        });
         break;
 
       case 'tools':
@@ -367,6 +395,9 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       case 'session_resumed':
         currentSessionId = msg.sessionId;
         addInfoMessage(`Session resumed: ${msg.sessionId}`);
+        notify('Session restored — ready to continue', {
+          tag: 'session-resumed',
+        });
         break;
 
       case 'session_deleted':

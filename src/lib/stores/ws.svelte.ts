@@ -6,6 +6,7 @@ import type {
   ServerMessage,
   NewSessionConfig,
 } from '$lib/types/index.js';
+import { notify } from '$lib/utils/notifications.js';
 
 const INITIAL_RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_DELAY = 60_000;
@@ -168,6 +169,9 @@ export function createWsStore(): WsStore {
         return;
       }
 
+      notify('Session disconnected — trying to reconnect…', {
+        tag: 'session-disconnected',
+      });
       scheduleReconnect();
     };
 

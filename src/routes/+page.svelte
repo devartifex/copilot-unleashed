@@ -141,14 +141,25 @@
       ...(settings.customInstructions.trim() && { customInstructions: settings.customInstructions.trim() }),
       ...(settings.excludedTools.length > 0 && { excludedTools: settings.excludedTools }),
       ...(settings.customTools.length > 0 && { customTools: settings.customTools }),
+      ...(settings.customAgents.length > 0 && { customAgents: settings.customAgents }),
       ...(settings.mcpServers.length > 0 && { mcpServers: settings.mcpServers.filter(s => s.enabled) }),
       ...(settings.disabledSkills.length > 0 && { disabledSkills: settings.disabledSkills }),
     });
   }
 
   function handleSend(content: string, attachments?: Array<{ path: string; name: string; type: string }>): void {
+    if (content.startsWith('/fleet ')) {
+      const prompt = content.slice(7).trim();
+      if (prompt) {
+        chatStore.addUserMessage(content);
+        wsStore.send({ type: 'start_fleet', prompt });
+        return;
+      }
+    }
+
     chatStore.addUserMessage(content);
-    wsStore.sendMessage(content, attachments);
+    const mode = chatStore.isStreaming ? 'immediate' : undefined;
+    wsStore.sendMessage(content, attachments, mode);
   }
 
   function handleNewChat(): void {
@@ -316,6 +327,7 @@
       customInstructions={settings.customInstructions}
       excludedTools={settings.excludedTools}
       customTools={settings.customTools}
+      customAgents={settings.customAgents}
       mcpServers={settings.mcpServers}
       availableSkills={settings.availableSkills}
       disabledSkills={settings.disabledSkills}
@@ -329,6 +341,7 @@
         }
       }}
       onSaveCustomTools={(tools) => { settings.customTools = tools; }}
+      onSaveCustomAgents={(agents) => { settings.customAgents = agents; }}
       onSaveMcpServers={(servers) => { settings.mcpServers = servers; }}
       onToggleSkill={handleToggleSkill}
       onSelectAgent={(name) => wsStore.selectAgent(name)}

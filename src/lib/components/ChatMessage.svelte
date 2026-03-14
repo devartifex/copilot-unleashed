@@ -1,6 +1,7 @@
 <script lang="ts">
-import type { ChatMessage } from '$lib/types/index.js';
+  import type { ChatMessage } from '$lib/types/index.js';
   import { renderMarkdown, highlightCodeBlocks, addCopyButtons } from '$lib/utils/markdown.js';
+  import FleetProgress from './FleetProgress.svelte';
   import ToolCall from '$lib/components/ToolCall.svelte';
   import ReasoningBlock from '$lib/components/ReasoningBlock.svelte';
 
@@ -106,6 +107,15 @@ import type { ChatMessage } from '$lib/types/index.js';
   <div class="subagent-line">
     <span class="subagent-icon">{subagentIcon}</span>
     <span>agent/{message.content}</span>
+  </div>
+
+{:else if message.role === 'fleet'}
+  <div class="fleet-line">
+    <span class="fleet-line-icon">⚡</span>
+    <span>{message.content}</span>
+    {#if message.fleetAgents && message.fleetAgents.length > 0}
+      <FleetProgress agents={message.fleetAgents} active={!message.content.includes('complete')} />
+    {/if}
   </div>
 
 {:else if message.role === 'tool' && toolState}
@@ -392,6 +402,20 @@ import type { ChatMessage } from '$lib/types/index.js';
   .subagent-icon {
     flex-shrink: 0;
     color: var(--purple);
+    font-weight: 700;
+  }
+
+  .fleet-line {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: var(--sp-1) 0;
+    color: var(--purple);
+    font-size: 0.85em;
+    animation: msg-in 0.3s;
+  }
+
+  .fleet-line-icon {
     font-weight: 700;
   }
 

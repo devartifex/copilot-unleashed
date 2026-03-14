@@ -32,6 +32,7 @@ function createWsStoreMock(options: {
     connect: vi.fn(),
     disconnect: vi.fn(),
     onMessage: vi.fn(() => () => {}),
+    send: vi.fn(),
     sendMessage: vi.fn(),
     newSession: vi.fn(),
     resumeSession: vi.fn(),
@@ -128,6 +129,7 @@ describe('createChatStore', () => {
       { type: 'reasoning_delta', reasoningId: 'reason-1', content: ' deeply' },
     );
 
+    expect(store.canSend).toBe(true);
     expect(store.isWaiting).toBe(false);
     expect(store.isReasoningStreaming).toBe(true);
     expect(store.currentReasoningContent).toBe('Thinking deeply');
@@ -145,6 +147,7 @@ describe('createChatStore', () => {
     );
 
     expect(store.isStreaming).toBe(true);
+    expect(store.canSend).toBe(true);
     expect(store.currentStreamContent).toBe('Hello world');
 
     dispatch(store, { type: 'done' });
@@ -416,6 +419,80 @@ describe('createChatStore', () => {
       expect.objectContaining({ role: 'info', content: 'Exiting plan mode…' }),
       expect.objectContaining({ role: 'info', content: 'Exited plan mode' }),
     ]);
+  });
+
+  it('handles fleet_started message', () => {
+    const store = createChatStore(createWsStoreMock());
+
+    store.handleServerMessage({ type: 'fleet_started', started: true });
+
+    expect(store.fleetActive).toBe(true);
+    const fleetMsg = store.messages.find(message => message.role === 'fleet');
+    expect(fleetMsg).toBeDefined();
+    expect(fleetMsg!.content).toContain('Fleet mode activated');
+  });
+
+  it('tracks fleet agents through subagent lifecycle', () => {
+    const store = createChatStore(createWsStoreMock());
+
+    dispatch(
+      store,
+      { type: 'fleet_started', started: true },
+      { type: 'subagent_start', agentName: 'researcher' },
+    );
+
+    expect(store.fleetAgents).toHaveLength(1);
+    expect(store.fleetAgents[0].status).toBe('running');
+
+    store.handleServerMessage({ type: 'subagent_end', agentName: 'researcher' });
+
+    expect(store.fleetAgents[0].status).toBe('completed');
+  });
+
+  it('marks fleet complete when all agents finish', () => {
+    const store = createChatStore(createWsStoreMock());
+
+    dispatch(
+      store,
+      { type: 'fleet_started', started: true },
+      { type: 'subagent_start', agentName: 'agent1' },
+      { type: 'subagent_start', agentName: 'agent2' },
+      { type: 'subagent_end', agentName: 'agent1' },
+    );
+
+    expect(store.fleetActive).toBe(true);
+
+    store.handleServerMessage({ type: 'subagent_end', agentName: 'agent2' });
+
+    expect(store.fleetActive).toBe(false);
+    const completeMsg = store.messages.find(
+      message => message.role === 'fleet' && message.content.includes('complete'),
+    );
+    expect(completeMsg).toBeDefined();
+  });
+
+  it('handles fleet agent failures', () => {
+    const store = createChatStore(createWsStoreMock());
+
+    dispatch(
+      store,
+      { type: 'fleet_started', started: true },
+      { type: 'subagent_start', agentName: 'agent1' },
+      { type: 'subagent_failed', agentName: 'agent1', error: 'timeout' },
+    );
+
+    expect(store.fleetAgents[0].status).toBe('failed');
+    expect(store.fleetAgents[0].error).toBe('timeout');
+  });
+
+  it('resets fleet state on clearMessages', () => {
+    const store = createChatStore(createWsStoreMock());
+
+    store.handleServerMessage({ type: 'fleet_started', started: true });
+    store.clearMessages();
+
+    expect(store.fleetActive).toBe(false);
+    expect(store.fleetAgents).toHaveLength(0);
   });
 
   it('accumulates session usage totals across multiple usage messages', () => {

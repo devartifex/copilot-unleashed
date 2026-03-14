@@ -5,6 +5,7 @@ import type {
   ClientMessage,
   ServerMessage,
   NewSessionConfig,
+  MessageDeliveryMode,
 } from '$lib/types/index.js';
 import { notify } from '$lib/utils/notifications.js';
 
@@ -30,8 +31,14 @@ export interface WsStore {
   disconnect(): void;
   onMessage(handler: (msg: ServerMessage) => void): () => void;
 
+  send(data: ClientMessage): void;
+
   // Typed send helpers
-  sendMessage(content: string, attachments?: Array<{ path: string; name: string; type: string }>): void;
+  sendMessage(
+    content: string,
+    attachments?: Array<{ path: string; name: string; type: string }>,
+    mode?: MessageDeliveryMode,
+  ): void;
   newSession(config: NewSessionConfig): void;
   resumeSession(sessionId: string): void;
   setMode(mode: SessionMode): void;
@@ -211,8 +218,17 @@ export function createWsStore(): WsStore {
 
   // ── Typed send functions ────────────────────────────────────────────────
 
-  function sendMessage(content: string, attachments?: Array<{ path: string; name: string; type: string }>): void {
-    send({ type: 'message', content, ...(attachments?.length ? { attachments } : {}) });
+  function sendMessage(
+    content: string,
+    attachments?: Array<{ path: string; name: string; type: string }>,
+    mode?: MessageDeliveryMode,
+  ): void {
+    send({
+      type: 'message',
+      content,
+      ...(attachments?.length ? { attachments } : {}),
+      ...(mode ? { mode } : {}),
+    });
   }
 
   function newSession(config: NewSessionConfig): void {
@@ -225,6 +241,7 @@ export function createWsStore(): WsStore {
       ...(config.customInstructions?.trim() && { customInstructions: config.customInstructions.trim() }),
       ...(config.excludedTools?.length && { excludedTools: config.excludedTools }),
       ...(config.customTools?.length && { customTools: config.customTools }),
+      ...(config.customAgents?.length && { customAgents: config.customAgents }),
       ...(config.mcpServers?.length && { mcpServers: config.mcpServers }),
       ...(config.disabledSkills?.length && { disabledSkills: config.disabledSkills }),
     };
@@ -325,6 +342,7 @@ export function createWsStore(): WsStore {
     disconnect,
     onMessage,
 
+    send,
     sendMessage,
     newSession,
     resumeSession,

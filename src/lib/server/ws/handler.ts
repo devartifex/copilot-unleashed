@@ -27,7 +27,7 @@ const VALID_MESSAGE_TYPES = new Set([
   'permission_response',
   'list_tools', 'list_agents', 'select_agent', 'deselect_agent',
   'get_quota', 'compact', 'list_sessions', 'resume_session',
-  'delete_session', 'get_session_detail', 'get_plan', 'update_plan', 'delete_plan',
+  'delete_session', 'get_session_detail', 'get_plan', 'update_plan', 'delete_plan', 'start_fleet',
 ]);
 const VALID_MODES = new Set(['interactive', 'plan', 'autopilot']);
 const VALID_REASONING = new Set(['low', 'medium', 'high', 'xhigh']);
@@ -118,7 +118,7 @@ function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: string): 
     });
   });
   session.on('subagent.started', (event: any) => {
-    poolSend(entry, { type: 'subagent_start', agentName: event.data.agentName });
+    poolSend(entry, { type: 'subagent_start', agentName: event.data.agentName, description: event.data?.description });
   });
   session.on('subagent.completed', (event: any) => {
     poolSend(entry, { type: 'subagent_end', agentName: event.data.agentName });
@@ -187,6 +187,10 @@ function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: string): 
   session.on('exit_plan_mode.completed', () => { poolSend(entry, { type: 'exit_plan_mode_completed' }); });
   session.on('session.idle', (event: any) => {
     poolSend(entry, { type: 'session_idle', backgroundTasks: event.data?.backgroundTasks });
+    const agents = event.data?.backgroundTasks?.agents;
+    if (Array.isArray(agents) && agents.length > 0) {
+      poolSend(entry, { type: 'fleet_status', agents });
+    }
   });
   session.on('session.task_complete', (event: any) => {
     poolSend(entry, { type: 'task_complete', summary: event.data?.summary });
@@ -576,6 +580,28 @@ export function setupWebSocket(
                 ? msg.disabledSkills.filter((s: unknown) => typeof s === 'string')
                 : undefined;
 
+              const customAgents = Array.isArray(msg.customAgents)
+                ? msg.customAgents
+                    .filter((a: unknown) => {
+                      if (!a || typeof a !== 'object') return false;
+                      const obj = a as Record<string, unknown>;
+                      return typeof obj.name === 'string' && typeof obj.prompt === 'string';
+                    })
+                    .slice(0, 10)
+                    .map((a: unknown) => {
+                      const obj = a as Record<string, unknown>;
+                      return {
+                        name: obj.name as string,
+                        displayName: typeof obj.displayName === 'string' ? obj.displayName : undefined,
+                        description: typeof obj.description === 'string' ? obj.description : undefined,
+                        tools: Array.isArray(obj.tools)
+                          ? (obj.tools as unknown[]).filter((t): t is string => typeof t === 'string')
+                          : undefined,
+                        prompt: obj.prompt as string,
+                      };
+                    })
+                : undefined;
+
               const skillDirectories = await getSkillDirectories();
 
               connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, {
@@ -592,6 +618,7 @@ export function setupWebSocket(
                 configDir: config.copilotConfigDir,
                 skillDirectories,
                 disabledSkills,
+                customAgents,
               });
 
               wireSessionEvents(connectionEntry.session, connectionEntry, connectionEntry.session?.sessionId);
@@ -649,9 +676,11 @@ export function setupWebSocket(
               : undefined;
 
             connectionEntry.isProcessing = true;
+            const sendMode = msg.mode === 'immediate' || msg.mode === 'enqueue' ? msg.mode : undefined;
             await connectionEntry.session.send({
               prompt: content,
               ...(attachments?.length ? { attachments } : {}),
+              ...(sendMode ? { mode: sendMode } : {}),
             });
             break;
           }
@@ -1149,6 +1178,28 @@ export function setupWebSocket(
             } catch (err: any) {
               console.error('Delete plan error:', err.message);
               poolSend(connectionEntry, { type: 'error', message: `Failed to delete plan: ${err.message}` });
+            }
+            break;
+          }
+
+          case 'start_fleet': {
+            if (!connectionEntry.session) {
+              poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
+              return;
+            }
+            const prompt = typeof msg.prompt === 'string' ? msg.prompt.trim() : '';
+            if (!prompt || prompt.length > MAX_MESSAGE_LENGTH) {
+              poolSend(connectionEntry, { type: 'error', message: `Fleet prompt must be 1-${MAX_MESSAGE_LENGTH} characters` });
+              return;
+            }
+            try {
+              connectionEntry.isProcessing = true;
+              const result = await connectionEntry.session.rpc.fleet.start({ prompt });
+              poolSend(connectionEntry, { type: 'fleet_started', started: result.started });
+            } catch (err: any) {
+              console.error('Fleet start error:', err.message);
+              connectionEntry.isProcessing = false;
+              poolSend(connectionEntry, { type: 'error', message: `Failed to start fleet: ${err.message}` });
             }
             break;
           }

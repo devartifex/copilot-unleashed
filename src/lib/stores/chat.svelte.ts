@@ -37,6 +37,8 @@ export interface ChatStore {
   readonly currentModel: string;
   readonly reasoningEffort: ReasoningEffort | null;
   readonly currentAgent: string | null;
+  readonly fleetActive: boolean;
+  readonly fleetAgents: Array<{ agentId: string; agentType: string; status: 'running' | 'completed' | 'failed'; error?: string }>;
   readonly sessionTitle: string | null;
   readonly pendingUserInput: UserInputState | null;
   readonly pendingPermission: PermissionRequestState | null;
@@ -59,6 +61,7 @@ export interface ChatStore {
   // Derived
   readonly isConnected: boolean;
   readonly canSend: boolean;
+  readonly canInterrupt: boolean;
 
   // Methods
   handleServerMessage(msg: ServerMessage): void;
@@ -88,6 +91,9 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   let currentModel = $state('');
   let reasoningEffort = $state<ReasoningEffort | null>(null);
   let currentAgent = $state<string | null>(null);
+  let fleetActive = $state(false);
+  let currentFleetMessageId = $state<string | null>(null);
+  let fleetAgents = $state<Array<{ agentId: string; agentType: string; status: 'running' | 'completed' | 'failed'; error?: string }>>([]);
   let sessionTitle = $state<string | null>(null);
   let currentSessionId = $state<string | null>(null);
   let pendingUserInput = $state<UserInputState | null>(null);
@@ -117,11 +123,12 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
   // ── Derived values ──────────────────────────────────────────────────────
   const isConnected = $derived(wsStore.connectionState === 'connected');
-  const canSend = $derived(isConnected && !isStreaming && wsStore.sessionReady);
+  const canSend = $derived(isConnected && wsStore.sessionReady);
+  const canInterrupt = $derived(isWaiting || isReasoningStreaming || isStreaming);
 
   // ── Internal helpers ────────────────────────────────────────────────────
 
-  function addMessage(role: ChatMessageRole, content: string, extra?: Partial<ChatMessage>): void {
+  function addMessage(role: ChatMessageRole, content: string, extra?: Partial<ChatMessage>): ChatMessage {
     const msg: ChatMessage = {
       id: genId(),
       role,
@@ -130,10 +137,25 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       ...extra,
     };
     messages = [...messages, msg];
+    return msg;
   }
 
   function addInfoMessage(content: string): void {
     addMessage('info', content);
+  }
+
+  function syncFleetMessage(content?: string): void {
+    if (!currentFleetMessageId) return;
+    const nextFleetAgents = fleetAgents.map((agent) => ({ ...agent }));
+    messages = messages.map(message =>
+      message.id === currentFleetMessageId
+        ? {
+            ...message,
+            content: content ?? message.content,
+            fleetAgents: nextFleetAgents,
+          }
+        : message,
+    );
   }
 
   function finalizeStream(): void {
@@ -489,16 +511,83 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         addMessage('skill', msg.skillName, { skillName: msg.skillName });
         break;
 
+      case 'fleet_started':
+        fleetActive = msg.started;
+        if (msg.started) {
+          fleetAgents = [];
+          const fleetMessage = addMessage('fleet', 'Fleet mode activated — parallel agents are working', {
+            fleetAgents: [],
+          });
+          currentFleetMessageId = fleetMessage.id;
+        } else {
+          currentFleetMessageId = null;
+        }
+        break;
+
+      case 'fleet_status':
+        if (Array.isArray(msg.agents)) {
+          const nextFleetAgents = [...fleetAgents];
+          for (const agent of msg.agents) {
+            const existingIndex = nextFleetAgents.findIndex(a => a.agentId === agent.agentId);
+            if (existingIndex === -1) {
+              nextFleetAgents.push({ ...agent, status: 'running' });
+            } else {
+              nextFleetAgents[existingIndex] = {
+                ...nextFleetAgents[existingIndex],
+                agentType: agent.agentType,
+              };
+            }
+          }
+          fleetAgents = nextFleetAgents;
+          syncFleetMessage();
+        }
+        break;
+
       case 'subagent_start':
         addMessage('subagent', `${msg.agentName} started`, { agentName: msg.agentName });
+        if (fleetActive) {
+          const exists = fleetAgents.some(a => a.agentId === msg.agentName);
+          if (!exists) {
+            fleetAgents = [...fleetAgents, { agentId: msg.agentName, agentType: msg.agentName, status: 'running' }];
+          }
+          syncFleetMessage();
+        }
         break;
 
       case 'subagent_end':
         addMessage('subagent', `${msg.agentName} completed`, { agentName: msg.agentName });
+        if (fleetActive) {
+          fleetAgents = fleetAgents.map(a =>
+            a.agentId === msg.agentName ? { ...a, status: 'completed' as const } : a
+          );
+          if (fleetAgents.length > 0 && fleetAgents.every(a => a.status !== 'running')) {
+            const completed = fleetAgents.filter(a => a.status === 'completed').length;
+            const failed = fleetAgents.filter(a => a.status === 'failed').length;
+            syncFleetMessage(`Fleet complete: ${completed} succeeded, ${failed} failed`);
+            fleetActive = false;
+            currentFleetMessageId = null;
+          } else {
+            syncFleetMessage();
+          }
+        }
         break;
 
       case 'subagent_failed':
         addMessage('error', `Sub-agent ${msg.agentName ?? 'unknown'} failed${msg.error ? `: ${msg.error}` : ''}`);
+        if (fleetActive) {
+          fleetAgents = fleetAgents.map(a =>
+            a.agentId === (msg.agentName ?? 'unknown') ? { ...a, status: 'failed' as const, error: msg.error } : a
+          );
+          if (fleetAgents.length > 0 && fleetAgents.every(a => a.status !== 'running')) {
+            const completed = fleetAgents.filter(a => a.status === 'completed').length;
+            const failed = fleetAgents.filter(a => a.status === 'failed').length;
+            syncFleetMessage(`Fleet complete: ${completed} succeeded, ${failed} failed`);
+            fleetActive = false;
+            currentFleetMessageId = null;
+          } else {
+            syncFleetMessage();
+          }
+        }
         break;
 
       case 'subagent_selected':
@@ -600,6 +689,9 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     currentStreamContent = '';
     currentReasoningContent = '';
     activeToolCalls = new Map();
+    fleetActive = false;
+    currentFleetMessageId = null;
+    fleetAgents = [];
     sessionTitle = null;
     currentSessionId = null;
     pendingUserInput = null;
@@ -637,6 +729,8 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     get currentModel() { return currentModel; },
     get reasoningEffort() { return reasoningEffort; },
     get currentAgent() { return currentAgent; },
+    get fleetActive() { return fleetActive; },
+    get fleetAgents() { return fleetAgents; },
     get sessionTitle() { return sessionTitle; },
     get pendingUserInput() { return pendingUserInput; },
     get pendingPermission() { return pendingPermission; },
@@ -655,6 +749,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
     get isConnected() { return isConnected; },
     get canSend() { return canSend; },
+    get canInterrupt() { return canInterrupt; },
 
     handleServerMessage,
     clearMessages,

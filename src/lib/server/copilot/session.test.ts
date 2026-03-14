@@ -384,6 +384,21 @@ describe('createCopilotSession', () => {
     expect(config.skillDirectories).toBeUndefined();
     expect(config.disabledSkills).toBeUndefined();
   });
+
+  it('passes custom agents to SDK session config', async () => {
+    const client = createClientMock();
+    const customAgents = [
+      { name: 'editor', prompt: 'Edit code', tools: ['bash', 'edit'] },
+      { name: 'reviewer', prompt: 'Review code', displayName: 'Code Reviewer' },
+    ];
+
+    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
+      customAgents,
+    });
+
+    const config = getSessionConfig(client);
+    expect(config.customAgents).toEqual(customAgents);
+  });
 });
 
 describe('getAvailableModels', () => {

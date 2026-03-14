@@ -144,6 +144,7 @@
       ...(settings.customAgents.length > 0 && { customAgents: settings.customAgents }),
       ...(settings.mcpServers.length > 0 && { mcpServers: settings.mcpServers.filter(s => s.enabled) }),
       ...(settings.disabledSkills.length > 0 && { disabledSkills: settings.disabledSkills }),
+      infiniteSessions: settings.infiniteSessions,
     });
   }
 

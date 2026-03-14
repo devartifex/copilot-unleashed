@@ -634,6 +634,12 @@ export type Attachment =
 
 // ─── Outgoing client messages (discriminated union on `type`) ────────────────
 
+export interface InfiniteSessionsConfig {
+  enabled: boolean;
+  backgroundThreshold: number;
+  bufferThreshold: number;
+}
+
 export interface NewSessionMessage {
   type: 'new_session';
   model: string;
@@ -646,6 +652,7 @@ export interface NewSessionMessage {
   disabledSkills?: string[];
   customAgents?: CustomAgentDefinition[];
   provider?: ProviderDefinition;
+  infiniteSessions?: InfiniteSessionsConfig;
 }
 
 export type MessageDeliveryMode = 'immediate' | 'enqueue';
@@ -887,6 +894,7 @@ export interface NewSessionConfig {
   disabledSkills?: string[];
   customAgents?: CustomAgentDefinition[];
   provider?: ProviderDefinition;
+  infiniteSessions?: InfiniteSessionsConfig;
 }
 
 // ─── Settings (persisted to localStorage) ───────────────────────────────────
@@ -902,6 +910,7 @@ export interface PersistedSettings {
   disabledSkills?: string[];
   customAgents?: CustomAgentDefinition[];
   provider?: ProviderDefinition;
+  infiniteSessions?: InfiniteSessionsConfig;
 }
 
 // ─── Custom agent definitions ───────────────────────────────────────────────

@@ -246,6 +246,7 @@ export function createWsStore(): WsStore {
       ...(config.customAgents?.length && { customAgents: config.customAgents }),
       ...(config.mcpServers?.length && { mcpServers: config.mcpServers }),
       ...(config.disabledSkills?.length && { disabledSkills: config.disabledSkills }),
+      ...(config.infiniteSessions && { infiniteSessions: config.infiniteSessions }),
     };
     send(msg);
   }

@@ -7,9 +7,16 @@ import type {
   McpServerDefinition,
   SkillDefinition,
   ProviderDefinition,
+  InfiniteSessionsConfig,
 } from '$lib/types/index.js';
 
 const STORAGE_KEY = 'copilot-cli-settings';
+
+const DEFAULT_INFINITE_SESSIONS: InfiniteSessionsConfig = {
+  enabled: true,
+  backgroundThreshold: 0.80,
+  bufferThreshold: 0.95,
+};
 
 const DEFAULT_SETTINGS: PersistedSettings = {
   model: '',
@@ -21,6 +28,7 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   customAgents: [],
   mcpServers: [],
   disabledSkills: [],
+  infiniteSessions: { ...DEFAULT_INFINITE_SESSIONS },
 };
 
 const VALID_MODES = new Set<SessionMode>(['interactive', 'plan', 'autopilot']);
@@ -91,6 +99,7 @@ export interface SettingsStore {
   disabledSkills: string[];
   availableSkills: SkillDefinition[];
   provider: ProviderDefinition | undefined;
+  infiniteSessions: InfiniteSessionsConfig;
   load(): void;
   save(): void;
   syncFromServer(): Promise<void>;
@@ -109,6 +118,7 @@ export function createSettingsStore(): SettingsStore {
   let disabledSkills = $state<string[]>([...(DEFAULT_SETTINGS.disabledSkills ?? [])]);
   let availableSkills = $state<SkillDefinition[]>([]);
   let provider = $state<ProviderDefinition | undefined>(undefined);
+  let infiniteSessions = $state<InfiniteSessionsConfig>({ ...DEFAULT_INFINITE_SESSIONS });
 
   function load(): void {
     if (typeof localStorage === 'undefined') return;
@@ -134,6 +144,7 @@ export function createSettingsStore(): SettingsStore {
       mcpServers,
       disabledSkills,
       provider,
+      infiniteSessions,
     };
   }
 
@@ -167,6 +178,18 @@ export function createSettingsStore(): SettingsStore {
       provider = undefined;
     } else if (isValidProvider(parsed.provider)) {
       provider = parsed.provider;
+    }
+    if (parsed.infiniteSessions && typeof parsed.infiniteSessions === 'object') {
+      const is = parsed.infiniteSessions;
+      infiniteSessions = {
+        enabled: typeof is.enabled === 'boolean' ? is.enabled : DEFAULT_INFINITE_SESSIONS.enabled,
+        backgroundThreshold: typeof is.backgroundThreshold === 'number'
+          ? Math.max(0, Math.min(1, is.backgroundThreshold))
+          : DEFAULT_INFINITE_SESSIONS.backgroundThreshold,
+        bufferThreshold: typeof is.bufferThreshold === 'number'
+          ? Math.max(0, Math.min(1, is.bufferThreshold))
+          : DEFAULT_INFINITE_SESSIONS.bufferThreshold,
+      };
     }
   }
 
@@ -260,6 +283,20 @@ export function createSettingsStore(): SettingsStore {
     get provider() { return provider; },
     set provider(v: ProviderDefinition | undefined) {
       provider = v && isValidProvider(v) ? v : undefined;
+      save();
+    },
+
+    get infiniteSessions() { return infiniteSessions; },
+    set infiniteSessions(v: InfiniteSessionsConfig) {
+      infiniteSessions = {
+        enabled: typeof v.enabled === 'boolean' ? v.enabled : DEFAULT_INFINITE_SESSIONS.enabled,
+        backgroundThreshold: typeof v.backgroundThreshold === 'number'
+          ? Math.max(0, Math.min(1, v.backgroundThreshold))
+          : DEFAULT_INFINITE_SESSIONS.backgroundThreshold,
+        bufferThreshold: typeof v.bufferThreshold === 'number'
+          ? Math.max(0, Math.min(1, v.bufferThreshold))
+          : DEFAULT_INFINITE_SESSIONS.bufferThreshold,
+      };
       save();
     },
 

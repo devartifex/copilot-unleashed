@@ -671,11 +671,11 @@ export function setupWebSocket(
               const infiniteSessions = msg.infiniteSessions && typeof msg.infiniteSessions === 'object'
                 ? {
                     enabled: msg.infiniteSessions.enabled !== false,
-                    ...(typeof msg.infiniteSessions.backgroundCompactionThreshold === 'number' && {
-                      backgroundCompactionThreshold: Math.max(0, Math.min(1, msg.infiniteSessions.backgroundCompactionThreshold)),
+                    ...(typeof msg.infiniteSessions.backgroundThreshold === 'number' && {
+                      backgroundCompactionThreshold: Math.max(0, Math.min(1, msg.infiniteSessions.backgroundThreshold)),
                     }),
-                    ...(typeof msg.infiniteSessions.bufferExhaustionThreshold === 'number' && {
-                      bufferExhaustionThreshold: Math.max(0, Math.min(1, msg.infiniteSessions.bufferExhaustionThreshold)),
+                    ...(typeof msg.infiniteSessions.bufferThreshold === 'number' && {
+                      bufferExhaustionThreshold: Math.max(0, Math.min(1, msg.infiniteSessions.bufferThreshold)),
                     }),
                   }
                 : undefined;

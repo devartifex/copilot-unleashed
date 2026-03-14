@@ -23,7 +23,10 @@ import type { ChatMessage } from '$lib/types/index.js';
     if (message.inputTokens != null) parts.push(`in: ${message.inputTokens}`);
     if (message.outputTokens != null) parts.push(`out: ${message.outputTokens}`);
     if (message.reasoningTokens != null) parts.push(`reasoning: ${message.reasoningTokens}`);
+    if (message.cacheReadTokens) parts.push(`cache read: ${message.cacheReadTokens}`);
+    if (message.cacheWriteTokens) parts.push(`cache write: ${message.cacheWriteTokens}`);
     if (message.cost != null) parts.push(`cost: ${message.cost}×`);
+    if (message.duration != null) parts.push(`${message.duration}ms`);
     return parts.length > 0 ? `tokens — ${parts.join(' · ')}` : '';
   });
 

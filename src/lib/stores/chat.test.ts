@@ -8,6 +8,7 @@ import type {
   ServerMessage,
   SessionDetail,
   SessionSummary,
+  SessionUsageTotals,
   ToolInfo,
 } from '$lib/types/index.js';
 
@@ -282,8 +283,12 @@ describe('createChatStore', () => {
         inputTokens: 100,
         outputTokens: 250,
         reasoningTokens: 40,
+        cacheReadTokens: 50,
+        cacheWriteTokens: 10,
+        duration: 1200,
         cost: 0.12,
         quotaSnapshots: initialQuota,
+        copilotUsage: [{ type: 'prompt', tokens: 100 }],
       },
       { type: 'quota' },
       { type: 'quota', quotaSnapshots: updatedQuota },
@@ -292,7 +297,7 @@ describe('createChatStore', () => {
       { type: 'plan_changed' },
       { type: 'plan_updated', content: '1. Investigate\n2. Ship\n3. Verify', path: '/tmp/plan.md' },
       { type: 'compaction_start' },
-      { type: 'compaction_complete', tokensRemoved: 120, messagesRemoved: 3 },
+      { type: 'compaction_complete', tokensRemoved: 120, messagesRemoved: 3, preCompactionTokens: 5000, postCompactionTokens: 4880 },
       { type: 'compaction_result', messagesRemoved: 1 },
       { type: 'reasoning_changed', effort: 'high' },
     );
@@ -302,8 +307,12 @@ describe('createChatStore', () => {
       inputTokens: 100,
       outputTokens: 250,
       reasoningTokens: 40,
+      cacheReadTokens: 50,
+      cacheWriteTokens: 10,
+      duration: 1200,
       cost: 0.12,
       quotaSnapshots: initialQuota,
+      copilotUsage: [{ type: 'prompt', tokens: 100 }],
     });
     expect(store.quotaSnapshots).toEqual(updatedQuota);
     expect(store.contextInfo).toEqual({ tokenLimit: 64000, currentTokens: 4000, messagesLength: 12 });
@@ -317,7 +326,7 @@ describe('createChatStore', () => {
       expect.objectContaining({ role: 'info', content: 'Plan updated' }),
       expect.objectContaining({ role: 'info', content: 'Plan saved' }),
       expect.objectContaining({ role: 'info', content: 'Compacting conversation…' }),
-      expect.objectContaining({ role: 'info', content: 'Compaction complete: removed 120 tokens, 3 messages' }),
+      expect.objectContaining({ role: 'info', content: 'Compaction complete: 5,000 → 4,880 tokens, removed 120 tokens, 3 messages' }),
       expect.objectContaining({ role: 'info', content: 'Compaction result, 1 messages' }),
       expect.objectContaining({ role: 'info', content: 'Reasoning effort set to high' }),
       expect.objectContaining({ role: 'info', content: 'Plan deleted' }),
@@ -406,6 +415,77 @@ describe('createChatStore', () => {
       expect.objectContaining({ role: 'info', content: 'Info' }),
       expect.objectContaining({ role: 'info', content: 'Exiting plan mode…' }),
       expect.objectContaining({ role: 'info', content: 'Exited plan mode' }),
+    ]);
+  });
+
+  it('accumulates session usage totals across multiple usage messages', () => {
+    const store = createChatStore(createWsStoreMock());
+
+    expect(store.sessionTotals).toEqual({
+      inputTokens: 0, outputTokens: 0, reasoningTokens: 0,
+      cacheReadTokens: 0, cacheWriteTokens: 0,
+      totalCost: 0, totalDurationMs: 0, apiCalls: 0, premiumRequests: 0,
+    });
+
+    dispatch(store, {
+      type: 'usage',
+      inputTokens: 100,
+      outputTokens: 200,
+      reasoningTokens: 30,
+      cacheReadTokens: 50,
+      cacheWriteTokens: 10,
+      duration: 500,
+      cost: 2,
+    });
+
+    expect(store.sessionTotals).toEqual({
+      inputTokens: 100, outputTokens: 200, reasoningTokens: 30,
+      cacheReadTokens: 50, cacheWriteTokens: 10,
+      totalCost: 2, totalDurationMs: 500, apiCalls: 1, premiumRequests: 0,
+    });
+
+    dispatch(store, {
+      type: 'usage',
+      inputTokens: 150,
+      outputTokens: 300,
+      cost: 3,
+      duration: 700,
+    });
+
+    expect(store.sessionTotals).toEqual({
+      inputTokens: 250, outputTokens: 500, reasoningTokens: 30,
+      cacheReadTokens: 50, cacheWriteTokens: 10,
+      totalCost: 5, totalDurationMs: 1200, apiCalls: 2, premiumRequests: 0,
+    });
+
+    // clearMessages resets totals
+    store.clearMessages();
+    expect(store.sessionTotals.apiCalls).toBe(0);
+    expect(store.sessionTotals.inputTokens).toBe(0);
+  });
+
+  it('handles session_shutdown and updates premium requests', () => {
+    const store = createChatStore(createWsStoreMock());
+
+    dispatch(store, {
+      type: 'usage',
+      inputTokens: 100,
+      outputTokens: 200,
+      cost: 1,
+    });
+
+    dispatch(store, {
+      type: 'session_shutdown',
+      totalPremiumRequests: 5,
+      totalApiDurationMs: 3200,
+      sessionStartTime: '2026-01-01T00:00:00Z',
+    });
+
+    expect(store.sessionTotals.premiumRequests).toBe(5);
+    expect(store.sessionTotals.totalDurationMs).toBe(3200);
+    expect(store.messages).toEqual([
+      expect.objectContaining({ role: 'usage' }),
+      expect.objectContaining({ role: 'info', content: 'Session ended · 5 premium requests · 3.2s total API time' }),
     ]);
   });
 });

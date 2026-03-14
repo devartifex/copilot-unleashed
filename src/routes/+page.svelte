@@ -216,6 +216,7 @@
       currentModel={chatStore.currentModel}
       connectionState={wsStore.connectionState}
       sessionTitle={chatStore.sessionTitle}
+      quotaSnapshots={chatStore.quotaSnapshots}
       onToggleSidebar={() => sidebarOpen = true}
       onOpenModelSheet={() => modelSheetOpen = true}
       onNewChat={handleNewChat}
@@ -272,6 +273,7 @@
       open={sidebarOpen}
       currentAgent={chatStore.currentAgent}
       quotaSnapshots={chatStore.quotaSnapshots}
+      sessionTotals={chatStore.sessionTotals}
       onClose={() => sidebarOpen = false}
       onNewChat={handleNewChat}
       onOpenSessions={handleOpenSessions}

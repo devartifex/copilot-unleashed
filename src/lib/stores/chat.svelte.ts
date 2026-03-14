@@ -16,6 +16,7 @@ import type {
   PlanState,
   QuotaSnapshots,
   QuotaSnapshot,
+  SessionUsageTotals,
 } from '$lib/types/index.js';
 import type { WsStore } from '$lib/stores/ws.svelte.js';
 import { notify } from '$lib/utils/notifications.js';
@@ -49,6 +50,7 @@ export interface ChatStore {
   // Context & quota
   readonly contextInfo: ContextInfo | null;
   readonly quotaSnapshots: QuotaSnapshots | null;
+  readonly sessionTotals: SessionUsageTotals;
 
   // Plan
   readonly plan: PlanState;
@@ -100,6 +102,13 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   // ── Context & quota ─────────────────────────────────────────────────────
   let contextInfo = $state<ContextInfo | null>(null);
   let quotaSnapshots = $state<QuotaSnapshots | null>(null);
+
+  const emptyTotals: SessionUsageTotals = {
+    inputTokens: 0, outputTokens: 0, reasoningTokens: 0,
+    cacheReadTokens: 0, cacheWriteTokens: 0,
+    totalCost: 0, totalDurationMs: 0, apiCalls: 0, premiumRequests: 0,
+  };
+  let sessionTotals = $state<SessionUsageTotals>({ ...emptyTotals });
 
   // ── Plan ────────────────────────────────────────────────────────────────
   let plan = $state<PlanState>({ exists: false, content: '' });
@@ -275,9 +284,25 @@ export function createChatStore(wsStore: WsStore): ChatStore {
           inputTokens: msg.inputTokens,
           outputTokens: msg.outputTokens,
           reasoningTokens: msg.reasoningTokens,
+          cacheReadTokens: msg.cacheReadTokens,
+          cacheWriteTokens: msg.cacheWriteTokens,
+          duration: msg.duration,
           cost: msg.cost,
           quotaSnapshots: msg.quotaSnapshots,
+          copilotUsage: msg.copilotUsage,
         });
+        // Accumulate session totals
+        sessionTotals = {
+          inputTokens: sessionTotals.inputTokens + (msg.inputTokens ?? 0),
+          outputTokens: sessionTotals.outputTokens + (msg.outputTokens ?? 0),
+          reasoningTokens: sessionTotals.reasoningTokens + (msg.reasoningTokens ?? 0),
+          cacheReadTokens: sessionTotals.cacheReadTokens + (msg.cacheReadTokens ?? 0),
+          cacheWriteTokens: sessionTotals.cacheWriteTokens + (msg.cacheWriteTokens ?? 0),
+          totalCost: sessionTotals.totalCost + (msg.cost ?? 0),
+          totalDurationMs: sessionTotals.totalDurationMs + (msg.duration ?? 0),
+          apiCalls: sessionTotals.apiCalls + 1,
+          premiumRequests: sessionTotals.premiumRequests,
+        };
         if (msg.quotaSnapshots) {
           quotaSnapshots = msg.quotaSnapshots;
         }
@@ -417,13 +442,20 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         addInfoMessage('Compacting conversation…');
         break;
 
-      case 'compaction_complete':
-        addInfoMessage(
-          'Compaction complete' +
-          (msg.tokensRemoved ? `: removed ${msg.tokensRemoved} tokens` : '') +
-          (msg.messagesRemoved ? `, ${msg.messagesRemoved} messages` : ''),
-        );
+      case 'compaction_complete': {
+        let compactionMsg = 'Compaction complete';
+        if (msg.preCompactionTokens != null && msg.postCompactionTokens != null) {
+          compactionMsg += `: ${msg.preCompactionTokens.toLocaleString()} → ${msg.postCompactionTokens.toLocaleString()} tokens`;
+        }
+        if (msg.tokensRemoved) {
+          compactionMsg += (msg.preCompactionTokens != null ? ', ' : ': ') + `removed ${msg.tokensRemoved.toLocaleString()} tokens`;
+        }
+        if (msg.messagesRemoved) {
+          compactionMsg += `, ${msg.messagesRemoved} messages`;
+        }
+        addInfoMessage(compactionMsg);
         break;
+      }
 
       case 'compaction_result':
         addInfoMessage(
@@ -477,6 +509,20 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         };
         break;
 
+      case 'session_shutdown':
+        if (msg.totalPremiumRequests != null) {
+          sessionTotals = { ...sessionTotals, premiumRequests: msg.totalPremiumRequests };
+        }
+        if (msg.totalApiDurationMs != null) {
+          sessionTotals = { ...sessionTotals, totalDurationMs: msg.totalApiDurationMs };
+        }
+        addInfoMessage(
+          'Session ended' +
+          (msg.totalPremiumRequests != null ? ` · ${msg.totalPremiumRequests} premium requests` : '') +
+          (msg.totalApiDurationMs != null ? ` · ${(msg.totalApiDurationMs / 1000).toFixed(1)}s total API time` : ''),
+        );
+        break;
+
       case 'reasoning_changed':
         reasoningEffort = msg.effort;
         addInfoMessage(`Reasoning effort set to ${msg.effort}`);
@@ -500,6 +546,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     pendingPermission = null;
     contextInfo = null;
     sessionDetail = null;
+    sessionTotals = { ...emptyTotals };
   }
 
   function addUserMessage(content: string): void {
@@ -541,6 +588,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
     get contextInfo() { return contextInfo; },
     get quotaSnapshots() { return quotaSnapshots; },
+    get sessionTotals() { return sessionTotals; },
 
     get plan() { return plan; },
 

@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { pickPrimaryQuota, type QuotaSnapshots } from '$lib/types/index.js';
+  import { pickPrimaryQuota, type QuotaSnapshots, type SessionUsageTotals } from '$lib/types/index.js';
 
   interface Props {
     open: boolean;
     currentAgent: string | null;
     quotaSnapshots: QuotaSnapshots | null;
+    sessionTotals: SessionUsageTotals;
     onClose: () => void;
     onNewChat: () => void;
     onOpenSessions: () => void;
@@ -16,6 +17,7 @@
     open,
     currentAgent,
     quotaSnapshots,
+    sessionTotals,
     onClose,
     onNewChat,
     onOpenSessions,
@@ -108,6 +110,28 @@
             {#if quotaInfo.resetLabel}
               <span class="quota-reset">{quotaInfo.resetLabel}</span>
             {/if}
+          </div>
+        {/if}
+
+        {#if sessionTotals.apiCalls > 0}
+          <div class="sidebar-section">
+            <span class="sidebar-label">Session Usage</span>
+            <div class="session-totals">
+              <span class="totals-line">in: {sessionTotals.inputTokens.toLocaleString()} · out: {sessionTotals.outputTokens.toLocaleString()}</span>
+              {#if sessionTotals.reasoningTokens > 0}
+                <span class="totals-line">reasoning: {sessionTotals.reasoningTokens.toLocaleString()}</span>
+              {/if}
+              {#if sessionTotals.cacheReadTokens > 0 || sessionTotals.cacheWriteTokens > 0}
+                <span class="totals-line">cache r: {sessionTotals.cacheReadTokens.toLocaleString()} · w: {sessionTotals.cacheWriteTokens.toLocaleString()}</span>
+              {/if}
+              <span class="totals-line">{sessionTotals.apiCalls} API calls · cost: {sessionTotals.totalCost}×</span>
+              {#if sessionTotals.totalDurationMs > 0}
+                <span class="totals-line">{(sessionTotals.totalDurationMs / 1000).toFixed(1)}s total API time</span>
+              {/if}
+              {#if sessionTotals.premiumRequests > 0}
+                <span class="totals-line">{sessionTotals.premiumRequests} premium requests</span>
+              {/if}
+            </div>
           </div>
         {/if}
 
@@ -283,6 +307,18 @@
   .quota-reset {
     font-family: var(--font-mono);
     font-size: 0.72em;
+    color: var(--fg-dim);
+  }
+
+  .session-totals {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .totals-line {
+    font-family: var(--font-mono);
+    font-size: 0.75em;
     color: var(--fg-dim);
   }
 </style>

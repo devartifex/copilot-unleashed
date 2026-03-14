@@ -225,14 +225,25 @@ export interface TitleChangedMessage {
   title: string;
 }
 
+export interface CopilotUsageItem {
+  type: string;
+  model?: string;
+  tokens?: number;
+  premiumRequests?: number;
+}
+
 export interface UsageMessage {
   type: 'usage';
   inputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
   reasoningTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  duration?: number;
   cost?: number;
   quotaSnapshots?: QuotaSnapshots;
+  copilotUsage?: CopilotUsageItem[];
 }
 
 export interface WarningMessage {
@@ -336,6 +347,8 @@ export interface CompactionCompleteMessage {
   type: 'compaction_complete';
   tokensRemoved?: number;
   messagesRemoved?: number;
+  preCompactionTokens?: number;
+  postCompactionTokens?: number;
 }
 
 export interface CompactionResultMessage {
@@ -412,6 +425,25 @@ export interface ReasoningChangedMessage {
   effort: ReasoningEffort;
 }
 
+export interface SessionShutdownMessage {
+  type: 'session_shutdown';
+  totalPremiumRequests?: number;
+  totalApiDurationMs?: number;
+  sessionStartTime?: string;
+}
+
+export interface SessionUsageTotals {
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalCost: number;
+  totalDurationMs: number;
+  apiCalls: number;
+  premiumRequests: number;
+}
+
 export type ServerMessage =
   | ConnectedMessage
   | SessionCreatedMessage
@@ -463,7 +495,8 @@ export type ServerMessage =
   | ExitPlanModeRequestedMessage
   | ExitPlanModeCompletedMessage
   | ContextInfoMessage
-  | ReasoningChangedMessage;
+  | ReasoningChangedMessage
+  | SessionShutdownMessage;
 
 // ─── File attachment ─────────────────────────────────────────────────────────
 
@@ -644,8 +677,12 @@ export interface ChatMessage {
   inputTokens?: number;
   outputTokens?: number;
   reasoningTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  duration?: number;
   cost?: number;
   quotaSnapshots?: QuotaSnapshots;
+  copilotUsage?: CopilotUsageItem[];
 }
 
 // ─── Tool call tracking ─────────────────────────────────────────────────────

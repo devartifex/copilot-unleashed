@@ -21,7 +21,7 @@
       contextInfo.tokenLimit > 0
         ? Math.round((contextInfo.currentTokens / contextInfo.tokenLimit) * 100)
         : 0;
-    return `ctx: ${currentK}k/${limitK}k (${percentage}%)`;
+    return { text: `ctx: ${currentK}k/${limitK}k (${percentage}%)`, percentage };
   });
 
   const toolLine = $derived.by(() => {
@@ -51,7 +51,16 @@
     <div class="env-line session-title-line"><span class="dot blue"></span> {sessionTitle}</div>
   {/if}
   {#if contextDisplay}
-    <div class="env-line">{contextDisplay}</div>
+    <div class="env-line">{contextDisplay.text}</div>
+    <div class="context-bar-track">
+      <div
+        class="context-bar-fill"
+        class:green={contextDisplay.percentage < 50}
+        class:yellow={contextDisplay.percentage >= 50 && contextDisplay.percentage < 80}
+        class:red={contextDisplay.percentage >= 80}
+        style="width: {contextDisplay.percentage}%"
+      ></div>
+    </div>
   {/if}
 </div>
 
@@ -107,4 +116,23 @@
   .env-skeleton.short {
     width: 90px;
   }
+
+  .context-bar-track {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 2px;
+    max-width: 160px;
+  }
+
+  .context-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .context-bar-fill.green { background: var(--green); }
+  .context-bar-fill.yellow { background: var(--yellow); }
+  .context-bar-fill.red { background: var(--red); }
 </style>

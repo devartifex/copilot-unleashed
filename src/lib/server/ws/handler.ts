@@ -97,8 +97,12 @@ function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: string): 
       outputTokens: event.data.outputTokens,
       totalTokens: event.data.totalTokens,
       reasoningTokens: event.data.reasoningTokens,
+      cacheReadTokens: event.data.cacheReadTokens,
+      cacheWriteTokens: event.data.cacheWriteTokens,
+      duration: event.data.duration,
       cost: event.data.cost,
       quotaSnapshots: normalizeQuotaSnapshots(event.data.quotaSnapshots),
+      copilotUsage: event.data.copilotUsage,
     });
   });
   session.on('session.warning', (event: any) => {
@@ -141,7 +145,21 @@ function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: string): 
   });
   session.on('session.compaction_start', () => { poolSend(entry, { type: 'compaction_start' }); });
   session.on('session.compaction_complete', (event: any) => {
-    poolSend(entry, { type: 'compaction_complete', tokensRemoved: event.data?.tokensRemoved, messagesRemoved: event.data?.messagesRemoved });
+    poolSend(entry, {
+      type: 'compaction_complete',
+      tokensRemoved: event.data?.tokensRemoved,
+      messagesRemoved: event.data?.messagesRemoved,
+      preCompactionTokens: event.data?.preCompactionTokens,
+      postCompactionTokens: event.data?.postCompactionTokens,
+    });
+  });
+  session.on('session.shutdown', (event: any) => {
+    poolSend(entry, {
+      type: 'session_shutdown',
+      totalPremiumRequests: event.data?.totalPremiumRequests,
+      totalApiDurationMs: event.data?.totalApiDurationMs,
+      sessionStartTime: event.data?.sessionStartTime,
+    });
   });
   session.on('skill.invoked', (event: any) => {
     poolSend(entry, { type: 'skill_invoked', skillName: event.data?.skillName });

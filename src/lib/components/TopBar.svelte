@@ -1,10 +1,12 @@
 <script lang="ts">
-  import type { ConnectionState } from '$lib/types/index.js';
+  import type { ConnectionState, QuotaSnapshots } from '$lib/types/index.js';
+  import QuotaDot from '$lib/components/QuotaDot.svelte';
 
   interface Props {
     currentModel: string;
     connectionState: ConnectionState;
     sessionTitle: string | null;
+    quotaSnapshots: QuotaSnapshots | null;
     onToggleSidebar: () => void;
     onOpenModelSheet: () => void;
     onNewChat: () => void;
@@ -14,6 +16,7 @@
     currentModel,
     connectionState,
     sessionTitle,
+    quotaSnapshots,
     onToggleSidebar,
     onOpenModelSheet,
     onNewChat,
@@ -56,6 +59,7 @@
     {:else}
       <span class="model-name loading-text">{displayModel}</span>
     {/if}
+    <QuotaDot {quotaSnapshots} />
     <svg class="chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M2.5 4 L5 6.5 L7.5 4"/>
     </svg>

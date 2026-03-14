@@ -1,8 +1,8 @@
 # Copilot Unleashed
 
 <p align="center">
+  <a href="https://github.com/devartifex/copilot-unleashed/releases/latest"><img src="https://img.shields.io/github/v/release/devartifex/copilot-unleashed?label=release&logo=github" alt="Latest Release"></a>
   <a href="https://github.com/devartifex/copilot-unleashed/actions/workflows/ci.yml"><img src="https://github.com/devartifex/copilot-unleashed/workflows/CI/badge.svg" alt="CI"></a>
-  <a href="https://github.com/devartifex/copilot-unleashed/actions/workflows/deploy.yml"><img src="https://github.com/devartifex/copilot-unleashed/workflows/Deploy/badge.svg" alt="Deploy"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D24-brightgreen?logo=node.js&logoColor=white" alt="Node ≥24">
   <img src="https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/Svelte-5-orange?logo=svelte&logoColor=white" alt="Svelte 5">

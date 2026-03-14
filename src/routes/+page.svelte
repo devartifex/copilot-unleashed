@@ -53,7 +53,7 @@
       case 'autopilot':
         return '--mode-color:#3fb950;--mode-border:rgba(63,185,80,0.45);--mode-user-bg:rgba(63,185,80,0.10);--mode-user-border:rgba(63,185,80,0.22);--mode-banner-bg:rgba(63,185,80,0.07)';
       default:
-        return '--mode-color:#d2a8ff;--mode-border:#5a3e8e;--mode-user-bg:rgba(110,64,201,0.12);--mode-user-border:rgba(110,64,201,0.20);--mode-banner-bg:rgba(110,64,201,0.08)';
+        return '--mode-color:#d2a8ff;--mode-border:#7c5cb5;--mode-user-bg:rgba(137,87,229,0.12);--mode-user-border:rgba(137,87,229,0.20);--mode-banner-bg:rgba(137,87,229,0.08)';
     }
   });
 

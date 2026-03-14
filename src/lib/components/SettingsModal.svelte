@@ -317,6 +317,10 @@
     }
   }
 
+  function handleEscapeKey(e: KeyboardEvent) {
+    if (open && e.key === 'Escape') onClose();
+  }
+
   function handleSaveInstructions() {
     onSaveInstructions(instructionsDraft);
   }
@@ -356,11 +360,13 @@
   }
 </script>
 
+<svelte:window onkeydown={handleEscapeKey} />
+
 {#if open}
+  <!-- a11y: overlay is role="presentation" — click-to-dismiss is a mouse convenience; keyboard users press Escape -->
   <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
   <div class="settings-overlay" role="presentation" onclick={handleBackdropClick}>
-    <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-    <div class="settings-panel" role="presentation" onclick={(e: MouseEvent) => e.stopPropagation()}>
+    <div class="settings-panel" role="presentation">
       <div class="settings-header">
         <span class="settings-title">Settings</span>
         <button class="settings-close" onclick={onClose}>✕</button>
@@ -648,14 +654,10 @@
               {:else}
                 {#each agents as agent (getAgentName(agent))}
                   {@const name = getAgentName(agent)}
-                  <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-                  <div
+                  <button
                     class="agent-item"
                     class:active={currentAgent === name}
-                    role="button"
-                    tabindex="0"
                     onclick={() => handleAgentClick(name)}
-                    onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleAgentClick(name); }}
                   >
                     <span class="agent-name">{name}</span>
                     {#if getAgentDescription(agent)}
@@ -664,7 +666,7 @@
                     {#if currentAgent === name}
                       <span class="agent-current">active</span>
                     {/if}
-                  </div>
+                  </button>
                 {/each}
               {/if}
             </div>
@@ -1060,6 +1062,12 @@
     gap: var(--sp-2);
     padding: var(--sp-2) var(--sp-1);
     cursor: pointer;
+    border: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    width: 100%;
     border-radius: var(--radius-sm);
     min-height: 36px;
   }

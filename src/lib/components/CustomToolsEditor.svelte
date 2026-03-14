@@ -178,14 +178,13 @@
 <div class="custom-tools">
   {#each tools as tool, index (tool.name)}
     <div class="custom-tool-item">
-      <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-      <div class="custom-tool-header" role="button" tabindex="0" onclick={() => handleExpandTool(index)} onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleExpandTool(index); }}>
+      <button class="custom-tool-header" onclick={() => handleExpandTool(index)}>
         <div>
           <div class="custom-tool-name">{tool.name}</div>
           <div class="custom-tool-url">{tool.method} {tool.webhookUrl}</div>
         </div>
         <span class="accordion-chevron" class:expanded={expandedIndex === index}>▸</span>
-      </div>
+      </button>
 
       {#if expandedIndex === index}
         <div class="custom-tool-form">
@@ -329,6 +328,11 @@
     justify-content: space-between;
     padding: var(--sp-2) var(--sp-3);
     cursor: pointer;
+    border: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    width: 100%;
     background: var(--bg-overlay);
   }
   .custom-tool-name {

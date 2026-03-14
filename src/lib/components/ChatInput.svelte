@@ -108,6 +108,13 @@
     // Handle @ mention keyboard navigation first
     if (handleMentionKeydown(event)) return;
 
+    // Close attach menu on Escape
+    if (event.key === 'Escape' && attachMenuOpen) {
+      event.preventDefault();
+      closeAttachMenu();
+      return;
+    }
+
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       if (pendingUserInput) {
@@ -522,8 +529,9 @@
           </button>
 
           {#if attachMenuOpen}
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="attach-backdrop" onclick={closeAttachMenu} onkeydown={(e) => e.key === 'Escape' && closeAttachMenu()} role="presentation"></div>
+            <!-- a11y: presentation backdrop — click-to-dismiss is a mouse convenience; keyboard Escape handled by attach menu -->
+            <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+            <div class="attach-backdrop" onclick={closeAttachMenu} role="presentation"></div>
             <div class="attach-menu" role="menu">
               <button class="attach-menu-item" role="menuitem" onclick={handleCameraCapture}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">

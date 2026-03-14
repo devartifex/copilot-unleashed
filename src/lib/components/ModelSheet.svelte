@@ -39,6 +39,10 @@
     }
   }
 
+  function handleEscapeKey(e: KeyboardEvent) {
+    if (open && e.key === 'Escape') onClose();
+  }
+
   function selectModel(id: string) {
     onSetModel(id);
     const info = models.get(id);
@@ -57,11 +61,13 @@
   }
 </script>
 
+<svelte:window onkeydown={handleEscapeKey} />
+
 {#if open}
+  <!-- a11y: overlay is role="presentation" — click-to-dismiss is a mouse convenience; keyboard users press Escape -->
   <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
   <div class="sheet-overlay" role="presentation" onclick={handleBackdropClick}>
-    <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-    <div class="sheet-panel" role="presentation" onclick={(e: MouseEvent) => e.stopPropagation()}>
+    <div class="sheet-panel" role="presentation">
       <div class="sheet-header">
         <span class="sheet-title">Models</span>
         <button class="sheet-close" onclick={onClose}>✕</button>

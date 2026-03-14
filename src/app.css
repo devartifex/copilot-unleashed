@@ -9,18 +9,18 @@
   --bg-overlay: #1c2128;
   --fg: #e6edf3;
   --fg-muted: #9ca3af;
-  --fg-dim: #6e7681;
+  --fg-dim: #848d97;
   --purple: #d2a8ff;
-  --purple-dim: #6e40c9;
+  --purple-dim: #8957e5;
   --green: #3fb950;
-  --green-dim: #238636;
+  --green-dim: #2ea043;
   --red: #f85149;
   --yellow: #e3b341;
   --blue: #58a6ff;
   --cyan: #56d4dd;
   --orange: #f0883e;
-  --border: #30363d;
-  --border-accent: #5a3e8e;
+  --border: #3d444d;
+  --border-accent: #7c5cb5;
   --shadow: rgba(0, 0, 0, 0.4);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -39,6 +39,37 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+
+  /* ── Semantic color aliases ─────────────────────────────────────────────── */
+  --color-accent: var(--purple);
+  --color-accent-dim: var(--purple-dim);
+  --color-success: var(--green);
+  --color-success-dim: var(--green-dim);
+  --color-error: var(--red);
+  --color-warning: var(--yellow);
+  --color-info: var(--blue);
+
+  /* ── Typography scale ───────────────────────────────────────────────────── */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: var(--font-size);
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --leading-tight: 1.3;
+  --leading-normal: var(--line-height);
+  --leading-relaxed: 1.75;
+
+  /* ── Transition tokens ──────────────────────────────────────────────────── */
+  --duration-fast: 0.1s;
+  --duration-normal: 0.2s;
+  --duration-slow: 0.3s;
+  --ease-default: ease;
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  /* ── Elevation / shadow scale ───────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Thin modern scrollbars ───────────────────────────────────────────────── */
@@ -86,4 +117,14 @@ html, body {
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: var(--radius-sm);
+}
+
+/* ── Reduced motion: respect user preference ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

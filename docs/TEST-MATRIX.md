@@ -1,7 +1,7 @@
 # Test Coverage Matrix
 
 > **Living document** — update whenever a feature is added, changed, or removed.
-> Last updated: 2026-03-13
+> Last updated: 2026-03-14
 
 ## Coverage Summary
 
@@ -27,6 +27,7 @@
 | File attachments | upload route, ChatInput | ❌ | ✅ | ❌ | ❌ | Partial | Integration tests only |
 | Quota & usage telemetry | quota display, usage events | ❌ | ❌ | ❌ | ✅ | Partial | chat-messaging.spec.ts covers usage display |
 | Operational safety | hooks.server.ts, health, config | ✅ | ✅ | N/A | ✅ | **Good** | error-handling.spec.ts covers errors, health, 404 |
+| Accessibility & design system | app.css tokens, all components, DESIGN-TOKENS.md | ❌ | ❌ | ❌ | ❌ | Partial | WCAG AA contrast audited; prefers-reduced-motion added; a11y keyboard handlers fixed; design tokens documented. Visual regression & aria-snapshot tests planned. |
 
 ## Test Files Index
 

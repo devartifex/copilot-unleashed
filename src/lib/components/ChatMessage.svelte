@@ -27,6 +27,8 @@ import type { ChatMessage } from '$lib/types/index.js';
     if (message.cacheWriteTokens) parts.push(`cache write: ${message.cacheWriteTokens}`);
     if (message.cost != null) parts.push(`cost: ${message.cost}×`);
     if (message.duration != null) parts.push(`${message.duration}ms`);
+    const premium = message.copilotUsage?.reduce((acc, item) => acc + (item.premiumRequests ?? 0), 0) ?? 0;
+    if (premium > 0) parts.push(`premium: ${premium}`);
     return parts.length > 0 ? `tokens — ${parts.join(' · ')}` : '';
   });
 

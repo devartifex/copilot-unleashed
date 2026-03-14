@@ -24,5 +24,5 @@ If applicable, add screenshots.
 **Environment**
 - Browser: [e.g. Chrome 120, Safari 17]
 - Device: [e.g. iPhone 15, Desktop]
-- Deployment: [e.g. Docker, Codespace, Azure]
+- Deployment: [e.g. Docker, Azure]
 - Node.js version: [e.g. 24.0.0]

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ContextInfo } from '$lib/types/index.js';
+  import type { ContextInfo, SessionUsageTotals } from '$lib/types/index.js';
 
   interface Props {
     modelCount: number;
@@ -8,9 +8,10 @@
     currentAgent: string | null;
     sessionTitle: string | null;
     contextInfo: ContextInfo | null;
+    sessionTotals: SessionUsageTotals;
   }
 
-  const { modelCount, toolCount, mcpServerCount, currentAgent, sessionTitle, contextInfo }: Props =
+  const { modelCount, toolCount, mcpServerCount, currentAgent, sessionTitle, contextInfo, sessionTotals }: Props =
     $props();
 
   const contextDisplay = $derived.by(() => {
@@ -62,6 +63,9 @@
       ></div>
     </div>
   {/if}
+  {#if sessionTotals.premiumRequests > 0}
+    <div class="env-line"><span class="dot orange"></span> {sessionTotals.premiumRequests} premium requests this session</div>
+  {/if}
 </div>
 
 <style>
@@ -91,6 +95,7 @@
   .dot.cyan   { background: var(--cyan); }
   .dot.purple { background: var(--purple); }
   .dot.blue   { background: var(--blue); }
+  .dot.orange { background: var(--orange); }
 
   .session-title-line {
     font-style: italic;

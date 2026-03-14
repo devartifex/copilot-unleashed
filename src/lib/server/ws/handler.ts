@@ -1,7 +1,8 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
 import { writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { approveAll } from '@github/copilot-sdk';
 import { createCopilotClient } from '../copilot/client.js';
 import { createCopilotSession, getAvailableModels } from '../copilot/session.js';
@@ -32,6 +33,13 @@ const VALID_MESSAGE_TYPES = new Set([
 const VALID_MODES = new Set(['interactive', 'plan', 'autopilot']);
 const VALID_REASONING = new Set(['low', 'medium', 'high', 'xhigh']);
 const HEARTBEAT_INTERVAL = 30_000;
+const UPLOAD_DIR_PREFIX = join(tmpdir(), 'copilot-uploads');
+
+/** Validate that an attachment path is an absolute path inside the upload directory (prevents arbitrary file reads). */
+export function isValidAttachmentPath(filePath: string): boolean {
+  const resolved = resolve(filePath);
+  return resolved.startsWith(UPLOAD_DIR_PREFIX + '/');
+}
 
 /** Normalize SDK quota snapshots: convert remainingPercentage from 0.0–1.0 to 0–100 and add percentageUsed */
 function normalizeQuotaSnapshots(raw: Record<string, any> | undefined): Record<string, any> | undefined {
@@ -619,6 +627,7 @@ export function setupWebSocket(
                 skillDirectories,
                 disabledSkills,
                 customAgents,
+                onHookEvent: (message) => poolSend(connectionEntry, message),
               });
 
               wireSessionEvents(connectionEntry.session, connectionEntry, connectionEntry.session?.sessionId);
@@ -664,6 +673,15 @@ export function setupWebSocket(
                   .filter((a: unknown) => {
                     const att = a as Record<string, unknown>;
                     return typeof att.path === 'string' && typeof att.name === 'string';
+                  })
+                  .filter((a: unknown) => {
+                    const att = a as Record<string, unknown>;
+                    const path = att.path as string;
+                    if (!isValidAttachmentPath(path)) {
+                      logSecurity('warn', 'ATTACHMENT_PATH_REJECTED', { path });
+                      return false;
+                    }
+                    return true;
                   })
                   .map((a: unknown) => {
                     const att = a as Record<string, unknown>;
@@ -1085,6 +1103,7 @@ export function setupWebSocket(
                   onUserInputRequest: makeUserInputHandler(connectionEntry),
                   permissionMode: 'approve_all',
                   configDir: resolvedConfigDir,
+                  onHookEvent: (message) => poolSend(connectionEntry, message),
                 });
                 console.log(`[RESUME] Fallback session created for ${sessionId} with context injection`);
               }

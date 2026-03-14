@@ -7,7 +7,7 @@ COPY . .
 RUN npm run build \
  && npm prune --omit=dev \
  && mkdir -p /tmp/copilot-config/session-state \
- && cp -a bundled-sessions/. /tmp/copilot-config/session-state/ \
+ && if [ -d bundled-sessions ]; then cp -a bundled-sessions/. /tmp/copilot-config/session-state/; fi \
  && if [ -f bundled-session-store.db ]; then cp bundled-session-store.db /tmp/copilot-config/session-store.db; fi
 
 FROM node:24-slim

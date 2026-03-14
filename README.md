@@ -164,10 +164,6 @@ docker compose up --build
 npm install && npm run build && npm start
 ```
 
-**Codespaces** (zero setup):
-
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/devartifex/copilot-unleashed?quickstart=1)
-
 Open [localhost:3000](http://localhost:3000). Log in with GitHub. Done.
 
 ---

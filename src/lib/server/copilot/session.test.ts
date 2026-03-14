@@ -400,6 +400,75 @@ describe('createCopilotSession', () => {
     expect(config.customAgents).toEqual(customAgents);
   });
 
+  it('supports SSE-type MCP servers alongside HTTP servers', async () => {
+    const client = createClientMock();
+
+    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
+      mcpServers: [
+        {
+          name: 'http-server',
+          url: 'https://api.example.com/mcp',
+          type: 'http',
+          headers: { 'X-Api-Key': 'key1' },
+          tools: ['search'],
+        },
+        {
+          name: 'sse-server',
+          url: 'https://stream.example.com/events',
+          type: 'sse',
+          headers: { Authorization: 'Bearer tok' },
+          tools: [],
+        },
+      ],
+    });
+
+    const mcpServers = getSessionConfig(client).mcpServers as Record<string, Record<string, unknown>>;
+
+    // GitHub server always present
+    expect(mcpServers.github).toBeDefined();
+
+    // HTTP server preserved as-is
+    expect(mcpServers['http-server']).toEqual({
+      type: 'http',
+      url: 'https://api.example.com/mcp',
+      headers: { 'X-Api-Key': 'key1' },
+      tools: ['search'],
+    });
+
+    // SSE server with empty tools defaults to wildcard
+    expect(mcpServers['sse-server']).toEqual({
+      type: 'sse',
+      url: 'https://stream.example.com/events',
+      headers: { Authorization: 'Bearer tok' },
+      tools: ['*'],
+    });
+  });
+
+  it('always includes GitHub MCP server with the provided token', async () => {
+    const client = createClientMock();
+
+    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'my-gh-token-123');
+
+    const mcpServers = getSessionConfig(client).mcpServers as Record<string, Record<string, unknown>>;
+    expect(mcpServers.github).toEqual({
+      type: 'http',
+      url: 'https://api.githubcopilot.com/mcp/x/all',
+      headers: { Authorization: 'Bearer my-gh-token-123' },
+      tools: ['*'],
+    });
+  });
+
+  it('omits user MCP servers when none are provided', async () => {
+    const client = createClientMock();
+
+    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
+      mcpServers: [],
+    });
+
+    const mcpServers = getSessionConfig(client).mcpServers as Record<string, Record<string, unknown>>;
+    expect(Object.keys(mcpServers)).toEqual(['github']);
+  });
+
   it('wires session hooks when onHookEvent callback is provided', async () => {
     const client = createClientMock();
     const onHookEvent = vi.fn();

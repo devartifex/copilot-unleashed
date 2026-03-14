@@ -695,6 +695,7 @@ export interface ListSessionsMessage {
 export interface ResumeSessionMessage {
   type: 'resume_session';
   sessionId: string;
+  mcpServers?: McpServerDefinition[];
 }
 
 export interface DeleteSessionMessage {

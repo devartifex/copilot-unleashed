@@ -41,6 +41,36 @@ export function isValidAttachmentPath(filePath: string): boolean {
   return resolved.startsWith(UPLOAD_DIR_PREFIX + '/');
 }
 
+/** Parse and validate MCP server entries from a WebSocket message, filtering out disabled servers. */
+export function parseMcpServers(raw: unknown): Array<{ name: string; url: string; type: 'http' | 'sse'; headers: Record<string, string>; tools: string[] }> | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const servers = raw
+    .filter((s: unknown) => {
+      if (!s || typeof s !== 'object') return false;
+      const obj = s as Record<string, unknown>;
+      if (obj.enabled === false) return false;
+      return (
+        typeof obj.name === 'string' &&
+        typeof obj.url === 'string' &&
+        (obj.type === 'http' || obj.type === 'sse') &&
+        typeof obj.headers === 'object' && obj.headers !== null &&
+        Array.isArray(obj.tools)
+      );
+    })
+    .slice(0, 10)
+    .map((s: unknown) => {
+      const obj = s as Record<string, unknown>;
+      return {
+        name: obj.name as string,
+        url: obj.url as string,
+        type: obj.type as 'http' | 'sse',
+        headers: obj.headers as Record<string, string>,
+        tools: (obj.tools as unknown[]).filter((t): t is string => typeof t === 'string'),
+      };
+    });
+  return servers.length > 0 ? servers : undefined;
+}
+
 /** Normalize SDK quota snapshots: convert remainingPercentage from 0.0–1.0 to 0–100 and add percentageUsed */
 function normalizeQuotaSnapshots(raw: Record<string, any> | undefined): Record<string, any> | undefined {
   if (!raw) return raw;
@@ -1058,6 +1088,29 @@ export function setupWebSocket(
               // Read filesystem plan for injection into resumed session context
               const detail = await getSessionDetail(sessionId);
 
+              // Parse MCP servers from the message so resumed sessions retain MCP access
+              const resumeMcpServers = parseMcpServers(msg.mcpServers);
+
+              // Build the full MCP config (GitHub server + user servers)
+              const mcpServersConfig: Record<string, unknown> = {
+                github: {
+                  type: 'http',
+                  url: 'https://api.githubcopilot.com/mcp/x/all',
+                  headers: { Authorization: `Bearer ${githubToken}` },
+                  tools: ['*'],
+                },
+              };
+              if (resumeMcpServers) {
+                for (const s of resumeMcpServers) {
+                  mcpServersConfig[s.name] = {
+                    type: s.type,
+                    url: s.url,
+                    headers: s.headers,
+                    tools: s.tools.length > 0 ? s.tools : ['*'],
+                  };
+                }
+              }
+
               let resumed = false;
 
               // Try native SDK resume first
@@ -1067,6 +1120,7 @@ export function setupWebSocket(
                   streaming: true,
                   onUserInputRequest: makeUserInputHandler(connectionEntry),
                   configDir: resolvedConfigDir,
+                  mcpServers: mcpServersConfig as any,
                   ...(detail?.plan && {
                     systemMessage: {
                       mode: 'append' as const,
@@ -1092,6 +1146,7 @@ export function setupWebSocket(
                   onUserInputRequest: makeUserInputHandler(connectionEntry),
                   permissionMode: 'approve_all',
                   configDir: resolvedConfigDir,
+                  mcpServers: resumeMcpServers,
                   onHookEvent: (message) => poolSend(connectionEntry, message),
                 });
                 console.log(`[RESUME] Fallback session created for ${sessionId} with context injection`);

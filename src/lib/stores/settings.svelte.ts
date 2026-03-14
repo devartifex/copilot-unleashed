@@ -3,6 +3,7 @@ import type {
   ReasoningEffort,
   PersistedSettings,
   CustomToolDefinition,
+  CustomAgentDefinition,
   McpServerDefinition,
   SkillDefinition,
 } from '$lib/types/index.js';
@@ -16,6 +17,7 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   customInstructions: '',
   excludedTools: [],
   customTools: [],
+  customAgents: [],
   mcpServers: [],
   disabledSkills: [],
 };
@@ -36,6 +38,18 @@ function isValidCustomTool(t: unknown): t is CustomToolDefinition {
   );
 }
 
+function isValidCustomAgent(agent: unknown): agent is CustomAgentDefinition {
+  if (!agent || typeof agent !== 'object') return false;
+  const obj = agent as Record<string, unknown>;
+  return (
+    typeof obj.name === 'string' &&
+    (typeof obj.displayName === 'undefined' || typeof obj.displayName === 'string') &&
+    (typeof obj.description === 'undefined' || typeof obj.description === 'string') &&
+    (typeof obj.tools === 'undefined' || (Array.isArray(obj.tools) && obj.tools.every((tool) => typeof tool === 'string'))) &&
+    typeof obj.prompt === 'string'
+  );
+}
+
 function isValidMcpServer(s: unknown): s is McpServerDefinition {
   if (!s || typeof s !== 'object') return false;
   const obj = s as Record<string, unknown>;
@@ -53,6 +67,7 @@ export interface SettingsStore {
   customInstructions: string;
   excludedTools: string[];
   customTools: CustomToolDefinition[];
+  customAgents: CustomAgentDefinition[];
   reasoningEffort: ReasoningEffort;
   selectedModel: string;
   selectedMode: SessionMode;
@@ -69,6 +84,7 @@ export function createSettingsStore(): SettingsStore {
   let customInstructions = $state(DEFAULT_SETTINGS.customInstructions);
   let excludedTools = $state<string[]>([...DEFAULT_SETTINGS.excludedTools]);
   let customTools = $state<CustomToolDefinition[]>([...DEFAULT_SETTINGS.customTools]);
+  let customAgents = $state<CustomAgentDefinition[]>([...(DEFAULT_SETTINGS.customAgents ?? [])]);
   let reasoningEffort = $state<ReasoningEffort>(DEFAULT_SETTINGS.reasoningEffort);
   let selectedModel = $state(DEFAULT_SETTINGS.model);
   let selectedMode = $state<SessionMode>(DEFAULT_SETTINGS.mode);
@@ -96,6 +112,7 @@ export function createSettingsStore(): SettingsStore {
       customInstructions,
       excludedTools,
       customTools,
+      customAgents,
       mcpServers,
       disabledSkills,
     };
@@ -117,6 +134,9 @@ export function createSettingsStore(): SettingsStore {
     }
     if (Array.isArray(parsed.customTools)) {
       customTools = parsed.customTools.filter(isValidCustomTool).slice(0, 10);
+    }
+    if (Array.isArray(parsed.customAgents)) {
+      customAgents = parsed.customAgents.filter(isValidCustomAgent).slice(0, 10);
     }
     if (Array.isArray(parsed.mcpServers)) {
       mcpServers = parsed.mcpServers.filter(isValidMcpServer).slice(0, 10);
@@ -191,6 +211,9 @@ export function createSettingsStore(): SettingsStore {
 
     get customTools() { return customTools; },
     set customTools(v: CustomToolDefinition[]) { customTools = v.slice(0, 10); save(); },
+
+    get customAgents() { return customAgents; },
+    set customAgents(v: CustomAgentDefinition[]) { customAgents = v.slice(0, 10); save(); },
 
     get reasoningEffort() { return reasoningEffort; },
     set reasoningEffort(v: ReasoningEffort) { reasoningEffort = v; save(); },

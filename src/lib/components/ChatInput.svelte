@@ -51,7 +51,7 @@
   let attachMenuOpen = $state(false);
 
   const isDisabled = $derived(
-    !pendingUserInput && (connectionState !== 'connected' || isStreaming || !sessionReady || isUploading),
+    !pendingUserInput && (connectionState !== 'connected' || !sessionReady || isUploading),
   );
 
   const canSend = $derived(
@@ -60,14 +60,18 @@
       : !isDisabled && (inputValue.trim().length > 0 || selectedFiles.length > 0),
   );
 
-  const placeholder = $derived.by(() => {
+  const inputPlaceholder = $derived.by(() => {
     if (pendingUserInput) return 'Type your answer…';
     if (connectionState === 'connecting') return 'Connecting…';
     if (connectionState !== 'connected') return 'Not connected';
     if (!sessionReady) return 'Starting session…';
-    if (isStreaming) return 'Waiting for response…';
-    return 'Ask Copilot…';
+    if (isStreaming) return 'Steer or queue a follow-up…';
+    return 'Ask anything…';
   });
+
+  const showSteeringIndicator = $derived(
+    !pendingUserInput && isStreaming && inputValue.trim().length > 0,
+  );
 
   function autoResize() {
     const el = textareaEl;
@@ -290,13 +294,19 @@
     <textarea
       bind:this={textareaEl}
       bind:value={inputValue}
-      {placeholder}
+      placeholder={inputPlaceholder}
       disabled={!pendingUserInput && isDisabled}
       maxlength={MAX_LENGTH}
       rows={2}
       oninput={handleInput}
       onkeydown={handleKeydown}
     ></textarea>
+
+    {#if showSteeringIndicator}
+      <div class="steering-indicator" role="status" aria-live="polite">
+        Sending now will steer the current response.
+      </div>
+    {/if}
 
     <div class="toolbar">
       <div class="toolbar-left">
@@ -365,6 +375,14 @@
 
       <div class="toolbar-right">
         {#if isStreaming || isWaiting}
+          {#if isStreaming && !pendingUserInput && canSend}
+            <button class="circle-btn send-btn" onclick={send} aria-label="Steer response">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 12 L8 4"/>
+                <path d="M4 7 L8 3 L12 7"/>
+              </svg>
+            </button>
+          {/if}
           <button class="circle-btn stop-btn" onclick={onAbort} aria-label="Stop generating">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
               <rect x="2" y="2" width="10" height="10" rx="2"/>
@@ -518,9 +536,18 @@
     min-width: 0;
   }
 
+  .steering-indicator {
+    padding: 0 var(--sp-4);
+    color: var(--fg-dim);
+    font-family: var(--font-mono);
+    font-size: 0.75em;
+    line-height: 1.4;
+  }
+
   .toolbar-right {
     display: flex;
     align-items: center;
+    gap: var(--sp-2);
     flex-shrink: 0;
   }
 

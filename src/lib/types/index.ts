@@ -365,6 +365,7 @@ export interface SkillInvokedMessage {
 export interface SubagentStartMessage {
   type: 'subagent_start';
   agentName: string;
+  description?: string;
 }
 
 export interface SubagentEndMessage {
@@ -473,6 +474,16 @@ export interface WorkspaceFileChangedMessage {
   operation: 'create' | 'update';
 }
 
+export interface FleetStartedMessage {
+  type: 'fleet_started';
+  started: boolean;
+}
+
+export interface FleetStatusMessage {
+  type: 'fleet_status';
+  agents: Array<{ agentId: string; agentType: string }>;
+}
+
 export interface SessionUsageTotals {
   inputTokens: number;
   outputTokens: number;
@@ -543,7 +554,9 @@ export type ServerMessage =
   | TruncationMessage
   | ToolPartialResultMessage
   | ContextChangedMessage
-  | WorkspaceFileChangedMessage;
+  | WorkspaceFileChangedMessage
+  | FleetStartedMessage
+  | FleetStatusMessage;
 
 // ─── File attachment ─────────────────────────────────────────────────────────
 
@@ -566,12 +579,16 @@ export interface NewSessionMessage {
   customTools?: CustomToolDefinition[];
   mcpServers?: McpServerDefinition[];
   disabledSkills?: string[];
+  customAgents?: CustomAgentDefinition[];
 }
+
+export type MessageDeliveryMode = 'immediate' | 'enqueue';
 
 export interface SendMessage {
   type: 'message';
   content: string;
   attachments?: Array<{ path: string; name: string; type: string }>;
+  mode?: MessageDeliveryMode;
 }
 
 export interface ListModelsMessage {
@@ -665,6 +682,11 @@ export interface UpdatePlanMessage {
   content: string;
 }
 
+export interface StartFleetMessage {
+  type: 'start_fleet';
+  prompt: string;
+}
+
 export interface DeletePlanMessage {
   type: 'delete_plan';
 }
@@ -691,7 +713,8 @@ export type ClientMessage =
   | GetSessionDetailMessage
   | GetPlanMessage
   | UpdatePlanMessage
-  | DeletePlanMessage;
+  | DeletePlanMessage
+  | StartFleetMessage;
 
 // ─── Chat message type for rendering ────────────────────────────────────────
 
@@ -706,6 +729,7 @@ export type ChatMessageRole =
   | 'usage'
   | 'skill'
   | 'subagent'
+  | 'fleet'
   | 'reasoning';
 
 export interface ChatMessage {
@@ -722,6 +746,7 @@ export interface ChatMessage {
   mcpToolName?: string;
   agentName?: string;
   skillName?: string;
+  fleetAgents?: Array<{ agentId: string; agentType: string; status: 'running' | 'completed' | 'failed'; error?: string }>;
   inputTokens?: number;
   outputTokens?: number;
   reasoningTokens?: number;
@@ -792,6 +817,7 @@ export interface NewSessionConfig {
   customTools?: CustomToolDefinition[];
   mcpServers?: McpServerDefinition[];
   disabledSkills?: string[];
+  customAgents?: CustomAgentDefinition[];
 }
 
 // ─── Settings (persisted to localStorage) ───────────────────────────────────
@@ -805,6 +831,17 @@ export interface PersistedSettings {
   customTools: CustomToolDefinition[];
   mcpServers?: McpServerDefinition[];
   disabledSkills?: string[];
+  customAgents?: CustomAgentDefinition[];
+}
+
+// ─── Custom agent definitions ───────────────────────────────────────────────
+
+export interface CustomAgentDefinition {
+  name: string;
+  displayName?: string;
+  description?: string;
+  tools?: string[];
+  prompt: string;
 }
 
 // ─── Skill definitions ──────────────────────────────────────────────────────

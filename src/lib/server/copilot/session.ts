@@ -44,6 +44,13 @@ export interface CreateSessionOptions {
   configDir?: string;
   skillDirectories?: string[];
   disabledSkills?: string[];
+  customAgents?: Array<{
+    name: string;
+    displayName?: string;
+    description?: string;
+    tools?: string[];
+    prompt: string;
+  }>;
 }
 
 function buildZodSchema(params: Record<string, { type: string; description: string }>): z.ZodObject<Record<string, z.ZodTypeAny>> {
@@ -267,6 +274,10 @@ export async function createCopilotSession(
 
   if (options.disabledSkills && options.disabledSkills.length > 0) {
     sessionConfig.disabledSkills = options.disabledSkills;
+  }
+
+  if (options.customAgents && options.customAgents.length > 0) {
+    sessionConfig.customAgents = options.customAgents;
   }
 
   return client.createSession(sessionConfig);

@@ -242,6 +242,7 @@
           currentAgent={chatStore.currentAgent}
           sessionTitle={chatStore.sessionTitle}
           contextInfo={chatStore.contextInfo}
+          sessionTotals={chatStore.sessionTotals}
         />
       </MessageList>
 

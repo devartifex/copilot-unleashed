@@ -18,6 +18,7 @@ import type {
   QuotaSnapshot,
   SessionUsageTotals,
 } from '$lib/types/index.js';
+import { pickPrimaryQuota } from '$lib/types/index.js';
 import type { WsStore } from '$lib/stores/ws.svelte.js';
 import { notify } from '$lib/utils/notifications.js';
 
@@ -102,6 +103,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   // ── Context & quota ─────────────────────────────────────────────────────
   let contextInfo = $state<ContextInfo | null>(null);
   let quotaSnapshots = $state<QuotaSnapshots | null>(null);
+  let baselineUsedRequests = $state<number | null>(null);
 
   const emptyTotals: SessionUsageTotals = {
     inputTokens: 0, outputTokens: 0, reasoningTokens: 0,
@@ -291,20 +293,38 @@ export function createChatStore(wsStore: WsStore): ChatStore {
           quotaSnapshots: msg.quotaSnapshots,
           copilotUsage: msg.copilotUsage,
         });
-        // Accumulate session totals
-        sessionTotals = {
-          inputTokens: sessionTotals.inputTokens + (msg.inputTokens ?? 0),
-          outputTokens: sessionTotals.outputTokens + (msg.outputTokens ?? 0),
-          reasoningTokens: sessionTotals.reasoningTokens + (msg.reasoningTokens ?? 0),
-          cacheReadTokens: sessionTotals.cacheReadTokens + (msg.cacheReadTokens ?? 0),
-          cacheWriteTokens: sessionTotals.cacheWriteTokens + (msg.cacheWriteTokens ?? 0),
-          totalCost: sessionTotals.totalCost + (msg.cost ?? 0),
-          totalDurationMs: sessionTotals.totalDurationMs + (msg.duration ?? 0),
-          apiCalls: sessionTotals.apiCalls + 1,
-          premiumRequests: sessionTotals.premiumRequests,
-        };
-        if (msg.quotaSnapshots) {
-          quotaSnapshots = msg.quotaSnapshots;
+        // Derive premium requests from quota snapshot delta
+        {
+          let premiumDelta = 0;
+          if (msg.quotaSnapshots) {
+            const primary = pickPrimaryQuota(msg.quotaSnapshots);
+            const currentUsed = primary?.snapshot.usedRequests;
+            if (currentUsed != null) {
+              if (baselineUsedRequests == null) {
+                // First snapshot — capture baseline (before this turn's usage)
+                // Estimate baseline as currentUsed minus cost (cost ≈ premium requests consumed this call)
+                baselineUsedRequests = currentUsed - (msg.cost ?? 0);
+              }
+              premiumDelta = currentUsed - baselineUsedRequests;
+            }
+            quotaSnapshots = msg.quotaSnapshots;
+          }
+          // Also try copilotUsage as fallback
+          const copilotPremium = msg.copilotUsage?.reduce(
+            (acc: number, item: { premiumRequests?: number }) => acc + (item.premiumRequests ?? 0), 0,
+          ) ?? 0;
+          const resolvedPremium = premiumDelta > 0 ? premiumDelta : copilotPremium;
+          sessionTotals = {
+            inputTokens: sessionTotals.inputTokens + (msg.inputTokens ?? 0),
+            outputTokens: sessionTotals.outputTokens + (msg.outputTokens ?? 0),
+            reasoningTokens: sessionTotals.reasoningTokens + (msg.reasoningTokens ?? 0),
+            cacheReadTokens: sessionTotals.cacheReadTokens + (msg.cacheReadTokens ?? 0),
+            cacheWriteTokens: sessionTotals.cacheWriteTokens + (msg.cacheWriteTokens ?? 0),
+            totalCost: sessionTotals.totalCost + (msg.cost ?? 0),
+            totalDurationMs: sessionTotals.totalDurationMs + (msg.duration ?? 0),
+            apiCalls: sessionTotals.apiCalls + 1,
+            premiumRequests: resolvedPremium,
+          };
         }
         break;
 
@@ -586,6 +606,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     pendingPermission = null;
     contextInfo = null;
     sessionDetail = null;
+    baselineUsedRequests = null;
     sessionTotals = { ...emptyTotals };
   }
 

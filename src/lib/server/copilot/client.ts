@@ -1,0 +1,20 @@
+import { homedir } from 'node:os';
+import { CopilotClient } from '@github/copilot-sdk';
+
+export function createCopilotClient(githubToken: string, configDir?: string): CopilotClient {
+  const clientEnv: Record<string, string | undefined> = { ...process.env, GH_TOKEN: githubToken };
+
+  // When configDir is set, pass COPILOT_HOME to the CLI subprocess so it
+  // reads and writes session state from the same directory as the CLI.
+  if (configDir) {
+    clientEnv.COPILOT_HOME = configDir;
+  }
+
+  return new CopilotClient({
+    githubToken,
+    env: clientEnv,
+    // Use home directory as CWD so the CLI subprocess has write access
+    // (in Docker, WORKDIR /app is root-owned but the process runs as node)
+    cwd: homedir(),
+  });
+}

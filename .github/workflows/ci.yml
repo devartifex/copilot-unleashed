@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Security audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Build server (required for svelte-check)
+        run: npm run build:server
+
+      - name: Generate SvelteKit types
+        run: npx svelte-kit sync
+
+      - name: Type check
+        run: npm run check
+
+      - name: Build
+        run: npm run build
+
+      - name: Run unit tests with coverage
+        run: npm run test:unit:coverage
+
+      # TODO: Add Playwright E2E tests in a future PR once CI installs browser binaries
+      # and starts the SvelteKit server for the test run environment.

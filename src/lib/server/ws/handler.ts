@@ -26,7 +26,7 @@ const MAX_MESSAGE_LENGTH = 10_000;
 const VALID_MESSAGE_TYPES = new Set([
   'new_session', 'message', 'list_models', 'set_mode',
   'abort', 'set_model', 'set_reasoning', 'user_input_response',
-  'permission_response',
+  'permission_response', 'ping',
   'list_tools', 'list_agents', 'select_agent', 'deselect_agent',
   'get_quota', 'compact', 'list_sessions', 'resume_session',
   'delete_session', 'get_session_detail', 'get_plan', 'update_plan', 'delete_plan', 'start_fleet',
@@ -35,6 +35,11 @@ const VALID_MODES = new Set(['interactive', 'plan', 'autopilot']);
 const VALID_REASONING = new Set(['low', 'medium', 'high', 'xhigh']);
 const HEARTBEAT_INTERVAL = 30_000;
 const UPLOAD_DIR_PREFIX = join(tmpdir(), 'copilot-uploads');
+
+// WS rate limiting: user-initiated message types subject to rate limits
+const RATE_LIMITED_TYPES = new Set(['message', 'new_session', 'resume_session', 'compact', 'start_fleet']);
+const WS_RATE_LIMIT_MAX = 30;
+const WS_RATE_LIMIT_WINDOW_MS = 60_000;
 
 /** Validate that an attachment path is an absolute path inside the upload directory (prevents arbitrary file reads). */
 export function isValidAttachmentPath(filePath: string): boolean {
@@ -91,13 +96,16 @@ export function mapAttachmentsToSdk(raw: unknown): SdkAttachment[] | undefined {
   return mapped.length ? mapped : undefined;
 }
 
-/** Get workspace root via git, fallback to cwd */
+/** Get workspace root via git, fallback to cwd — cached for process lifetime */
+let cachedWorkspaceRoot: string | null = null;
 function getWorkspaceRoot(): string {
+  if (cachedWorkspaceRoot !== null) return cachedWorkspaceRoot;
   try {
-    return execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
+    cachedWorkspaceRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
   } catch {
-    return process.cwd();
+    cachedWorkspaceRoot = process.cwd();
   }
+  return cachedWorkspaceRoot;
 }
 
 /** Regex to match @file mentions: @path/to/file.ext */
@@ -386,12 +394,14 @@ function makeUserInputHandler(entry: PoolEntry) {
   return (request: any) => {
     return new Promise<{ answer: string; wasFreeform: boolean }>((resolve) => {
       entry.userInputResolve = resolve;
-      poolSend(entry, {
+      const prompt = {
         type: 'user_input_request',
         question: request.question,
         choices: request.choices,
         allowFreeform: request.allowFreeform ?? true,
-      });
+      };
+      entry.pendingUserInputPrompt = prompt;
+      poolSend(entry, prompt);
     });
   };
 }
@@ -487,11 +497,13 @@ function makePermissionHandler(entry: PoolEntry) {
     return new Promise<{ kind: 'approved' } | { kind: 'denied-interactively-by-user'; feedback?: string }>((resolve) => {
       const timeout = setTimeout(() => {
         entry.permissionResolve = null;
+        entry.pendingPermissionPrompt = null;
         resolve({ kind: 'denied-interactively-by-user', feedback: 'Permission request timed out' });
       }, PERMISSION_TIMEOUT_MS);
 
       entry.permissionResolve = (decision: string) => {
         clearTimeout(timeout);
+        entry.pendingPermissionPrompt = null;
         resolve(
           decision === 'allow'
             ? { kind: 'approved' }
@@ -499,13 +511,15 @@ function makePermissionHandler(entry: PoolEntry) {
         );
       };
 
-      poolSend(entry, {
+      const prompt = {
         type: 'permission_request',
         requestId,
         kind,
         toolName,
         toolArgs,
-      });
+      };
+      entry.pendingPermissionPrompt = prompt;
+      poolSend(entry, prompt);
     });
   };
 }
@@ -580,8 +594,9 @@ export function setupWebSocket(
     const reqUrl = new URL(req.url || '/', `http://${req.headers.host}`);
     const rawTabId = reqUrl.searchParams.get('tabId') || 'default';
     const tabId = isValidTabId(rawTabId) ? rawTabId : 'default';
+    const lastSeq = parseInt(reqUrl.searchParams.get('lastSeq') || '-1', 10);
     const poolKey = `${userLogin}:${tabId}`;
-    console.log('[WS-SERVER] Authenticated user:', userLogin, 'tab:', tabId, 'checking pool...');
+    console.log('[WS-SERVER] Authenticated user:', userLogin, 'tab:', tabId, 'lastSeq:', lastSeq, 'checking pool...');
     let entry = sessionPool.get(poolKey);
 
     if (entry) {
@@ -596,10 +611,11 @@ export function setupWebSocket(
       }
       entry.ws = ws;
 
-      // Replay buffered messages
+      // Replay only messages the client hasn't seen (based on sequence numbers)
       const buffer = entry.messageBuffer.splice(0);
       for (const msg of buffer) {
-        if (ws.readyState === WebSocket.OPEN) {
+        const msgSeq = typeof msg.seq === 'number' ? msg.seq : -1;
+        if (msgSeq > lastSeq && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify(msg));
         }
       }
@@ -611,6 +627,14 @@ export function setupWebSocket(
         hasSession: !!entry.session,
         isProcessing: entry.isProcessing,
       });
+
+      // Re-send pending prompts so the user can respond on the new connection
+      if (entry.pendingUserInputPrompt && entry.userInputResolve) {
+        poolSend(entry, entry.pendingUserInputPrompt);
+      }
+      if (entry.pendingPermissionPrompt && entry.permissionResolve) {
+        poolSend(entry, entry.pendingPermissionPrompt);
+      }
     } else {
       // Create new pool entry — enforce per-user session cap
       if (countUserSessions(userLogin) >= config.maxSessionsPerUser) {
@@ -637,11 +661,16 @@ export function setupWebSocket(
       if (connectionEntry.ws === ws) {
         connectionEntry.ws = null;
         connectionEntry.ttlTimer = setTimeout(async () => {
+          // Re-verify the connection wasn't re-attached during the TTL window
+          if (connectionEntry.ws !== null) return;
           await destroyPoolEntry(connectionEntry);
           sessionPool.delete(poolKey);
         }, config.sessionPoolTtl);
       }
     });
+
+    // WS rate limiting: sliding window per connection for user-initiated messages
+    const rateLimitWindow: number[] = [];
 
     ws.on('message', async (raw) => {
       try {
@@ -653,6 +682,28 @@ export function setupWebSocket(
           return;
         }
 
+        // Handle client-side heartbeat
+        if (msg.type === 'ping') {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'pong' }));
+          }
+          return;
+        }
+
+        // Rate limit user-initiated message types
+        if (RATE_LIMITED_TYPES.has(msg.type)) {
+          const now = Date.now();
+          // Prune expired entries
+          while (rateLimitWindow.length > 0 && rateLimitWindow[0] <= now - WS_RATE_LIMIT_WINDOW_MS) {
+            rateLimitWindow.shift();
+          }
+          if (rateLimitWindow.length >= WS_RATE_LIMIT_MAX) {
+            poolSend(connectionEntry, { type: 'error', message: 'Rate limit exceeded — please slow down' });
+            return;
+          }
+          rateLimitWindow.push(now);
+        }
+
         switch (msg.type) {
           case 'new_session': {
             if (connectionEntry.session) {
@@ -661,6 +712,8 @@ export function setupWebSocket(
             }
             connectionEntry.userInputResolve = null;
             connectionEntry.permissionResolve = null;
+            connectionEntry.pendingUserInputPrompt = null;
+            connectionEntry.pendingPermissionPrompt = null;
 
             try {
               const customInstructions = typeof msg.customInstructions === 'string'
@@ -897,6 +950,7 @@ export function setupWebSocket(
             }
             const resolve = connectionEntry.userInputResolve;
             connectionEntry.userInputResolve = null;
+            connectionEntry.pendingUserInputPrompt = null;
             resolve({ answer, wasFreeform: msg.wasFreeform ?? true });
             break;
           }
@@ -921,6 +975,7 @@ export function setupWebSocket(
             }
             const permResolve = connectionEntry.permissionResolve;
             connectionEntry.permissionResolve = null;
+            connectionEntry.pendingPermissionPrompt = null;
             permResolve(decision.replace('always_', ''));
             break;
           }

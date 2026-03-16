@@ -107,6 +107,7 @@
   const inputPlaceholder = $derived.by(() => {
     if (pendingUserInput) return 'Type your answer…';
     if (connectionState === 'connecting') return 'Connecting…';
+    if (connectionState === 'reconnecting') return 'Reconnecting…';
     if (connectionState !== 'connected') return 'Not connected';
     if (!sessionReady) return 'Starting session…';
     if (isStreaming) return 'Queue a follow-up…';

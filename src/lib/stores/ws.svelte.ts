@@ -15,6 +15,9 @@ const INITIAL_RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_DELAY = 60_000;
 const UNAUTHORIZED_CODE = 4001;
 const REPLACED_CODE = 4002;
+const RECONNECT_DEBOUNCE_MS = 500;
+const HEARTBEAT_INTERVAL = 25_000;
+const HEARTBEAT_TIMEOUT = 5_000;
 
 // Unique ID for this browser tab — persisted in sessionStorage to survive hard refreshes
 const TAB_ID = typeof sessionStorage !== 'undefined'
@@ -72,6 +75,13 @@ export function createWsStore(): WsStore {
   let reconnectDelay = INITIAL_RECONNECT_DELAY;
   let messageHandlers: Array<(msg: ServerMessage) => void> = [];
   let visibilityCleanup: (() => void) | null = null;
+  let onlineCleanup: (() => void) | null = null;
+  let lastConnectAttempt = 0;
+  let hasConnectedOnce = false;
+  let reconnectPending = false;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
+  let lastSeq = -1;
 
   // ── Internal helpers ────────────────────────────────────────────────────
 
@@ -104,7 +114,18 @@ export function createWsStore(): WsStore {
 
   function scheduleReconnect(): void {
     clearReconnectTimer();
-    reconnectTimer = setTimeout(() => connect(), reconnectDelay);
+
+    // Don't reconnect while tab is hidden — save battery on mobile
+    if (typeof document !== 'undefined' && document.hidden) {
+      reconnectPending = true;
+      connectionState = 'reconnecting';
+      return;
+    }
+
+    connectionState = 'reconnecting';
+    // Add ±25% jitter to prevent thundering herd on server restart
+    const jitter = reconnectDelay * (0.75 + Math.random() * 0.5);
+    reconnectTimer = setTimeout(() => connect(), jitter);
     reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
   }
 
@@ -120,6 +141,8 @@ export function createWsStore(): WsStore {
     const handler = () => {
       if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
         clearReconnectTimer();
+        reconnectDelay = INITIAL_RECONNECT_DELAY;
+        reconnectPending = false;
         connect();
       }
     };
@@ -127,10 +150,63 @@ export function createWsStore(): WsStore {
     visibilityCleanup = () => document.removeEventListener('visibilitychange', handler);
   }
 
+  function setupOnlineHandler(): void {
+    if (typeof window === 'undefined' || onlineCleanup) return;
+
+    const handler = () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        clearReconnectTimer();
+        reconnectDelay = INITIAL_RECONNECT_DELAY;
+        reconnectPending = false;
+        connect();
+      }
+    };
+    window.addEventListener('online', handler);
+    onlineCleanup = () => window.removeEventListener('online', handler);
+  }
+
+  function clearHeartbeat(): void {
+    if (heartbeatTimer !== null) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+    if (heartbeatTimeout !== null) {
+      clearTimeout(heartbeatTimeout);
+      heartbeatTimeout = null;
+    }
+  }
+
+  function startHeartbeat(): void {
+    clearHeartbeat();
+    heartbeatTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }));
+        heartbeatTimeout = setTimeout(() => {
+          // No pong received — connection is silently dead
+          console.log('[WS-STORE] Heartbeat timeout — forcing reconnect');
+          if (ws) {
+            ws.onclose = null;
+            try { ws.close(); } catch { /* ignore */ }
+            ws = null;
+          }
+          connectionState = 'disconnected';
+          sessionReady = false;
+          scheduleReconnect();
+        }, HEARTBEAT_TIMEOUT);
+      }
+    }, HEARTBEAT_INTERVAL);
+  }
+
   // ── Connection lifecycle ────────────────────────────────────────────────
 
   function connect(): void {
     if (typeof window === 'undefined') return;
+
+    // Debounce guard — prevent double-connect from visibility + online firing together
+    const now = Date.now();
+    if (now - lastConnectAttempt < RECONNECT_DEBOUNCE_MS) return;
+    lastConnectAttempt = now;
+
     console.log(`[WS-STORE] connect() called, existing ws=${!!ws}, readyState=${ws?.readyState}`);
 
     // Close existing connection without triggering reconnect logic
@@ -140,20 +216,34 @@ export function createWsStore(): WsStore {
       try { ws.close(); } catch { /* ignore */ }
       ws = null;
     }
+    clearHeartbeat();
 
-    connectionState = 'connecting';
-    const socket = new WebSocket(buildWsUrl());
+    connectionState = hasConnectedOnce ? 'reconnecting' : 'connecting';
+    const url = buildWsUrl() + (lastSeq >= 0 ? `&lastSeq=${lastSeq}` : '');
+    const socket = new WebSocket(url);
 
     socket.onopen = () => {
       console.log(`[WS-STORE] WebSocket connected`);
       connectionState = 'connected';
       reconnectDelay = INITIAL_RECONNECT_DELAY;
+      hasConnectedOnce = true;
       clearReconnectTimer();
+      startHeartbeat();
     };
 
     socket.onmessage = (event: MessageEvent) => {
       try {
         const msg = JSON.parse(event.data as string) as ServerMessage;
+        // Reset heartbeat timeout on any message from server
+        if (heartbeatTimeout !== null) {
+          clearTimeout(heartbeatTimeout);
+          heartbeatTimeout = null;
+        }
+        if (msg.type === 'pong') return;
+        // Track sequence numbers for replay-on-reconnect
+        if (typeof (msg as any).seq === 'number') {
+          lastSeq = (msg as any).seq;
+        }
         console.log(`[WS-STORE] Received message: type=${msg.type}`);
         dispatchMessage(msg);
       } catch {
@@ -191,14 +281,20 @@ export function createWsStore(): WsStore {
 
     ws = socket;
     setupVisibilityHandler();
+    setupOnlineHandler();
   }
 
   function disconnect(): void {
     console.log(`[WS-STORE] disconnect() called, ws=${!!ws}`);
     clearReconnectTimer();
+    clearHeartbeat();
     if (visibilityCleanup) {
       visibilityCleanup();
       visibilityCleanup = null;
+    }
+    if (onlineCleanup) {
+      onlineCleanup();
+      onlineCleanup = null;
     }
     if (ws) {
       ws.onclose = null; // prevent onclose from scheduling a reconnect
@@ -207,6 +303,7 @@ export function createWsStore(): WsStore {
     }
     connectionState = 'disconnected';
     sessionReady = false;
+    reconnectPending = false;
   }
 
   // ── Message subscription ────────────────────────────────────────────────

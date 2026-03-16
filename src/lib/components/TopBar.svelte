@@ -27,7 +27,8 @@
   const connectionDotClass = $derived.by(() => {
     switch (connectionState) {
       case 'connected': return 'dot-connected';
-      case 'connecting': return 'dot-connecting';
+      case 'connecting':
+      case 'reconnecting': return 'dot-connecting';
       default: return 'dot-disconnected';
     }
   });

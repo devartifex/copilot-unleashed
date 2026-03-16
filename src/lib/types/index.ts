@@ -2,7 +2,7 @@
 
 export type SessionMode = 'interactive' | 'plan' | 'autopilot';
 export type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
-export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
+export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'error';
 
 // ─── Model types ────────────────────────────────────────────────────────────
 
@@ -539,6 +539,11 @@ export interface SessionUsageTotals {
   premiumRequests: number;
 }
 
+/** Server heartbeat response to client-side ping */
+export interface PongMessage {
+  type: 'pong';
+}
+
 export type ServerMessage =
   | ConnectedMessage
   | SessionCreatedMessage
@@ -605,7 +610,8 @@ export type ServerMessage =
   | HookUserPromptMessage
   | HookSessionStartMessage
   | HookSessionEndMessage
-  | HookErrorMessage;
+  | HookErrorMessage
+  | PongMessage;
 
 // ─── File attachment (upload metadata) ───────────────────────────────────────
 

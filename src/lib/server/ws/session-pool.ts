@@ -5,6 +5,16 @@ import { config } from '../config.js';
 const MAX_BUFFER_SIZE = 500;
 const TAB_ID_PATTERN = /^[a-z0-9_-]{1,64}$/i;
 
+// Control message types that should be prioritized in the buffer (never evicted before data messages)
+const CONTROL_MESSAGE_TYPES = new Set([
+  'connected', 'session_created', 'session_resumed', 'session_reconnected',
+  'turn_start', 'turn_end', 'done', 'error', 'warning',
+  'session_shutdown', 'mode_changed', 'model_changed', 'title_changed',
+  'permission_request', 'user_input_request',
+  'tool_start', 'tool_end', 'session_idle', 'task_complete',
+  'compaction_start', 'compaction_complete',
+]);
+
 export interface PoolEntry {
   client: CopilotClient;
   session: any;
@@ -15,6 +25,12 @@ export interface PoolEntry {
   permissionResolve: ((decision: string) => void) | null;
   permissionPreferences: Map<string, 'allow' | 'deny'>;
   isProcessing: boolean;
+  /** Monotonically increasing sequence number for message ordering */
+  seq: number;
+  /** Stored pending user input prompt for re-send on reconnect */
+  pendingUserInputPrompt: Record<string, unknown> | null;
+  /** Stored pending permission prompt for re-send on reconnect */
+  pendingPermissionPrompt: Record<string, unknown> | null;
 }
 
 export const sessionPool = new Map<string, PoolEntry>();
@@ -30,6 +46,9 @@ export function createPoolEntry(client: CopilotClient, ws: WebSocket): PoolEntry
     permissionResolve: null,
     permissionPreferences: new Map(),
     isProcessing: false,
+    seq: 0,
+    pendingUserInputPrompt: null,
+    pendingPermissionPrompt: null,
   };
 }
 
@@ -44,18 +63,29 @@ export async function destroyPoolEntry(entry: PoolEntry): Promise<void> {
   }
   entry.userInputResolve = null;
   entry.permissionResolve = null;
+  entry.pendingUserInputPrompt = null;
+  entry.pendingPermissionPrompt = null;
   entry.permissionPreferences.clear();
   try { await entry.client.stop(); } catch { /* ignore */ }
 }
 
 export function poolSend(entry: PoolEntry, data: Record<string, unknown>): void {
+  const seqData = { ...data, seq: entry.seq++ };
   if (entry.ws && entry.ws.readyState === WebSocket.OPEN) {
-    entry.ws.send(JSON.stringify(data));
+    entry.ws.send(JSON.stringify(seqData));
   } else {
     if (entry.messageBuffer.length >= MAX_BUFFER_SIZE) {
-      entry.messageBuffer.shift();
+      // Evict oldest data (non-control) message first to preserve important messages
+      const dataIdx = entry.messageBuffer.findIndex(
+        (m) => !CONTROL_MESSAGE_TYPES.has(m.type as string),
+      );
+      if (dataIdx >= 0) {
+        entry.messageBuffer.splice(dataIdx, 1);
+      } else {
+        entry.messageBuffer.shift();
+      }
     }
-    entry.messageBuffer.push(data);
+    entry.messageBuffer.push(seqData);
   }
 }
 

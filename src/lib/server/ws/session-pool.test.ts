@@ -75,6 +75,9 @@ describe('createPoolEntry', () => {
       userInputResolve: null,
       permissionResolve: null,
       isProcessing: false,
+      seq: 0,
+      pendingUserInputPrompt: null,
+      pendingPermissionPrompt: null,
     });
     expect(entry.permissionPreferences.size).toBe(0);
   });
@@ -86,7 +89,7 @@ describe('poolSend', () => {
 
     poolSend(entry, { type: 'delta', content: 'hello' });
 
-    expect(entry.ws?.send).toHaveBeenCalledWith(JSON.stringify({ type: 'delta', content: 'hello' }));
+    expect(entry.ws?.send).toHaveBeenCalledWith(JSON.stringify({ type: 'delta', content: 'hello', seq: 0 }));
     expect(entry.messageBuffer).toEqual([]);
   });
 
@@ -99,8 +102,26 @@ describe('poolSend', () => {
     }
 
     expect(entry.messageBuffer).toHaveLength(500);
-    expect(entry.messageBuffer[0]).toEqual({ type: 'delta', index: 50 });
-    expect(entry.messageBuffer.at(-1)).toEqual({ type: 'delta', index: 549 });
+    // First 50 data messages were evicted; seq starts at 0 so item 50 has seq=50
+    expect(entry.messageBuffer[0]).toMatchObject({ type: 'delta', index: 50 });
+    expect(entry.messageBuffer.at(-1)).toMatchObject({ type: 'delta', index: 549 });
+  });
+
+  it('evicts data messages before control messages when buffer is full', () => {
+    const entry = createPoolEntry(createClientMock() as never, createWsMock() as never);
+    entry.ws = null;
+
+    // Fill buffer with 499 data messages + 1 control message at the start
+    poolSend(entry, { type: 'session_created' });
+    for (let i = 0; i < 499; i++) {
+      poolSend(entry, { type: 'delta', index: i });
+    }
+    expect(entry.messageBuffer).toHaveLength(500);
+
+    // Add one more — should evict a delta, not session_created
+    poolSend(entry, { type: 'delta', index: 999 });
+    expect(entry.messageBuffer).toHaveLength(500);
+    expect(entry.messageBuffer[0]).toMatchObject({ type: 'session_created' });
   });
 });
 
@@ -132,6 +153,8 @@ describe('destroyPoolEntry', () => {
     expect(entry.ttlTimer).toBeNull();
     expect(entry.userInputResolve).toBeNull();
     expect(entry.permissionResolve).toBeNull();
+    expect(entry.pendingUserInputPrompt).toBeNull();
+    expect(entry.pendingPermissionPrompt).toBeNull();
     expect(entry.permissionPreferences.size).toBe(0);
   });
 

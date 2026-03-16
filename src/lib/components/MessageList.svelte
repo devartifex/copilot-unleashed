@@ -10,10 +10,12 @@
   interface Props {
     chatStore: ChatStore;
     username?: string;
+    onSendQueued?: (id: string) => void;
+    onCancelQueued?: (id: string) => void;
     children?: Snippet;
   }
 
-  const { chatStore, username, children }: Props = $props();
+  const { chatStore, username, onSendQueued, onCancelQueued, children }: Props = $props();
 
   let messagesEl: HTMLDivElement | undefined = $state();
   let streamContentEl: HTMLDivElement | undefined = $state();
@@ -79,7 +81,7 @@
   {@render children?.()}
 
   {#each chatStore.messages as msg (msg.id)}
-      <ChatMessage message={msg} {username} />
+      <ChatMessage message={msg} {username} {onSendQueued} {onCancelQueued} />
     {/each}
 
     {#if hasReasoningContent}

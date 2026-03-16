@@ -804,7 +804,8 @@ export type ChatMessageRole =
   | 'skill'
   | 'subagent'
   | 'fleet'
-  | 'reasoning';
+  | 'reasoning'
+  | 'queued';
 
 export interface ChatMessage {
   id: string;

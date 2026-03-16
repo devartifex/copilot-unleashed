@@ -170,10 +170,43 @@
       return;
     }
 
+    // Queue during streaming instead of steering immediately
+    if (chatStore.isStreaming || chatStore.isWaiting) {
+      chatStore.addQueuedMessage(content, attachments);
+      return;
+    }
+
     chatStore.addUserMessage(content, attachments);
-    const mode = chatStore.isStreaming ? 'immediate' : undefined;
-    wsStore.sendMessage(content, attachments, mode);
+    wsStore.sendMessage(content, attachments);
   }
+
+  function handleSendQueued(id: string): void {
+    const data = chatStore.sendQueuedMessage(id);
+    if (data) {
+      wsStore.sendMessage(data.content, data.attachments, 'immediate');
+    }
+  }
+
+  function handleCancelQueued(id: string): void {
+    chatStore.cancelQueuedMessage(id);
+  }
+
+  // Auto-flush queued messages when streaming ends
+  $effect(() => {
+    const streaming = chatStore.isStreaming;
+    const waiting = chatStore.isWaiting;
+    const hasQueued = chatStore.hasQueuedMessages;
+
+    if (!streaming && !waiting && hasQueued) {
+      // Use microtask to avoid acting during the reactive update
+      queueMicrotask(() => {
+        const data = chatStore.flushQueue();
+        if (data) {
+          wsStore.sendMessage(data.content, data.attachments);
+        }
+      });
+    }
+  });
 
   function handleNewChat(): void {
     chatStore.clearMessages();
@@ -270,7 +303,7 @@
         />
       {/if}
 
-      <MessageList {chatStore} username={data.user?.login}>
+      <MessageList {chatStore} username={data.user?.login} onSendQueued={handleSendQueued} onCancelQueued={handleCancelQueued}>
         {#if chatStore.messages.length === 0}
           <Banner />
         {/if}
@@ -311,6 +344,9 @@
           chatStore.addUserMessage(`/fleet ${prompt}`);
           wsStore.send({ type: 'start_fleet', prompt });
         }}
+        onNewChat={handleNewChat}
+        onOpenModelSheet={() => { modelSheetOpen = true; }}
+        onCompact={() => wsStore.compact()}
       />
     </div>
 

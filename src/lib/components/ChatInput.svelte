@@ -16,6 +16,9 @@
     onSetMode: (mode: SessionMode) => void;
     onUserInputResponse: (answer: string, wasFreeform: boolean) => void;
     onFleet?: (prompt: string) => void;
+    onNewChat?: () => void;
+    onOpenModelSheet?: () => void;
+    onCompact?: () => void;
   }
 
   const MAX_LENGTH = 10_000;
@@ -40,6 +43,9 @@
     onSetMode,
     onUserInputResponse,
     onFleet,
+    onNewChat,
+    onOpenModelSheet,
+    onCompact,
   }: Props = $props();
 
   const modes: { value: SessionMode; label: string }[] = [
@@ -66,6 +72,25 @@
   let mentionListEl: HTMLUListElement | undefined = $state();
   let mentionFetchTimer: ReturnType<typeof setTimeout> | undefined;
 
+  // # issue/PR autocomplete state
+  interface IssueResult {
+    number: number;
+    title: string;
+    type: 'issue' | 'pr';
+    state: string;
+  }
+  let issueOpen = $state(false);
+  let issueQuery = $state('');
+  let issueStartPos = $state(0);
+  let issueResults = $state<IssueResult[]>([]);
+  let issueIndex = $state(0);
+  let issueLoading = $state(false);
+  let issueListEl: HTMLUListElement | undefined = $state();
+  let issueFetchTimer: ReturnType<typeof setTimeout> | undefined;
+
+  // ? help overlay state
+  let showHelp = $state(false);
+
   const isDisabled = $derived(
     !pendingUserInput && (connectionState !== 'connected' || !sessionReady || isUploading),
   );
@@ -81,7 +106,7 @@
     if (connectionState === 'connecting') return 'Connecting…';
     if (connectionState !== 'connected') return 'Not connected';
     if (!sessionReady) return 'Starting session…';
-    if (isStreaming) return 'Steer or queue a follow-up…';
+    if (isStreaming) return 'Queue a follow-up…';
     return 'Ask anything…';
   });
 
@@ -93,9 +118,72 @@
     checkImageAttachments(selectedFiles),
   );
 
+  interface SlashCommand {
+    cmd: string;
+    desc: string;
+    action: () => void;
+  }
+
+  const slashCommands = $derived.by((): SlashCommand[] => {
+    const cmds: SlashCommand[] = [
+      { cmd: '/ask', desc: 'Switch to Ask mode', action: () => { onSetMode('interactive'); inputValue = ''; textareaEl?.focus(); } },
+      { cmd: '/plan', desc: 'Switch to Plan mode', action: () => { onSetMode('plan'); inputValue = ''; textareaEl?.focus(); } },
+      { cmd: '/agent', desc: 'Switch to Agent mode', action: () => { onSetMode('autopilot'); inputValue = ''; textareaEl?.focus(); } },
+    ];
+    if (onFleet) {
+      cmds.push({ cmd: '/fleet', desc: 'Run parallel sub-agents on a task', action: () => { onSetMode('autopilot'); inputValue = '/fleet '; textareaEl?.focus(); } });
+    }
+    if (onNewChat) {
+      cmds.push({ cmd: '/clear', desc: 'Start a new conversation', action: () => { onNewChat(); inputValue = ''; textareaEl?.focus(); } });
+    }
+    if (onOpenModelSheet) {
+      cmds.push({ cmd: '/model', desc: 'Switch model', action: () => { onOpenModelSheet(); inputValue = ''; } });
+    }
+    if (onCompact) {
+      cmds.push({ cmd: '/compact', desc: 'Compact conversation context', action: () => { onCompact(); inputValue = ''; textareaEl?.focus(); } });
+    }
+    cmds.push(
+      { cmd: '@', desc: 'Mention a file', action: () => { inputValue = '@'; textareaEl?.focus(); tick().then(() => detectMention()); } },
+      { cmd: '#', desc: 'Reference an issue or PR', action: () => { inputValue = '#'; textareaEl?.focus(); tick().then(() => detectIssue()); } },
+      { cmd: '?', desc: 'Show keyboard shortcuts', action: () => { inputValue = ''; showHelp = true; } },
+    );
+    return cmds;
+  });
+
   const showSlashHint = $derived(
-    !pendingUserInput && inputValue === '/' && !isDisabled,
+    !pendingUserInput && inputValue.startsWith('/') && !inputValue.includes(' ') && !isDisabled,
   );
+
+  const filteredSlashCommands = $derived.by(() => {
+    if (!showSlashHint) return [];
+    const typed = inputValue.toLowerCase();
+    return slashCommands.filter(c => c.cmd.startsWith(typed) || typed === '/');
+  });
+
+  const showHelpTrigger = $derived(
+    !pendingUserInput && inputValue === '?' && !isDisabled,
+  );
+
+  // Show help overlay when ? is typed on empty input
+  $effect(() => {
+    if (showHelpTrigger) {
+      showHelp = true;
+      inputValue = '';
+    }
+  });
+
+  let slashIndex = $state(0);
+
+  $effect(() => {
+    if (showSlashHint) {
+      // Clamp index when filtered list changes
+      if (slashIndex >= filteredSlashCommands.length) {
+        slashIndex = 0;
+      }
+    } else {
+      slashIndex = 0;
+    }
+  });
 
   function autoResize() {
     const el = textareaEl;
@@ -107,6 +195,45 @@
   function handleKeydown(event: KeyboardEvent) {
     // Handle @ mention keyboard navigation first
     if (handleMentionKeydown(event)) return;
+
+    // Handle # issue keyboard navigation
+    if (handleIssueKeydown(event)) return;
+
+    // Handle slash command keyboard navigation
+    if (showSlashHint && filteredSlashCommands.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        slashIndex = (slashIndex + 1) % filteredSlashCommands.length;
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        slashIndex = (slashIndex - 1 + filteredSlashCommands.length) % filteredSlashCommands.length;
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        filteredSlashCommands[slashIndex].action();
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        inputValue = '';
+        return;
+      }
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        filteredSlashCommands[slashIndex].action();
+        return;
+      }
+    }
+
+    // Close help overlay on Escape
+    if (event.key === 'Escape' && showHelp) {
+      event.preventDefault();
+      showHelp = false;
+      return;
+    }
 
     // Close attach menu on Escape
     if (event.key === 'Escape' && attachMenuOpen) {
@@ -238,6 +365,7 @@
     }
     autoResize();
     detectMention();
+    detectIssue();
   }
 
   async function fetchMentionFiles(query: string) {
@@ -286,6 +414,7 @@
     mentionStartPos = lastAt;
     mentionQuery = query;
     mentionOpen = true;
+    mentionLoading = true;
 
     if (mentionFetchTimer) clearTimeout(mentionFetchTimer);
     mentionFetchTimer = setTimeout(() => fetchMentionFiles(query), 150);
@@ -351,6 +480,122 @@
     tick().then(() => {
       if (!mentionListEl) return;
       const active = mentionListEl.querySelector('[aria-selected="true"]');
+      active?.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  // ── # Issue/PR autocomplete ─────────────────────────────────────
+  async function fetchIssues(query: string) {
+    issueLoading = true;
+    try {
+      const params = query ? `?q=${encodeURIComponent(query)}` : '';
+      const res = await fetch(`/api/issues${params}`);
+      if (!res.ok) {
+        issueResults = [];
+        return;
+      }
+      const data = await res.json();
+      issueResults = Array.isArray(data.items) ? data.items : [];
+      issueIndex = 0;
+    } catch {
+      issueResults = [];
+    } finally {
+      issueLoading = false;
+    }
+  }
+
+  function detectIssue() {
+    if (!textareaEl) return;
+    const pos = textareaEl.selectionStart;
+    const text = inputValue.slice(0, pos);
+
+    const lastHash = text.lastIndexOf('#');
+    if (lastHash === -1) {
+      closeIssue();
+      return;
+    }
+
+    if (lastHash > 0 && !/\s/.test(text[lastHash - 1])) {
+      closeIssue();
+      return;
+    }
+
+    const query = text.slice(lastHash + 1);
+    if (/\s/.test(query)) {
+      closeIssue();
+      return;
+    }
+
+    issueStartPos = lastHash;
+    issueQuery = query;
+    issueOpen = true;
+    issueLoading = true;
+
+    if (issueFetchTimer) clearTimeout(issueFetchTimer);
+    issueFetchTimer = setTimeout(() => fetchIssues(query), 250);
+  }
+
+  function closeIssue() {
+    issueOpen = false;
+    issueResults = [];
+    issueQuery = '';
+    issueIndex = 0;
+    if (issueFetchTimer) {
+      clearTimeout(issueFetchTimer);
+      issueFetchTimer = undefined;
+    }
+  }
+
+  function selectIssue(issue: IssueResult) {
+    if (!textareaEl) return;
+    const before = inputValue.slice(0, issueStartPos);
+    const after = inputValue.slice(textareaEl.selectionStart);
+    inputValue = `${before}#${issue.number}${after ? '' : ' '}${after}`;
+    closeIssue();
+    tick().then(() => {
+      if (textareaEl) {
+        const numStr = String(issue.number);
+        const newPos = before.length + 1 + numStr.length + (after ? 0 : 1);
+        textareaEl.selectionStart = newPos;
+        textareaEl.selectionEnd = newPos;
+        textareaEl.focus();
+        autoResize();
+      }
+    });
+  }
+
+  function handleIssueKeydown(event: KeyboardEvent): boolean {
+    if (!issueOpen || issueResults.length === 0) return false;
+
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        issueIndex = (issueIndex + 1) % issueResults.length;
+        scrollIssueIntoView();
+        return true;
+      case 'ArrowUp':
+        event.preventDefault();
+        issueIndex = (issueIndex - 1 + issueResults.length) % issueResults.length;
+        scrollIssueIntoView();
+        return true;
+      case 'Enter':
+      case 'Tab':
+        event.preventDefault();
+        selectIssue(issueResults[issueIndex]);
+        return true;
+      case 'Escape':
+        event.preventDefault();
+        closeIssue();
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  function scrollIssueIntoView() {
+    tick().then(() => {
+      if (!issueListEl) return;
+      const active = issueListEl.querySelector('[aria-selected="true"]');
       active?.scrollIntoView({ block: 'nearest' });
     });
   }
@@ -469,12 +714,21 @@
       onkeydown={handleKeydown}
     ></textarea>
 
-    {#if showSlashHint}
+    {#if showSlashHint && filteredSlashCommands.length > 0}
       <div class="slash-hint" role="listbox" aria-label="Slash commands">
-        <button class="slash-option" role="option" aria-selected="false" onclick={() => { inputValue = '/fleet '; textareaEl?.focus(); }}>
-          <span class="slash-cmd">/fleet</span>
-          <span class="slash-desc">Run parallel sub-agents on a task</span>
-        </button>
+        {#each filteredSlashCommands as cmd, i (cmd.cmd)}
+          <button
+            class="slash-option"
+            class:active={i === slashIndex}
+            role="option"
+            aria-selected={i === slashIndex}
+            onclick={() => cmd.action()}
+            onmouseenter={() => { slashIndex = i; }}
+          >
+            <span class="slash-cmd">{cmd.cmd}</span>
+            <span class="slash-desc">{cmd.desc}</span>
+          </button>
+        {/each}
       </div>
     {/if}
 
@@ -505,9 +759,38 @@
       </div>
     {/if}
 
+    {#if issueOpen && (issueResults.length > 0 || issueLoading)}
+      <div class="mention-popover" role="listbox" aria-label="Issues and pull requests">
+        {#if issueLoading && issueResults.length === 0}
+          <div class="mention-loading">Searching issues…</div>
+        {:else}
+          <ul class="mention-list" bind:this={issueListEl}>
+            {#each issueResults.slice(0, 8) as issue, i (issue.number)}
+              <li
+                class="mention-item"
+                class:active={i === issueIndex}
+                role="option"
+                aria-selected={i === issueIndex}
+                onmousedown={(e) => { e.preventDefault(); selectIssue(issue); }}
+                onmouseenter={() => { issueIndex = i; }}
+              >
+                <span class="issue-icon" aria-hidden="true">{issue.type === 'pr' ? '⑂' : '●'}</span>
+                <span class="issue-number">#{issue.number}</span>
+                <span class="mention-path">{issue.title}</span>
+                <span class="issue-state" class:open={issue.state === 'open'} class:closed={issue.state !== 'open'}>{issue.state}</span>
+              </li>
+            {/each}
+          </ul>
+          {#if issueResults.length > 8}
+            <div class="mention-more">{issueResults.length - 8} more…</div>
+          {/if}
+        {/if}
+      </div>
+    {/if}
+
     {#if showSteeringIndicator}
       <div class="steering-indicator" role="status" aria-live="polite">
-        Sending now will steer the current response.
+        Message will be queued and sent when the current response completes.
       </div>
     {/if}
 
@@ -574,25 +857,13 @@
               {m.label}
             </button>
           {/each}
-          {#if onFleet}
-            <button
-              class="mode-btn fleet-btn"
-              class:active={mode === 'autopilot' && inputValue.startsWith('/fleet')}
-              onclick={() => { onSetMode('autopilot'); inputValue = '/fleet '; textareaEl?.focus(); }}
-              disabled={isDisabled && !pendingUserInput}
-              aria-label="Fleet mode"
-              title="Switch to Agent mode and run parallel sub-agents"
-            >
-              ⚡ Fleet
-            </button>
-          {/if}
         </div>
       </div>
 
       <div class="toolbar-right">
         {#if isStreaming || isWaiting}
-          {#if isStreaming && !pendingUserInput && canSend}
-            <button class="circle-btn send-btn" onclick={send} aria-label="Steer response">
+          {#if !pendingUserInput && canSend}
+            <button class="circle-btn send-btn" onclick={send} aria-label="Queue message" disabled={!inputValue.trim()}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M8 12 L8 4"/>
                 <path d="M4 7 L8 3 L12 7"/>
@@ -621,6 +892,48 @@
     </div>
   </div>
 </div>
+
+{#if showHelp}
+  <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+  <div class="help-backdrop" onclick={() => showHelp = false} role="presentation"></div>
+  <div class="help-overlay" role="dialog" aria-label="Keyboard shortcuts">
+    <div class="help-header">
+      <h2>Keyboard Shortcuts</h2>
+      <button class="help-close" onclick={() => showHelp = false} aria-label="Close">×</button>
+    </div>
+    <div class="help-body">
+      <div class="help-section">
+        <h3>Commands</h3>
+        <div class="help-row"><kbd>/</kbd><span>Open command palette</span></div>
+        <div class="help-row"><kbd>@</kbd><span>Mention a file</span></div>
+        <div class="help-row"><kbd>#</kbd><span>Reference an issue or PR</span></div>
+        <div class="help-row"><kbd>?</kbd><span>Show this help</span></div>
+      </div>
+      <div class="help-section">
+        <h3>Input</h3>
+        <div class="help-row"><kbd>Enter</kbd><span>Send message</span></div>
+        <div class="help-row"><kbd>Shift + Enter</kbd><span>New line</span></div>
+        <div class="help-row"><kbd>Escape</kbd><span>Close menu / overlay</span></div>
+      </div>
+      <div class="help-section">
+        <h3>Menus</h3>
+        <div class="help-row"><kbd>↑ ↓</kbd><span>Navigate options</span></div>
+        <div class="help-row"><kbd>Enter / Tab</kbd><span>Select option</span></div>
+        <div class="help-row"><kbd>Escape</kbd><span>Dismiss</span></div>
+      </div>
+      <div class="help-section">
+        <h3>Slash Commands</h3>
+        <div class="help-row"><kbd>/ask</kbd><span>Ask mode</span></div>
+        <div class="help-row"><kbd>/plan</kbd><span>Plan mode</span></div>
+        <div class="help-row"><kbd>/agent</kbd><span>Agent mode</span></div>
+        <div class="help-row"><kbd>/fleet</kbd><span>Parallel sub-agents</span></div>
+        <div class="help-row"><kbd>/clear</kbd><span>New conversation</span></div>
+        <div class="help-row"><kbd>/model</kbd><span>Switch model</span></div>
+        <div class="help-row"><kbd>/compact</kbd><span>Compact context</span></div>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .input-area {
@@ -789,7 +1102,8 @@
     font-size: 0.85em;
   }
 
-  .slash-option:hover {
+  .slash-option:hover,
+  .slash-option.active {
     background: var(--bg-secondary);
   }
 
@@ -874,8 +1188,140 @@
     text-align: center;
   }
 
-  .fleet-btn {
-    color: var(--purple) !important;
+  /* ── # Issue autocomplete ──────────────────────────────────────── */
+  .issue-icon {
+    flex-shrink: 0;
+    font-size: 0.9em;
+  }
+
+  .issue-number {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--purple);
+    font-size: 0.85em;
+  }
+
+  .issue-state {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 0.7em;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: auto;
+  }
+
+  .issue-state.open {
+    color: var(--green, #3fb950);
+    background: rgba(63, 185, 80, 0.15);
+  }
+
+  .issue-state.closed {
+    color: var(--purple);
+    background: rgba(163, 113, 247, 0.15);
+  }
+
+  /* ── ? Help overlay ──────────────────────────────────────────── */
+  .help-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 100;
+  }
+
+  .help-overlay {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(480px, calc(100% - 2rem));
+    background: var(--bg-raised, var(--bg-overlay));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    z-index: 101;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    animation: userInputIn 0.15s ease;
+    max-height: 70vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  .help-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--sp-3) var(--sp-4);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .help-header h2 {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--fg);
+  }
+
+  .help-close {
+    background: none;
+    border: none;
+    color: var(--fg-muted);
+    font-size: 1.4em;
+    cursor: pointer;
+    padding: 0 var(--sp-1);
+    line-height: 1;
+  }
+
+  .help-close:hover {
+    color: var(--fg);
+  }
+
+  .help-body {
+    padding: var(--sp-3) var(--sp-4);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-3);
+  }
+
+  @media (max-width: 480px) {
+    .help-body {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .help-section h3 {
+    margin: 0 0 var(--sp-2);
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .help-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-1) 0;
+    font-size: 0.82em;
+    color: var(--fg);
+  }
+
+  .help-row kbd {
+    display: inline-block;
+    min-width: 28px;
+    padding: 2px 6px;
+    background: var(--bg-overlay);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    text-align: center;
+    color: var(--purple);
+    white-space: nowrap;
+  }
+
+  .help-row span {
+    color: var(--fg-muted);
   }
 
   .toolbar-right {

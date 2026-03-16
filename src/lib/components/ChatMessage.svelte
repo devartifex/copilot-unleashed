@@ -8,9 +8,11 @@
   interface Props {
     message: ChatMessage;
     username?: string;
+    onSendQueued?: (id: string) => void;
+    onCancelQueued?: (id: string) => void;
   }
 
-  const { message, username }: Props = $props();
+  const { message, username, onSendQueued, onCancelQueued }: Props = $props();
 
   let contentEl: HTMLDivElement | undefined = $state();
 
@@ -118,6 +120,28 @@
     {/if}
   </div>
 
+{:else if message.role === 'queued'}
+  <div class="message user queued">
+    <div class="queued-header">
+      <span class="user-marker queued-marker">Queued</span>
+      <div class="queue-actions">
+        <button class="queue-action-btn send-now-btn" onclick={() => onSendQueued?.(message.id)} aria-label="Send now">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 12 L8 4"/>
+            <path d="M4 7 L8 3 L12 7"/>
+          </svg>
+        </button>
+        <button class="queue-action-btn cancel-btn" onclick={() => onCancelQueued?.(message.id)} aria-label="Cancel queued message">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4 L12 12"/>
+            <path d="M12 4 L4 12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="user-text">{message.content}</div>
+  </div>
+
 {:else if message.role === 'assistant'}
   <div class="message assistant">
     <span class="assistant-marker">◆ Copilot</span>
@@ -211,6 +235,60 @@
     font-weight: 500;
     font-size: 0.95em;
     line-height: 1.65;
+  }
+
+  /* ── queued message ────────────────────────────────────────────────────── */
+  .message.queued {
+    border-left-style: dashed;
+    border-left-color: var(--yellow, #d29922);
+    background: rgba(210, 153, 34, 0.08);
+    opacity: 0.85;
+  }
+
+  .queued-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--sp-1);
+  }
+
+  .queued-marker {
+    color: var(--yellow, #d29922);
+  }
+
+  .queue-actions {
+    display: flex;
+    gap: var(--sp-1);
+  }
+
+  .queue-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-overlay);
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    padding: 0;
+  }
+
+  .queue-action-btn:hover {
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  .send-now-btn:hover {
+    border-color: var(--green, #3fb950);
+    color: var(--green, #3fb950);
+  }
+
+  .cancel-btn:hover {
+    border-color: var(--red, #f85149);
+    color: var(--red, #f85149);
   }
 
   /* ── attachment thumbnails ─────────────────────────────────────────────── */

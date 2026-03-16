@@ -64,10 +64,17 @@ export interface ChatStore {
   readonly canSend: boolean;
   readonly canInterrupt: boolean;
 
+  // Queue
+  readonly hasQueuedMessages: boolean;
+
   // Methods
   handleServerMessage(msg: ServerMessage): void;
   clearMessages(): void;
   addUserMessage(content: string, attachments?: Attachment[]): void;
+  addQueuedMessage(content: string, attachments?: Attachment[]): void;
+  sendQueuedMessage(id: string): { content: string; attachments?: Attachment[] } | null;
+  cancelQueuedMessage(id: string): void;
+  flushQueue(): { content: string; attachments?: Attachment[] } | null;
   clearPendingPermission(): void;
   clearPendingUserInput(): void;
 }
@@ -126,6 +133,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   const isConnected = $derived(wsStore.connectionState === 'connected');
   const canSend = $derived(isConnected && wsStore.sessionReady);
   const canInterrupt = $derived(isWaiting || isReasoningStreaming || isStreaming);
+  const hasQueuedMessages = $derived(messages.some((m) => m.role === 'queued'));
 
   // ── Internal helpers ────────────────────────────────────────────────────
 
@@ -715,6 +723,32 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     pendingUserInput = null;
   }
 
+  // ── Queue management ──────────────────────────────────────────────────
+
+  function addQueuedMessage(content: string, attachments?: Attachment[]): void {
+    addMessage('queued', content, attachments?.length ? { attachments } : undefined);
+  }
+
+  function sendQueuedMessage(id: string): { content: string; attachments?: Attachment[] } | null {
+    const msg = messages.find((m) => m.id === id && m.role === 'queued');
+    if (!msg) return null;
+    // Convert to user message in-place
+    messages = messages.map((m) =>
+      m.id === id ? { ...m, role: 'user' as ChatMessageRole } : m,
+    );
+    return { content: msg.content, attachments: msg.attachments };
+  }
+
+  function cancelQueuedMessage(id: string): void {
+    messages = messages.filter((m) => !(m.id === id && m.role === 'queued'));
+  }
+
+  function flushQueue(): { content: string; attachments?: Attachment[] } | null {
+    const queued = messages.find((m) => m.role === 'queued');
+    if (!queued) return null;
+    return sendQueuedMessage(queued.id);
+  }
+
   // ── Return public interface ─────────────────────────────────────────────
 
   return {
@@ -751,10 +785,15 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     get isConnected() { return isConnected; },
     get canSend() { return canSend; },
     get canInterrupt() { return canInterrupt; },
+    get hasQueuedMessages() { return hasQueuedMessages; },
 
     handleServerMessage,
     clearMessages,
     addUserMessage,
+    addQueuedMessage,
+    sendQueuedMessage,
+    cancelQueuedMessage,
+    flushQueue,
     clearPendingPermission,
     clearPendingUserInput,
   };

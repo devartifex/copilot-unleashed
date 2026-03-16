@@ -72,6 +72,7 @@ export function createWsStore(): WsStore {
   let reconnectDelay = INITIAL_RECONNECT_DELAY;
   let messageHandlers: Array<(msg: ServerMessage) => void> = [];
   let visibilityCleanup: (() => void) | null = null;
+  let onlineCleanup: (() => void) | null = null;
 
   // ── Internal helpers ────────────────────────────────────────────────────
 
@@ -120,11 +121,26 @@ export function createWsStore(): WsStore {
     const handler = () => {
       if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
         clearReconnectTimer();
+        reconnectDelay = INITIAL_RECONNECT_DELAY;
         connect();
       }
     };
     document.addEventListener('visibilitychange', handler);
     visibilityCleanup = () => document.removeEventListener('visibilitychange', handler);
+  }
+
+  function setupOnlineHandler(): void {
+    if (typeof window === 'undefined' || onlineCleanup) return;
+
+    const handler = () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        clearReconnectTimer();
+        reconnectDelay = INITIAL_RECONNECT_DELAY;
+        connect();
+      }
+    };
+    window.addEventListener('online', handler);
+    onlineCleanup = () => window.removeEventListener('online', handler);
   }
 
   // ── Connection lifecycle ────────────────────────────────────────────────
@@ -191,6 +207,7 @@ export function createWsStore(): WsStore {
 
     ws = socket;
     setupVisibilityHandler();
+    setupOnlineHandler();
   }
 
   function disconnect(): void {
@@ -199,6 +216,10 @@ export function createWsStore(): WsStore {
     if (visibilityCleanup) {
       visibilityCleanup();
       visibilityCleanup = null;
+    }
+    if (onlineCleanup) {
+      onlineCleanup();
+      onlineCleanup = null;
     }
     if (ws) {
       ws.onclose = null; // prevent onclose from scheduling a reconnect

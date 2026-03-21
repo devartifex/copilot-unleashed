@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { isValidAttachmentPath, mapAttachmentsToSdk } from './handler.js';
+import { isValidAttachmentPath, mapAttachmentsToSdk } from './attachments.js';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 

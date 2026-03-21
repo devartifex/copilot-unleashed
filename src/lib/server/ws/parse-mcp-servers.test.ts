@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { parseMcpServers } from './handler.js';
+import { parseMcpServers } from './mcp-servers.js';
 
 describe('parseMcpServers', () => {
   it('returns undefined for non-array input', () => {

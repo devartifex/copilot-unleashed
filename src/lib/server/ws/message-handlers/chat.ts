@@ -2,7 +2,12 @@ import { poolSend } from '../session-pool.js';
 import { MAX_MESSAGE_LENGTH } from '../constants.js';
 import { mapAttachmentsToSdk } from '../attachments.js';
 import { resolveFileMentions } from '../file-mentions.js';
+import { chatStateStore } from '../../chat-state-singleton.js';
 import type { MessageContext } from '../types.js';
+
+function rawTabId(ctx: MessageContext): string {
+  return ctx.poolKey.split(':').slice(1).join(':');
+}
 
 export async function handleChat(msg: any, ctx: MessageContext): Promise<void> {
   const { connectionEntry } = ctx;
@@ -25,6 +30,15 @@ export async function handleChat(msg: any, ctx: MessageContext): Promise<void> {
   const allAttachments = [...uploadAttachments, ...mentionAttachments];
 
   connectionEntry.isProcessing = true;
+
+  // Persist user message before sending to SDK (fire-and-forget)
+  chatStateStore.appendMessage(ctx.userLogin, rawTabId(ctx), {
+    type: 'user',
+    content,
+    timestamp: Date.now(),
+    ...(allAttachments.length ? { attachmentCount: allAttachments.length } : {}),
+  }).catch(() => {});
+
   const sendMode = msg.mode === 'immediate' || msg.mode === 'enqueue' ? msg.mode : undefined;
   await connectionEntry.session.send({
     prompt,

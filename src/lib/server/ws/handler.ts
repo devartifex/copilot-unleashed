@@ -12,6 +12,7 @@ import {
 } from './session-pool.js';
 import { VALID_MESSAGE_TYPES, HEARTBEAT_INTERVAL, RATE_LIMITED_TYPES, WS_RATE_LIMIT_MAX, WS_RATE_LIMIT_WINDOW_MS } from './constants.js';
 import { messageHandlers } from './message-handlers/index.js';
+import { chatStateStore } from '../chat-state-singleton.js';
 import type { SessionMiddleware, MessageContext } from './types.js';
 
 export { cleanupAllSessions, cleanupUserSessions } from './session-pool.js';
@@ -143,6 +144,22 @@ export function setupWebSocket(
         type: 'connected',
         user: userLogin,
       });
+
+      // Cold resume: replay persisted chat state for returning users
+      try {
+        const persistedState = await chatStateStore.load(userLogin, tabId);
+        if (persistedState && persistedState.messages.length > 0) {
+          poolSend(entry, {
+            type: 'cold_resume',
+            messages: persistedState.messages,
+            model: persistedState.model,
+            mode: persistedState.mode,
+            sdkSessionId: persistedState.sdkSessionId,
+          });
+        }
+      } catch (err) {
+        console.error('[WS-SERVER] Cold resume load failed:', err);
+      }
     }
 
     // Capture entry reference for this connection's handlers

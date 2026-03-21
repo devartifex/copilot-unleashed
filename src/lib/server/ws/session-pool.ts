@@ -7,7 +7,7 @@ const TAB_ID_PATTERN = /^[a-z0-9_-]{1,64}$/i;
 
 // Control message types that should be prioritized in the buffer (never evicted before data messages)
 const CONTROL_MESSAGE_TYPES = new Set([
-  'connected', 'session_created', 'session_resumed', 'session_reconnected',
+  'connected', 'cold_resume', 'session_created', 'session_resumed', 'session_reconnected',
   'turn_start', 'turn_end', 'done', 'error', 'warning',
   'session_shutdown', 'mode_changed', 'model_changed', 'title_changed',
   'permission_request', 'user_input_request',
@@ -18,6 +18,12 @@ const CONTROL_MESSAGE_TYPES = new Set([
 export interface PoolEntry {
   client: CopilotClient;
   session: any;
+  /** SDK session ID for cold resume — stored when session is created */
+  sdkSessionId: string | null;
+  /** Current model for session resume */
+  model: string | null;
+  /** Current session mode */
+  mode: string | null;
   ws: WebSocket | null;
   messageBuffer: Record<string, unknown>[];
   ttlTimer: NodeJS.Timeout | null;
@@ -39,6 +45,9 @@ export function createPoolEntry(client: CopilotClient, ws: WebSocket): PoolEntry
   return {
     client,
     session: null,
+    sdkSessionId: null,
+    model: null,
+    mode: null,
     ws,
     messageBuffer: [],
     ttlTimer: null,
@@ -114,6 +123,15 @@ export async function cleanupUserSessions(username: string): Promise<void> {
     }
   }
   await Promise.allSettled(promises);
+}
+
+/** Send a message to all pool entries with an active WebSocket */
+export function broadcastToAll(data: Record<string, unknown>): void {
+  for (const entry of sessionPool.values()) {
+    if (entry.ws && entry.ws.readyState === WebSocket.OPEN) {
+      entry.ws.send(JSON.stringify(data));
+    }
+  }
 }
 
 /** Count active pool entries for a specific user */

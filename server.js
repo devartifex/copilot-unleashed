@@ -15,6 +15,10 @@ if (!process.env.ORIGIN) {
 }
 const { handler } = await import('./build/handler.js');
 
+if (!isDev && !process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET environment variable is required in production');
+}
+
 const sessionStorePath = process.env.SESSION_STORE_PATH || (isDev ? '.sessions' : '/data/sessions');
 const sessionMiddleware = session({
   store: new FileStore({ path: sessionStorePath, ttl: 86400, retries: 0, logFn: () => {} }),

@@ -17,6 +17,10 @@ Self-hosted multi-model AI chat platform powered by the official `@github/copilo
 - **Settings**: Persisted server-side via `/api/settings` and mirrored in `localStorage`
 - **Deployment**: Docker container → Azure Container Apps via `azd up`
 
+### Deployment
+- **Azure**: VNet with subnets, Key Vault for secrets, Premium ACR, NFS volume with private endpoints; `COPILOT_CONFIG_DIR=/data/copilot-home`
+- **Local Docker**: Bind mount `~/.copilot` preserved for CLI sync; `COPILOT_CONFIG_DIR` stays at `/home/node/.copilot`
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -46,18 +50,34 @@ svelte.config.js                # SvelteKit config (adapter-node)
 vite.config.ts                  # Vite config
 vitest.config.ts                # Vitest config for colocated unit tests
 
+scripts/
+└── generate-vapid-keys.mjs     # VAPID key generation utility for push notifications
+static/
+└── manifest.json               # PWA manifest (name, icons, start_url, display)
+infra/
+├── modules/
+│   ├── vnet.bicep              # Azure VNet with subnets for private endpoints
+│   └── key-vault.bicep         # Azure Key Vault for secrets management
+
 src/
 ├── app.html                    # SvelteKit shell (viewport, theme-color, PWA meta)
 ├── app.css                     # Global reset, design tokens, highlight.js theme
 ├── hooks.server.ts             # Session bridge, CSP headers, rate limiting
 ├── hooks.server.test.ts        # Example colocated unit test pattern
+├── service-worker.ts           # Service worker: push handler, notificationclick, offline
 │
 ├── lib/
 │   ├── components/             # 20 Svelte 5 components (see ARCHITECTURE.md)
 │   ├── stores/                 # 4 rune stores: auth, chat, settings, ws
 │   ├── server/                 # 22 server files: auth, copilot, settings, skills, ws, security
+│   │   ├── chat-state-store.ts # Persistent chat state CRUD per user+tab
+│   │   ├── session-watcher.ts  # fs.watch on session-state dir, broadcasts via WS
+│   │   ├── push-store.ts       # Push subscription CRUD per user
+│   │   └── push-sender.ts      # web-push wrapper with retry
 │   ├── types/index.ts          # All message types: 60 server + 18 client = 78 total
-│   └── utils/markdown.ts       # Shared markdown pipeline
+│   └── utils/
+│       ├── markdown.ts         # Shared markdown pipeline
+│       └── push-client.ts      # Client-side push subscription management
 │
 ├── routes/
 │   ├── +page.svelte            # Main page: login or full chat screen (1 page route)
@@ -105,6 +125,10 @@ src/
 - **Try-catch** in route handlers and WebSocket — return JSON errors to client
 - **Message type whitelist** — WebSocket handler validates against `VALID_MESSAGE_TYPES` Set
 - **Session disconnect** — use `session.disconnect()` (not deprecated `destroy()`)
+- **Atomic file writes** — ChatStateStore (and settings-store) writes to `.tmp` then renames, preventing partial reads on crash
+- **Session watcher** — `fs.watch` on session-state directory with 100ms debounce, broadcasts state changes to all connected WS clients
+- **Push on disconnect** — Push notifications triggered in `poolSend()` when the target user's WS is disconnected
+- **Cold resume** — Load persisted chat state from disk, resume SDK session via `client.resumeSession()`, replay messages to the client
 
 ### Security
 - CSP in hooks.server.ts: self + unsafe-inline (Svelte) + ws/wss + GitHub avatars
@@ -113,8 +137,11 @@ src/
 - XSS prevention: DOMPurify sanitizes all rendered markdown
 - Max message length: 10,000 chars (server-enforced)
 - Upload limits: 10MB per file, 5 files max, extension allowlist
-- SSRF prevention: internal IP range blocklist for custom webhook tools
+- SSRF prevention: internal IP range blocklist for custom webhook tools; `redirect:'manual'` on all outbound fetches
 - Token revalidation on WebSocket connect (catches revoked tokens)
+- All API endpoints require `checkAuth()` except `/health`
+- CSRF: Origin header required on mutation requests in production
+- Periodic token revalidation every 30 minutes (server-side interval)
 
 ### Environment Variables
 | Variable | Required | Default | Purpose |
@@ -126,6 +153,11 @@ src/
 | `NODE_ENV` | No | development | Dev vs prod behavior |
 | `ALLOWED_GITHUB_USERS` | No | — | Comma-separated GitHub usernames |
 | `TOKEN_MAX_AGE_MS` | No | 86400000 | Force re-auth interval (24h) |
+| `CHAT_STATE_PATH` | No | ./data/chat-state | Directory for persisted chat state files |
+| `VAPID_PUBLIC_KEY` | No | — | VAPID public key for web push (generate with `scripts/generate-vapid-keys.mjs`) |
+| `VAPID_PRIVATE_KEY` | No | — | VAPID private key for web push |
+| `VAPID_SUBJECT` | No | — | VAPID subject (mailto: or https: URL) |
+| `PUSH_STORE_PATH` | No | ./data/push-subscriptions | Directory for push subscription storage |
 
 ## Build & Run
 

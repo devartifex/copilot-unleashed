@@ -1,8 +1,10 @@
 {
   "containerAppsEnvironment": "cae-",
   "containerRegistry": "cr",
+  "keyVault": "kv-",
   "resourceGroup": "rg-",
   "managedIdentity": "mi-",
   "monitoring": "mon-",
-  "storageAccount": "st"
+  "storageAccount": "st",
+  "vnet": "vnet-"
 }

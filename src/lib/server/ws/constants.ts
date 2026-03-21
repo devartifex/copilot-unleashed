@@ -10,6 +10,7 @@ export const VALID_MESSAGE_TYPES = new Set([
   'list_tools', 'list_agents', 'select_agent', 'deselect_agent',
   'get_quota', 'compact', 'list_sessions', 'resume_session',
   'delete_session', 'get_session_detail', 'get_plan', 'update_plan', 'delete_plan', 'start_fleet',
+  'clear_chat',
 ]);
 
 export const VALID_MODES = new Set(['interactive', 'plan', 'autopilot']);

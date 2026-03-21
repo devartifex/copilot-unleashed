@@ -186,6 +186,44 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       case 'connected':
         break;
 
+      case 'cold_resume': {
+        // Restore persisted chat history from server-side storage
+        if (Array.isArray(msg.messages) && msg.messages.length > 0) {
+          const restored: ChatMessage[] = msg.messages
+            .filter(
+              (m: Record<string, unknown>) =>
+                m.type === 'user' || m.type === 'assistant' || m.type === 'error',
+            )
+            .map((m: Record<string, unknown>) => ({
+              id: genId(),
+              role:
+                m.type === 'user'
+                  ? ('user' as const)
+                  : m.type === 'assistant'
+                    ? ('assistant' as const)
+                    : ('error' as const),
+              content: typeof m.content === 'string' ? m.content : '',
+              timestamp: typeof m.timestamp === 'number' ? m.timestamp : Date.now(),
+            }));
+
+          if (restored.length > 0) {
+            messages = restored;
+            addInfoMessage('Session restored from previous visit');
+          }
+        }
+
+        // Restore model/mode if provided
+        if (msg.model) currentModel = msg.model;
+        if (
+          msg.mode === 'interactive' ||
+          msg.mode === 'plan' ||
+          msg.mode === 'autopilot'
+        ) {
+          mode = msg.mode;
+        }
+        break;
+      }
+
       case 'session_created':
         currentModel = msg.model;
         if (msg.sessionId) currentSessionId = msg.sessionId;
@@ -691,6 +729,13 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       case 'workspace_file_changed':
         addInfoMessage(`Workspace file ${msg.operation}d: ${msg.path}`);
         break;
+
+      case 'sessions_changed':
+        // Re-fetch session list when filesystem changes detected
+        if (sessions.length > 0) {
+          wsStore.listSessions();
+        }
+        break;
     }
   }
 
@@ -715,6 +760,9 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     sessionDetail = null;
     baselineUsedRequests = null;
     sessionTotals = { ...emptyTotals };
+
+    // Notify server to delete persisted state
+    wsStore.send({ type: 'clear_chat' });
   }
 
   function addUserMessage(content: string, attachments?: Attachment[]): void {

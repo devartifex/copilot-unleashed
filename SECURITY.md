@@ -30,19 +30,64 @@ Instead, please use [GitHub's private vulnerability reporting](https://docs.gith
 
 ## Security Architecture
 
-This application follows security best practices:
+This application follows security best practices. Items marked 🔒 **PLANNED** are part of the `feature/session-persistence-security-pwa` branch and not yet released.
 
-- **Authentication**: GitHub Device Flow OAuth (no client secret stored)
-- **Session security**: httpOnly, secure (prod), sameSite cookies with server-side session storage
+### Authentication Hardening
+
+- **GitHub Device Flow OAuth**: Public client — no client secret required or stored
 - **Session fixation**: `session.regenerate()` after successful GitHub auth
 - **Token handling**: GitHub tokens stored server-side only, never sent to browser
-- **Token freshness**: tokens expire after 7 days (configurable); re-auth required
-- **Token revalidation**: WebSocket connections validate GitHub token against GitHub's API on connect (catches revoked tokens)
-- **XSS prevention**: DOMPurify sanitizes all dynamic content; CSP restricts script sources
+- **Token freshness**: tokens expire after 7 days (configurable via `TOKEN_MAX_AGE_MS`); re-auth required
+- 🔒 **PLANNED — Authenticated endpoints**: All API endpoints now require GitHub authentication via `checkAuth()`. Previously unprotected: `/api/skills`, `/api/version`, `/api/client-error`. Only `/health` remains public (infrastructure health check)
+- 🔒 **PLANNED — Periodic token revalidation**: GitHub tokens validated every 30 minutes via `GET /user` API to catch revoked tokens. Previously only validated on WebSocket connect
+
+### Session Security
+
+- **httpOnly, secure, sameSite cookies**: Session cookies use `httpOnly`, `secure` (production), and `sameSite: lax`
+- 🔒 **PLANNED — SESSION_SECRET required in production**: `SESSION_SECRET` is now required when `NODE_ENV=production` — server fails fast (throws) on missing value
+- 🔒 **PLANNED — File-based session store**: Server-side file-based session store with 24-hour TTL replaces in-memory sessions for persistence across restarts
+- 🔒 **PLANNED — Rolling sessions**: `maxAge` resets on each request, keeping active users authenticated
+
+### CSP Hardening
+
+- **Content-Security-Policy**: Restrictive CSP set in `hooks.server.ts` — `self` + `unsafe-inline` (required by Svelte) + `ws`/`wss` + GitHub avatar domains
+- **XSS prevention**: DOMPurify sanitizes all rendered markdown; CSP restricts script sources
 - **Subresource Integrity**: All CDN scripts use SRI hashes
-- **Rate limiting**: 200 requests per 15 minutes per IP
-- **WebSocket**: Origin validation, session-based auth, message type whitelist, 10K char limit
-- **Infrastructure**: Managed identity for registry pull, HTTPS-only ingress, secrets stored natively in Container Apps (encrypted at rest)
+- 🔒 **PLANNED — Additional CSP directives**: `form-action 'self'`, `base-uri 'self'`, `object-src 'none'` added to prevent clickjacking and form hijacking. Push service endpoints added to `connect-src`
+- 🔒 **PLANNED — Nonce-based script-src**: Investigating nonce-based `script-src` to replace `unsafe-inline` for stronger XSS protection
+
+### SSRF Protection
+
+- **URL validation**: Custom webhook and MCP tool URLs validated — HTTPS-only, private/internal IP ranges blocked
+- 🔒 **PLANNED — Redirect prevention**: Webhook and MCP URL fetches now use `redirect: 'manual'` to prevent redirect-based SSRF to internal IPs
+
+### CSRF Protection
+
+- **SvelteKit built-in CSRF**: SvelteKit's built-in CSRF checking enabled
+- 🔒 **PLANNED — Origin header enforcement**: State-changing requests (POST/PUT/DELETE) rejected without `Origin` header in production, layered on top of SvelteKit's CSRF checking
+
+### Rate Limiting & WebSocket
+
+- **Rate limiting**: 200 requests per 15 minutes per IP (Map-based)
+- **WebSocket**: Origin validation, session-based auth, message type whitelist, 10K char message limit
+- **Token revalidation on connect**: WebSocket connections validate GitHub token against GitHub's API
+
+### Push Notification Security
+
+- 🔒 **PLANNED — VAPID key management**: VAPID keys stored in Azure Key Vault (production) or environment variables (local development)
+- 🔒 **PLANNED — Authenticated subscriptions**: Push subscription endpoints require GitHub authentication
+- 🔒 **PLANNED — Minimal payloads**: Push payloads contain no sensitive data — only notification titles and bodies
+
+### Azure Infrastructure Security
+
+- **Managed identity**: Used for ACR registry pull — no credentials stored in config
+- **HTTPS-only ingress**: Azure Container Apps enforces HTTPS
+- 🔒 **PLANNED — VNet isolation**: All Azure resources placed within a Virtual Network
+- 🔒 **PLANNED — Key Vault for secrets**: All secrets (SESSION_SECRET, VAPID keys, GitHub Client ID) stored in Azure Key Vault — no inline secrets in Container App configuration
+- 🔒 **PLANNED — Premium ACR**: Private endpoint with public access denied
+- 🔒 **PLANNED — Azure Files NFS**: VNet rules and RootSquash enabled for session storage
+- 🔒 **PLANNED — Private endpoints**: All data-plane resources use private endpoints
+- 🔒 **PLANNED — Diagnostic settings**: Audit logging enabled on ACR, Storage Account, and Key Vault
 
 ## GitHub Secret Scanning
 

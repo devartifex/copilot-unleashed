@@ -24,7 +24,7 @@ export async function handleSetMode(msg: any, ctx: MessageContext): Promise<void
     if (mode === 'autopilot') {
       connectionEntry.session.registerPermissionHandler(approveAll);
     } else {
-      connectionEntry.session.registerPermissionHandler(makePermissionHandler(connectionEntry));
+      connectionEntry.session.registerPermissionHandler(makePermissionHandler(connectionEntry, ctx.userLogin));
     }
 
     // Note: mode_changed is sent by the SDK event handler (session.mode_changed)

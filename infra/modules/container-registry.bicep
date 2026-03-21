@@ -6,15 +6,85 @@ param location string
 
 param tags object = {}
 
+@description('Resource ID of the private endpoints subnet. Leave empty to skip private endpoint creation.')
+param privateEndpointsSubnetId string = ''
+
+@description('Resource ID of the VNet to link the private DNS zone. Leave empty to skip DNS zone creation.')
+param vnetId string = ''
+
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: name
   location: location
   tags: tags
   sku: {
-    name: 'Basic'
+    name: 'Premium'
   }
   properties: {
     adminUserEnabled: false
+    publicNetworkAccess: 'Disabled'
+    networkRuleSet: {
+      defaultAction: 'Deny'
+    }
+  }
+}
+
+// --- Private Endpoint (conditional) ---
+
+resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = if (!empty(privateEndpointsSubnetId)) {
+  name: '${name}-pe'
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: privateEndpointsSubnetId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: '${name}-plsc'
+        properties: {
+          privateLinkServiceId: containerRegistry.id
+          groupIds: [
+            'registry'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+// --- Private DNS Zone for ACR (conditional) ---
+
+resource privateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = if (!empty(privateEndpointsSubnetId)) {
+  name: 'privatelink.azurecr.io'
+  location: 'global'
+  tags: tags
+}
+
+resource privateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = if (!empty(privateEndpointsSubnetId) && !empty(vnetId)) {
+  parent: privateDnsZone
+  name: '${name}-dnslink'
+  location: 'global'
+  tags: tags
+  properties: {
+    virtualNetwork: {
+      id: vnetId
+    }
+    registrationEnabled: false
+  }
+}
+
+resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01' = if (!empty(privateEndpointsSubnetId)) {
+  parent: privateEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'privatelink-azurecr-io'
+        properties: {
+          privateDnsZoneId: privateDnsZone.id
+        }
+      }
+    ]
   }
 }
 

@@ -179,6 +179,57 @@ Both the **Copilot CLI** and **Copilot Unleashed** share this directory. Session
 
 **Bidirectional plan sync**: On resume, the filesystem `plan.md` is injected as a `systemMessage` (append mode) so the agent has full plan context. When the agent modifies the plan during a session, the `session.plan_changed` event triggers a read via `session.rpc.plan.read()` and the content is written back to `plan.md` on disk — enabling the CLI to pick up changes made in the browser.
 
+### Session Persistence (Planned)
+
+A server-side `ChatStateStore` will persist the full chat message array (the client-visible conversation) to disk, enabling **cold resume** — reconnecting to a conversation even after the in-memory session pool entry has expired and been cleaned up.
+
+**Storage layout:**
+
+```
+/data/chat-state/{username}/{tabId}.json
+```
+
+Each file contains the serialized `ChatMessage[]` for one browser tab's conversation. The `tabId` is a stable identifier generated client-side and stored in **localStorage** (moved from sessionStorage to survive tab restores and browser restarts).
+
+**Cold resume flow:**
+
+```
+1. Browser reconnects WebSocket after pool entry TTL expired
+2. Server receives WS upgrade — no PoolEntry found in memory
+3. Server checks /data/chat-state/{username}/{tabId}.json
+4. If found: creates new CopilotClient, calls resumeSession() with last SDK session ID
+5. Loads persisted ChatMessage[] and replays full history to browser via WS
+6. User sees their previous conversation restored — can continue chatting
+7. If not found: starts fresh session (existing behavior)
+```
+
+**Write strategy:** Chat state is written to disk on every `session.idle` event (end of each assistant turn) and on graceful disconnect. Writes are atomic (write to temp file, then rename) to prevent corruption.
+
+### CLI ↔ Browser Session Autosync (Planned)
+
+Real-time synchronization of the SDK's `session-state/` directory between the Copilot CLI and Copilot Unleashed, so sessions created or updated in one tool appear instantly in the other.
+
+**Mechanism:**
+
+```
+1. Server starts fs.watch() on the session-state directory (recursive)
+2. File change events are debounced (100ms) to batch rapid writes
+3. On change: server re-reads session metadata from disk
+4. Broadcasts { type: 'sessions_changed' } to all connected WS clients
+5. Clients refresh session list in SessionsSheet component
+```
+
+**UI indicator:** When the Sessions panel is closed, a badge appears on the Sessions button indicating new/updated sessions are available.
+
+**Docker bind mount for local development:**
+
+```yaml
+volumes:
+  - ~/.copilot:/home/node/.copilot   # Shares session-state with host CLI
+```
+
+This enables bidirectional sync: sessions started in the host terminal's `copilot` CLI appear in the browser, and vice versa. In Azure deployments, the session-state directory lives on a persistent NFS mount instead (see [Filesystem Persistence](#filesystem-persistence-planned)).
+
 ## Component Architecture
 
 ### Store Pattern
@@ -224,6 +275,46 @@ Discriminated unions on `type` field for all messages:
 | SSRF | Internal IP range blocklist for custom webhook tools |
 | Permissions | Per-tool allow/deny/always_allow with 30s timeout |
 
+### Push Notifications — Web Push + PWA (Planned)
+
+Full Progressive Web App (PWA) support with push notifications, so users receive alerts even when the browser tab is closed or the device is locked.
+
+**PWA foundation:**
+
+- `manifest.json` with app name, icons, theme color, `display: standalone`
+- Service worker for offline caching and push event handling
+- Installable on desktop and mobile (iOS requires Add to Home Screen, iOS 16.4+)
+
+**VAPID key pair:** Server generates a VAPID key pair (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` env vars) used to authenticate push messages. The public key is exposed to the client for subscription.
+
+**Server-side components:**
+
+| Component | Purpose |
+|-----------|---------|
+| `push-store.ts` | Stores push subscriptions per user (persisted to `/data/push-subscriptions/`) |
+| `push-sender.ts` | Sends push notifications using the `web-push` npm package |
+
+**Push notification triggers** (sent only when the user's WebSocket is disconnected):
+
+| Event | Notification |
+|-------|-------------|
+| Assistant response ready | "Your response is ready" with message preview |
+| Session error | "Error in your session" with error summary |
+| User input prompt (elicitation) | "Action required: input needed" |
+| Permission prompt | "Action required: tool permission" |
+
+**Flow:**
+
+```
+1. Browser requests push permission → gets PushSubscription
+2. Client sends subscription to server (stored in push-store)
+3. User closes tab or loses connection
+4. SDK event fires (response, error, prompt)
+5. Server checks: user has no active WS connection?
+6. If disconnected: push-sender delivers notification via web-push
+7. User taps notification → opens app → WS reconnects → cold resume
+```
+
 ## Environment Variables
 
 | Variable | Required | Default | Purpose |
@@ -235,9 +326,84 @@ Discriminated unions on `type` field for all messages:
 | `NODE_ENV` | — | `development` | Dev vs prod behavior |
 | `ALLOWED_GITHUB_USERS` | — | — | Comma-separated login allowlist |
 | `TOKEN_MAX_AGE_MS` | — | `86400000` | Force re-auth interval (24h) |
+| `VAPID_PUBLIC_KEY` | — | — | Web Push VAPID public key (Planned) |
+| `VAPID_PRIVATE_KEY` | — | — | Web Push VAPID private key (Planned) |
+| `COPILOT_CONFIG_DIR` | — | `~/.copilot` | SDK config/session directory (Planned — Azure: `/data/copilot-home`) |
 
 ## Deployment
 
 - **Docker**: `npm run build` → `node build/index.js` (adapter-node output)
 - **Azure**: `azd up` → Container Apps + ACR + Managed Identity + monitoring
 - **CI/CD**: GitHub Actions — ci.yml (check + build), deploy.yml (Docker → ACR → ACA)
+
+### Filesystem Persistence (Planned)
+
+All persistent application data lives under `/data`, with the layout varying by deployment target.
+
+**Directory layout:**
+
+```
+/data/
+├── chat-state/{username}/{tabId}.json   # Persisted chat conversations
+├── push-subscriptions/{username}.json   # Web Push subscriptions
+├── copilot-home/                        # SDK state (Azure only — see COPILOT_CONFIG_DIR)
+│   └── session-state/                   # SDK session files
+└── uploads/                             # Uploaded file staging
+```
+
+**Deployment-specific storage:**
+
+| Deployment | `/data` mount | `COPILOT_CONFIG_DIR` | CLI sync |
+|-----------|--------------|---------------------|----------|
+| **Azure** | NFS file share (Premium Storage, VNet rules, RootSquash) | `/data/copilot-home` | N/A — no host CLI |
+| **Local Docker** | Named volume (`copilot-data:/data`) | `/home/node/.copilot` (default) | Bind mount `~/.copilot:/home/node/.copilot` |
+| **Dev (no Docker)** | Local filesystem `./data/` | `~/.copilot` (default) | Shared natively — same filesystem |
+
+**Docker Compose volumes (local):**
+
+```yaml
+volumes:
+  copilot-data:          # Named volume for /data (chat-state, push-subscriptions, uploads)
+
+services:
+  app:
+    volumes:
+      - copilot-data:/data
+      - ~/.copilot:/home/node/.copilot   # Bind mount for CLI ↔ browser session sync
+```
+
+In Azure, `COPILOT_CONFIG_DIR=/data/copilot-home` moves the SDK's session-state onto the NFS mount so sessions persist across container restarts and scale events.
+
+### Azure Infrastructure Security (Planned)
+
+Hardened Azure infrastructure with network isolation, secret management, and private endpoints for all PaaS services.
+
+**VNet topology:**
+
+```
+VNet (10.0.0.0/16)
+├── snet-apps    (10.0.0.0/23)   # Container Apps Environment (delegated)
+├── snet-pe      (10.0.2.0/24)   # Private Endpoints (ACR, Key Vault)
+└── snet-storage (10.0.3.0/24)   # Storage NFS (service endpoints)
+```
+
+**Key Vault** replaces inline Bicep secret values:
+
+| Secret | Source |
+|--------|--------|
+| `github-client-id` | GitHub OAuth App |
+| `session-secret` | Random 64-char string |
+| `vapid-public-key` | Generated VAPID key pair |
+| `vapid-private-key` | Generated VAPID key pair |
+
+Container Apps access secrets via Managed Identity → Key Vault references (no secrets in environment variables or Bicep parameters).
+
+**Private endpoints and network rules:**
+
+| Resource | Access |
+|----------|--------|
+| **ACR** (Premium SKU) | Private endpoint in `snet-pe`, public access disabled |
+| **Storage** (NFS file share) | VNet rules on `snet-storage`, RootSquash enabled |
+| **Key Vault** | Private endpoint in `snet-pe`, network ACL deny-all + VNet exception |
+
+**Diagnostic settings** are enabled on all resources (Container Apps Environment, ACR, Key Vault, Storage Account), streaming logs and metrics to a Log Analytics workspace for observability and audit.

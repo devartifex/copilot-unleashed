@@ -25,7 +25,7 @@ ENV PORT=3000
 ENV HOME=/home/node
 
 RUN npm install -g @github/copilot
-RUN mkdir -p /home/node/.copilot/session-state /data/sessions /data/settings && chown -R node:node /home/node /data
+RUN mkdir -p /home/node/.copilot/session-state /data/sessions /data/settings /data/chat-state /data/push-subscriptions /data/copilot-home && chown -R node:node /home/node /data
 
 # Copy bundled CLI session data if it was prepared with scripts/bundle-sessions.mjs
 COPY --from=builder --chown=node:node /tmp/copilot-config/ /home/node/.copilot/

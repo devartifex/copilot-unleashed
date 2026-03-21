@@ -1,6 +1,9 @@
+import { WebSocket } from 'ws';
 import { poolSend, type PoolEntry } from './session-pool.js';
+import { sendPushToUser } from '../push/sender.js';
+import { subscriptionStore } from '../push-singleton.js';
 
-export function makeUserInputHandler(entry: PoolEntry) {
+export function makeUserInputHandler(entry: PoolEntry, userLogin?: string) {
   return (request: any) => {
     return new Promise<{ answer: string; wasFreeform: boolean }>((resolve) => {
       entry.userInputResolve = resolve;
@@ -12,6 +15,16 @@ export function makeUserInputHandler(entry: PoolEntry) {
       };
       entry.pendingUserInputPrompt = prompt;
       poolSend(entry, prompt);
+
+      // Push notification when browser is closed
+      if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+        sendPushToUser(userLogin, {
+          title: 'Copilot is asking you something',
+          body: request.question?.slice(0, 100) || 'User input is needed',
+          url: '/',
+          tag: 'user-input-request',
+        }, subscriptionStore).catch(() => {});
+      }
     });
   };
 }
@@ -92,7 +105,7 @@ export function extractPermissionDisplay(request: any): {
   }
 }
 
-export function makePermissionHandler(entry: PoolEntry) {
+export function makePermissionHandler(entry: PoolEntry, userLogin?: string) {
   return (request: any) => {
     const { kind, toolName, toolArgs } = extractPermissionDisplay(request);
 
@@ -130,6 +143,16 @@ export function makePermissionHandler(entry: PoolEntry) {
       };
       entry.pendingPermissionPrompt = prompt;
       poolSend(entry, prompt);
+
+      // Push notification when browser is closed
+      if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+        sendPushToUser(userLogin, {
+          title: 'Tool approval needed',
+          body: `${kind}: ${toolName}`.slice(0, 100),
+          url: '/',
+          tag: 'permission-request',
+        }, subscriptionStore).catch(() => {});
+      }
     });
   };
 }

@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockConfig, logSecurityMock } = vi.hoisted(() => ({
+const { mockConfig, logSecurityMock, mockValidateGitHubToken, mockClearAuth } = vi.hoisted(() => ({
 	mockConfig: {
 		tokenMaxAge: 60_000,
 		allowedUsers: [] as string[],
 	},
 	logSecurityMock: vi.fn(),
+	mockValidateGitHubToken: vi.fn(),
+	mockClearAuth: vi.fn(),
 }));
 
 vi.mock('../config.js', () => ({
@@ -16,7 +18,15 @@ vi.mock('../security-log.js', () => ({
 	logSecurity: logSecurityMock,
 }));
 
-import { checkAuth, type GitHubUser, type SessionData } from './guard.js';
+vi.mock('./github.js', () => ({
+	validateGitHubToken: mockValidateGitHubToken,
+}));
+
+vi.mock('./session-utils.js', () => ({
+	clearAuth: mockClearAuth,
+}));
+
+import { checkAuth, revalidateTokenIfStale, type GitHubUser, type SessionData } from './guard.js';
 
 function createUser(login = 'octocat', name = 'Octo Cat'): GitHubUser {
 	return { login, name };
@@ -35,6 +45,8 @@ describe('checkAuth', () => {
 		mockConfig.tokenMaxAge = 60_000;
 		mockConfig.allowedUsers = [];
 		logSecurityMock.mockReset();
+		mockValidateGitHubToken.mockReset();
+		mockClearAuth.mockReset().mockResolvedValue(undefined);
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
 	});
@@ -195,5 +207,128 @@ describe('checkAuth', () => {
 			user: null,
 			error: 'Session expired. Please sign in again.',
 		});
+	});
+});
+
+describe('revalidateTokenIfStale', () => {
+	beforeEach(() => {
+		mockValidateGitHubToken.mockReset();
+		mockClearAuth.mockReset().mockResolvedValue(undefined);
+		logSecurityMock.mockReset();
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('skips validation when the token was validated recently (within 30 minutes)', async () => {
+		const session = createSession({
+			githubToken: 'token-123',
+			githubUser: createUser(),
+			githubAuthTime: Date.now() - 10 * 60 * 1000, // 10 minutes ago
+		});
+
+		const result = await revalidateTokenIfStale(session);
+
+		expect(result).toEqual({ valid: true });
+		expect(mockValidateGitHubToken).not.toHaveBeenCalled();
+	});
+
+	it('validates the token with GitHub when auth time exceeds 30 minutes', async () => {
+		mockValidateGitHubToken.mockResolvedValue({
+			valid: true,
+			user: { login: 'octocat', name: 'Octo Cat' },
+		});
+		const session = createSession({
+			githubToken: 'token-123',
+			githubUser: createUser(),
+			githubAuthTime: Date.now() - 31 * 60 * 1000, // 31 minutes ago
+		});
+
+		const result = await revalidateTokenIfStale(session);
+
+		expect(result).toEqual({ valid: true });
+		expect(mockValidateGitHubToken).toHaveBeenCalledWith('token-123');
+		expect(session.githubAuthTime).toBe(Date.now());
+	});
+
+	it('returns invalid and clears auth when GitHub reports a revoked token', async () => {
+		mockValidateGitHubToken.mockResolvedValue({
+			valid: false,
+			reason: 'invalid_token',
+		});
+		const session = createSession({
+			githubToken: 'token-123',
+			githubUser: createUser('revoked-user'),
+			githubAuthTime: Date.now() - 31 * 60 * 1000,
+		});
+
+		const result = await revalidateTokenIfStale(session);
+
+		expect(result).toEqual({ valid: false });
+		expect(mockClearAuth).toHaveBeenCalledWith(session);
+		expect(logSecurityMock).toHaveBeenCalledWith('warn', 'http_token_revoked', {
+			user: 'revoked-user',
+		});
+	});
+
+	it('returns valid on transient GitHub API errors (does not lock out users)', async () => {
+		mockValidateGitHubToken.mockResolvedValue({
+			valid: false,
+			reason: 'api_error',
+		});
+		const session = createSession({
+			githubToken: 'token-123',
+			githubUser: createUser(),
+			githubAuthTime: Date.now() - 31 * 60 * 1000,
+		});
+
+		const result = await revalidateTokenIfStale(session);
+
+		expect(result).toEqual({ valid: true });
+		expect(mockClearAuth).not.toHaveBeenCalled();
+	});
+
+	it('validates when githubAuthTime is missing (treats as infinitely stale)', async () => {
+		mockValidateGitHubToken.mockResolvedValue({
+			valid: true,
+			user: { login: 'octocat', name: 'Octo Cat' },
+		});
+		const session = createSession({
+			githubToken: 'token-123',
+			githubUser: createUser(),
+		});
+
+		const result = await revalidateTokenIfStale(session);
+
+		expect(result).toEqual({ valid: true });
+		expect(mockValidateGitHubToken).toHaveBeenCalledWith('token-123');
+	});
+
+	it('returns invalid when the session has no token', async () => {
+		const session = createSession({
+			githubUser: createUser(),
+			githubAuthTime: Date.now() - 31 * 60 * 1000,
+		});
+
+		const result = await revalidateTokenIfStale(session);
+
+		expect(result).toEqual({ valid: false });
+		expect(mockValidateGitHubToken).not.toHaveBeenCalled();
+	});
+
+	it('treats auth time at exactly 30 minutes as still fresh', async () => {
+		const session = createSession({
+			githubToken: 'token-123',
+			githubUser: createUser(),
+			githubAuthTime: Date.now() - 30 * 60 * 1000, // exactly 30 minutes
+		});
+
+		const result = await revalidateTokenIfStale(session);
+
+		expect(result).toEqual({ valid: true });
+		expect(mockValidateGitHubToken).not.toHaveBeenCalled();
 	});
 });

@@ -105,7 +105,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
       console.log(`[RESUME] Fallback session created for ${sessionId} with context injection`);
     }
 
-    wireSessionEvents(connectionEntry.session, connectionEntry, sessionId);
+    wireSessionEvents(connectionEntry.session, connectionEntry, sessionId, ctx.userLogin, ctx.poolKey.split(':').slice(1).join(':'));
 
     // Read and send the restored session's mode to the client
     try {

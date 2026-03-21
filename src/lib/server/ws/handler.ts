@@ -121,6 +121,22 @@ export function setupWebSocket(
         isProcessing: entry.isProcessing,
       });
 
+      // Restore chat history from persisted state so the UI is populated
+      try {
+        const persistedState = await chatStateStore.load(userLogin, tabId);
+        if (persistedState && persistedState.messages.length > 0) {
+          poolSend(entry, {
+            type: 'cold_resume',
+            messages: persistedState.messages,
+            model: persistedState.model,
+            mode: persistedState.mode,
+            sdkSessionId: persistedState.sdkSessionId,
+          });
+        }
+      } catch (err) {
+        console.error('[WS-SERVER] Warm reconnect history load failed:', err);
+      }
+
       // Re-send pending prompts so the user can respond on the new connection
       if (entry.pendingUserInputPrompt && entry.userInputResolve) {
         poolSend(entry, entry.pendingUserInputPrompt);

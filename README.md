@@ -52,10 +52,10 @@ Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, 
 - **File & directory attachments** — drop in code files, images, CSVs, or whole directories with `@` mention autocomplete
 - **Issue & PR references** — type `#` to search and reference GitHub issues/PRs across all your repos
 - **Persistent sessions** — resume any conversation, on any device, with full checkpoint history
-- **Session persistence** *(Planned)* — chat history survives browser close; server-side storage with cold resume from disk, works across devices
+- **Session persistence** — chat history survives browser close; server-side storage with cold resume from disk, works across devices
 - **CLI ↔ Browser sync** — sessions started in the Copilot CLI appear in the browser and vice versa
-- **CLI ↔ Browser autosync** *(Planned)* — sessions created in the Copilot CLI appear in the browser automatically via filesystem watcher and Docker bind mount
-- **Push notifications** *(Planned)* — Web Push alerts when the browser is closed; triggers on response ready, errors, permission prompts, and disconnects; full PWA support (iOS 16.4+ requires "Add to Home Screen" from Safari)
+- **CLI ↔ Browser autosync** — sessions created in the Copilot CLI appear in the browser automatically via filesystem watcher and Docker bind mount
+- **Push notifications** — Web Push alerts when the browser is closed; triggers on response ready, errors, permission prompts, and user input; full PWA support (iOS 16.4+ requires "Add to Home Screen" from Safari)
 - **Plan mode** — agent creates an editable execution plan before acting; bidirectional sync with `plan.md` on disk
 - **Fleet mode** — launch multi-agent parallel execution with per-agent status tracking
 - **Quota tracking** — see premium request usage, remaining balance, and reset date at a glance
@@ -173,13 +173,21 @@ That's it. Container Apps, ACR, managed identity, TLS, monitoring — all provis
 | `SESSION_STORE_PATH` | `/data/sessions` | Persistent session directory |
 | `SETTINGS_STORE_PATH` | `/data/settings` | Per-user settings directory |
 | `COPILOT_CONFIG_DIR` | `~/.copilot` | Copilot session-state directory (share with CLI for bidirectional sync) |
-| `CHAT_STATE_PATH` | `.chat-state` (dev) / `/data/chat-state` (prod) | Persisted chat state storage *(Planned)* |
-| `VAPID_PUBLIC_KEY` | — | VAPID public key (base64url) — required for push notifications *(Planned)* |
-| `VAPID_PRIVATE_KEY` | — | VAPID private key (base64url) — required for push notifications *(Planned)* |
-| `VAPID_SUBJECT` | `mailto:admin@example.com` | VAPID subject identifier *(Planned)* |
-| `PUSH_STORE_PATH` | `/data/push-subscriptions` | Push subscription storage path *(Planned)* |
+| `CHAT_STATE_PATH` | `.chat-state` (dev) / `/data/chat-state` (prod) | Persisted chat state storage |
+| `VAPID_PUBLIC_KEY` | — | VAPID public key (base64url) — required for push notifications |
+| `VAPID_PRIVATE_KEY` | — | VAPID private key (base64url) — required for push notifications |
+| `VAPID_SUBJECT` | `mailto:admin@example.com` | VAPID subject identifier |
+| `PUSH_STORE_PATH` | `/data/push-subscriptions` | Push subscription storage path |
 
 </details>
+
+### Generate VAPID keys (for push notifications)
+
+```bash
+node scripts/generate-vapid-keys.mjs
+```
+
+Copy the output into your `.env` file. Push notifications require all three VAPID variables (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`).
 
 ---
 
@@ -313,7 +321,7 @@ Scopes: `copilot` (API access) + `read:user` (avatar) + `repo` (SDK tools need i
 - CodeQL scanning + secret scanning via GitHub Advanced Security
 - All API endpoints require GitHub authentication — no anonymous access
 - Periodic token revalidation ensures revoked tokens are caught promptly
-- **Azure** *(Planned)*: VNet isolation for Container Apps, Key Vault for secrets management
+- **Azure**: VNet isolation for Container Apps, Key Vault for secrets management, Premium ACR with private endpoints
 
 </details>
 
@@ -328,8 +336,8 @@ All stateful data survives container restarts when volumes are configured correc
 | SDK sessions & checkpoints | `COPILOT_CONFIG_DIR` (`~/.copilot`) | ✅ with volume |
 | App session metadata | `SESSION_STORE_PATH` (`/data/sessions`) | ✅ with volume |
 | Per-user settings | `SETTINGS_STORE_PATH` (`/data/settings`) | ✅ with volume |
-| Chat history *(Planned)* | `CHAT_STATE_PATH` (`/data/chat-state`) | ✅ with volume |
-| Push subscriptions *(Planned)* | `PUSH_STORE_PATH` (`/data/push-subscriptions`) | ✅ with volume |
+| Chat history | `CHAT_STATE_PATH` (`/data/chat-state`) | ✅ with volume |
+| Push subscriptions | `PUSH_STORE_PATH` (`/data/push-subscriptions`) | ✅ with volume |
 
 **Local Docker:** Use a named volume for `/data` and a bind mount for `~/.copilot` (enables CLI ↔ Browser sync).
 

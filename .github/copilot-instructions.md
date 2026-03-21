@@ -53,7 +53,8 @@ vitest.config.ts                # Vitest config for colocated unit tests
 scripts/
 └── generate-vapid-keys.mjs     # VAPID key generation utility for push notifications
 static/
-└── manifest.json               # PWA manifest (name, icons, start_url, display)
+├── manifest.json               # PWA manifest (name, icons, start_url, display: standalone)
+└── sw.js                       # Service worker: precaching, push handler, notification click
 infra/
 ├── modules/
 │   ├── vnet.bicep              # Azure VNet with subnets for private endpoints
@@ -62,26 +63,40 @@ infra/
 src/
 ├── app.html                    # SvelteKit shell (viewport, theme-color, PWA meta)
 ├── app.css                     # Global reset, design tokens, highlight.js theme
-├── hooks.server.ts             # Session bridge, CSP headers, rate limiting
+├── hooks.server.ts             # Session bridge, CSP headers, rate limiting, CSRF, token revalidation
 ├── hooks.server.test.ts        # Example colocated unit test pattern
-├── service-worker.ts           # Service worker: push handler, notificationclick, offline
 │
 ├── lib/
 │   ├── components/             # 20 Svelte 5 components (see ARCHITECTURE.md)
 │   ├── stores/                 # 4 rune stores: auth, chat, settings, ws
-│   ├── server/                 # 22 server files: auth, copilot, settings, skills, ws, security
-│   │   ├── chat-state-store.ts # Persistent chat state CRUD per user+tab
-│   │   ├── session-watcher.ts  # fs.watch on session-state dir, broadcasts via WS
-│   │   ├── push-store.ts       # Push subscription CRUD per user
-│   │   └── push-sender.ts      # web-push wrapper with retry
+│   ├── server/                 # Server-only code
+│   │   ├── auth/
+│   │   │   ├── github.ts              # Device Flow OAuth (fetch-based)
+│   │   │   └── guard.ts               # Auth middleware + 30-min token revalidation
+│   │   ├── copilot/
+│   │   │   ├── client.ts              # CopilotClient factory
+│   │   │   └── session.ts             # Session config (model, reasoning, tools, hooks)
+│   │   ├── ws/
+│   │   │   ├── handler.ts             # WebSocket handler: 22+ message types, SDK events
+│   │   │   └── session-pool.ts        # Per-user session pool with TTL + buffer
+│   │   ├── push/
+│   │   │   ├── subscription-store.ts  # Push subscription CRUD per user (10 sub cap)
+│   │   │   └── sender.ts             # web-push wrapper with 60-min TTL, auto-cleanup
+│   │   ├── chat-state-store.ts        # Persistent chat state per user+tab (1000-msg cap, atomic writes)
+│   │   ├── session-watcher.ts         # fs.watch on session-state dir, 100ms debounce
+│   │   ├── init.ts                    # Server-side initialization (watcher + signal handlers)
+│   │   ├── config.ts                  # Env var validation (fail-fast)
+│   │   ├── security-log.ts            # Structured security event logging
+│   │   └── session-store.ts           # Express session ↔ SvelteKit bridge
 │   ├── types/index.ts          # All message types: 60 server + 18 client = 78 total
 │   └── utils/
 │       ├── markdown.ts         # Shared markdown pipeline
-│       └── push-client.ts      # Client-side push subscription management
+│       ├── push-client.ts      # Client-side push subscription management
+│       └── sw-register.ts      # Service worker registration
 │
 ├── routes/
 │   ├── +page.svelte            # Main page: login or full chat screen (1 page route)
-│   ├── +layout.svelte          # App shell layout
+│   ├── +layout.svelte          # App shell layout (registers service worker)
 │   ├── +layout.server.ts       # Root auth/session bootstrap
 │   ├── +error.svelte           # Route error boundary
 │   ├── auth/
@@ -96,8 +111,11 @@ src/
 │   │   ├── skills/+server.ts
 │   │   ├── upload/+server.ts
 │   │   ├── version/+server.ts
-│   │   └── sessions/sync/+server.ts
-│   └── health/+server.ts       # 12 +server.ts endpoint routes total
+│   │   ├── sessions/sync/+server.ts
+│   │   ├── push/subscribe/+server.ts     # POST: register push subscription
+│   │   ├── push/unsubscribe/+server.ts   # POST: remove push subscription
+│   │   └── push/vapid-key/+server.ts     # GET: public VAPID key
+│   └── health/+server.ts       # 18 +server.ts endpoint routes total
 │
 └── **/*.test.ts                # Vitest unit tests live next to source files
 ```

@@ -10,6 +10,11 @@
   "categories": ["productivity", "developer-tools"],
   "icons": [
     {
+      "src": "/img/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
       "src": "/favicon.png",
       "sizes": "128x128",
       "type": "image/png"

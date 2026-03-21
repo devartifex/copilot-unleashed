@@ -50,7 +50,7 @@
     <span class="title-text" title={sessionTitle}>{sessionTitle}</span>
   {:else}
     <span class="brand-group" aria-label="Copilot Unleashed">
-      <img src="/img/logo.png" alt="" class="brand-icon" width="22" height="22" aria-hidden="true" />
+      <img src="/img/logo.svg" alt="" class="brand-icon" width="22" height="22" aria-hidden="true" />
       <span class="brand-name">Copilot <span class="brand-accent">Unleashed</span></span>
     </span>
   {/if}

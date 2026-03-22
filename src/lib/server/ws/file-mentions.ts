@@ -14,8 +14,8 @@ function getWorkspaceRoot(): string {
   return cachedWorkspaceRoot;
 }
 
-/** Regex to match @file mentions: @path/to/file.ext */
-const FILE_MENTION_RE = /(?:^|\s)@((?:[^\s@]+\/)*[^\s@]+\.[a-zA-Z0-9]+)/g;
+/** Regex to match @file mentions: @path/to/file.ext — flat character class to avoid ReDoS */
+const FILE_MENTION_RE = /(?:^|\s)@([^\s@]+\.[a-zA-Z0-9]+)/g;
 
 /** Parse @path/to/file tokens from message content. Returns resolved file attachments and cleaned prompt. */
 export async function resolveFileMentions(

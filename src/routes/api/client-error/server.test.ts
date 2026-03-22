@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$lib/server/auth/guard', () => ({
+vi.mock('$lib/server/auth/guard.js', () => ({
 	checkAuth: vi.fn(),
 }));
 
@@ -10,7 +10,7 @@ vi.mock('$lib/server/security-log', () => ({
 }));
 
 import { POST } from './+server';
-import { checkAuth } from '$lib/server/auth/guard';
+import { checkAuth } from '$lib/server/auth/guard.js';
 import { logSecurity } from '$lib/server/security-log';
 
 function createEvent(request: Request, session?: Record<string, unknown>) {

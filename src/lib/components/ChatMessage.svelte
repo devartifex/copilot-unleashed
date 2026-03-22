@@ -211,11 +211,11 @@
   .message.user {
     margin-top: var(--sp-2);
     padding: var(--sp-2) var(--sp-3);
-    align-self: flex-start;
+    align-self: flex-end;
     max-width: 92%;
     background: var(--mode-user-bg, rgba(110, 64, 201, 0.12));
-    border-left: 3px solid var(--mode-user-border, rgba(110, 64, 201, 0.35));
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    border-right: 3px solid var(--mode-user-border, rgba(110, 64, 201, 0.35));
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
     transition: background 0.3s ease, border-color 0.3s ease;
   }
 
@@ -226,6 +226,7 @@
     display: block;
     margin-bottom: var(--sp-1);
     opacity: 0.7;
+    text-align: right;
     transition: color 0.3s ease;
   }
 
@@ -239,8 +240,9 @@
 
   /* ── queued message ────────────────────────────────────────────────────── */
   .message.queued {
-    border-left-style: dashed;
-    border-left-color: var(--yellow, #d29922);
+    border-right-style: dashed;
+    border-right-color: var(--yellow, #d29922);
+    border-left: none;
     background: rgba(210, 153, 34, 0.08);
     opacity: 0.85;
   }

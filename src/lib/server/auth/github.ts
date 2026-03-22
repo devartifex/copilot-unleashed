@@ -64,8 +64,14 @@ export async function validateGitHubToken(
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       return { valid: false, reason: 'invalid_token' };
+    }
+
+    // 403 can mean rate-limiting, IP block, or scope issues — not necessarily
+    // a revoked token. Treat as transient so the caller doesn't nuke auth.
+    if (res.status === 403) {
+      return { valid: false, reason: 'api_error' };
     }
 
     if (!res.ok) {

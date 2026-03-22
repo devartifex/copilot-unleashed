@@ -374,7 +374,8 @@ describe('createChatStore', () => {
     expect(store.isWaiting).toBe(false);
     expect(store.currentStreamContent).toBe('');
     expect(store.pendingUserInput).toBeNull();
-    expect(store.pendingPermissions).toEqual([]);    expect(notifyMock).toHaveBeenCalledWith('Copilot is asking you something', {
+    expect(store.pendingPermissions).toEqual([]);
+    expect(notifyMock).toHaveBeenCalledWith('Copilot is asking you something', {
       body: 'Need approval?',
       tag: 'user-input',
       requireInteraction: true,

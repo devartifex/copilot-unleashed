@@ -43,6 +43,9 @@ param ipRestrictions string = ''
 @description('Comma-separated GitHub usernames allowed to log in (empty = allow all)')
 param allowedGithubUsers string = ''
 
+@description('Public IP address of the deployer machine (e.g. your local IP or CI runner IP). Required for azd deploy to push images to the private ACR. Leave empty to keep ACR fully private.')
+param deployerIpAddress string = ''
+
 @secure()
 @description('VAPID public key for web push notifications')
 param vapidPublicKey string = ''
@@ -85,6 +88,7 @@ module containerRegistry './modules/container-registry.bicep' = {
     tags: tags
     privateEndpointsSubnetId: vnet.outputs.privateEndpointsSubnetId
     vnetId: vnet.outputs.vnetId
+    deployerIpAddress: deployerIpAddress
   }
 }
 

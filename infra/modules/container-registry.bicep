@@ -12,6 +12,11 @@ param privateEndpointsSubnetId string = ''
 @description('Resource ID of the VNet to link the private DNS zone. Leave empty to skip DNS zone creation.')
 param vnetId string = ''
 
+@description('Deployer public IP address to allow for azd deploy push access (e.g. your local machine or CI runner IP). Leave empty to keep ACR fully private.')
+param deployerIpAddress string = ''
+
+var hasDeployerIp = !empty(deployerIpAddress)
+
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: name
   location: location
@@ -21,9 +26,15 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
   }
   properties: {
     adminUserEnabled: false
-    publicNetworkAccess: 'Disabled'
+    publicNetworkAccess: hasDeployerIp ? 'Enabled' : 'Disabled'
     networkRuleSet: {
       defaultAction: 'Deny'
+      ipRules: hasDeployerIp ? [
+        {
+          action: 'Allow'
+          value: deployerIpAddress
+        }
+      ] : []
     }
   }
 }

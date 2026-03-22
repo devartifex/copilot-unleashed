@@ -29,7 +29,6 @@
   let sessionsOpen = $state(false);
   let modelSheetOpen = $state(false);
   let sessionsLoading = $state(false);
-  let pendingSessionTimer: ReturnType<typeof setTimeout> | null = null;
 
   const modelCount = $derived(chatStore.models.size);
   const toolCount = $derived(chatStore.tools.length);
@@ -77,31 +76,14 @@
         console.log(`[PAGE] WS message received: type=${msg.type}`, msg);
         chatStore.handleServerMessage(msg);
 
-        // On first connect, wait briefly for cold_resume before starting a new session.
-        // If cold_resume arrives with an sdkSessionId we resume that SDK session instead
-        // of creating a fresh empty one (which would pollute the session list on every refresh).
+        // The server pre-loads persisted state and includes sdkSessionId
+        // directly in the 'connected' message — no timer/delay needed.
         if (msg.type === 'connected') {
-          console.log('[PAGE] Got connected, waiting for cold_resume before deciding session strategy');
-          pendingSessionTimer = setTimeout(() => {
-            pendingSessionTimer = null;
-            // No cold_resume arrived within 400ms — start fresh
-            console.log('[PAGE] No cold_resume, calling requestNewSession()');
-            requestNewSession();
-          }, 400);
-        }
-
-        if (msg.type === 'cold_resume') {
-          if (pendingSessionTimer !== null) {
-            clearTimeout(pendingSessionTimer);
-            pendingSessionTimer = null;
-          }
           if (msg.sdkSessionId) {
-            // Resume the existing SDK session — avoids creating an empty new session
-            console.log('[PAGE] cold_resume with sdkSessionId, resuming', msg.sdkSessionId);
+            console.log('[PAGE] connected with sdkSessionId, resuming', msg.sdkSessionId);
             wsStore.resumeSession(msg.sdkSessionId, settings.mcpServers.length > 0 ? settings.mcpServers : undefined);
           } else {
-            // Has chat history but no SDK session to resume — create a fresh session
-            console.log('[PAGE] cold_resume without sdkSessionId, calling requestNewSession()');
+            console.log('[PAGE] connected without sdkSessionId, creating new session');
             requestNewSession();
           }
         }
@@ -139,10 +121,6 @@
 
       return () => {
         console.log('[PAGE] effect cleanup: unsubscribing and disconnecting WS');
-        if (pendingSessionTimer !== null) {
-          clearTimeout(pendingSessionTimer);
-          pendingSessionTimer = null;
-        }
         unsub();
         wsStore.disconnect();
       };

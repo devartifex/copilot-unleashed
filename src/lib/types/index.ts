@@ -137,6 +137,8 @@ export interface SessionDetail {
 export interface ConnectedMessage {
   type: 'connected';
   user: string;
+  sdkSessionId?: string | null;
+  hasPersistedState?: boolean;
 }
 
 export interface ColdResumeMessage {

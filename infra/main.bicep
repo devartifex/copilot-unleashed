@@ -136,6 +136,10 @@ module keyVault './modules/key-vault.bicep' = {
     managedIdentityPrincipalId: managedIdentity.outputs.principalId
     privateEndpointsSubnetId: vnet.outputs.privateEndpointsSubnetId
     vnetId: vnet.outputs.vnetId
+    githubClientId: githubClientId
+    sessionSecret: sessionSecret
+    vapidPublicKey: vapidPublicKey
+    vapidPrivateKey: vapidPrivateKey
   }
 }
 

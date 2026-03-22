@@ -15,6 +15,22 @@ param privateEndpointsSubnetId string = ''
 @description('VNet resource ID for the private DNS zone link (empty = no DNS link)')
 param vnetId string = ''
 
+@secure()
+@description('GitHub OAuth client ID to store as a secret')
+param githubClientId string
+
+@secure()
+@description('Session encryption secret to store')
+param sessionSecret string
+
+@secure()
+@description('VAPID public key for web push notifications (optional)')
+param vapidPublicKey string = ''
+
+@secure()
+@description('VAPID private key for web push notifications (optional)')
+param vapidPrivateKey string = ''
+
 var hasPrivateEndpoint = !empty(privateEndpointsSubnetId)
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
@@ -52,7 +68,39 @@ resource secretsUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022
   }
 }
 
-// --- Private Endpoint (conditional) ---
+// Store application secrets in Key Vault
+
+resource githubClientIdSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'github-client-id'
+  properties: {
+    value: githubClientId
+  }
+}
+
+resource sessionSecretResource 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'session-secret'
+  properties: {
+    value: sessionSecret
+  }
+}
+
+resource vapidPublicKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(vapidPublicKey)) {
+  parent: keyVault
+  name: 'vapid-public-key'
+  properties: {
+    value: vapidPublicKey
+  }
+}
+
+resource vapidPrivateKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(vapidPrivateKey)) {
+  parent: keyVault
+  name: 'vapid-private-key'
+  properties: {
+    value: vapidPrivateKey
+  }
+}
 
 resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = if (hasPrivateEndpoint) {
   name: '${name}-pe'

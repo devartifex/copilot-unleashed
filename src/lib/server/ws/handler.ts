@@ -155,26 +155,34 @@ export function setupWebSocket(
       entry = createPoolEntry(client, ws);
       sessionPool.set(poolKey, entry);
 
-      console.log('[WS-SERVER] Sending connected to', poolKey);
+      // Load persisted state BEFORE sending connected so the client gets
+      // sdkSessionId in a single message and can decide immediately
+      // whether to resume or create a new session (no timer/delay needed).
+      let persistedState: Awaited<ReturnType<typeof chatStateStore.load>> = null;
+      try {
+        persistedState = await chatStateStore.load(userLogin, tabId);
+      } catch (err) {
+        console.error('[WS-SERVER] Cold resume load failed:', err);
+      }
+
+      const hasPersistedState = !!(persistedState && persistedState.messages.length > 0);
+      console.log('[WS-SERVER] Sending connected to', poolKey, 'persisted:', hasPersistedState);
       poolSend(entry, {
         type: 'connected',
         user: userLogin,
+        sdkSessionId: hasPersistedState ? persistedState!.sdkSessionId : null,
+        hasPersistedState,
       });
 
-      // Cold resume: replay persisted chat state for returning users
-      try {
-        const persistedState = await chatStateStore.load(userLogin, tabId);
-        if (persistedState && persistedState.messages.length > 0) {
-          poolSend(entry, {
-            type: 'cold_resume',
-            messages: persistedState.messages,
-            model: persistedState.model,
-            mode: persistedState.mode,
-            sdkSessionId: persistedState.sdkSessionId,
-          });
-        }
-      } catch (err) {
-        console.error('[WS-SERVER] Cold resume load failed:', err);
+      // Send full chat history for UI restoration
+      if (hasPersistedState) {
+        poolSend(entry, {
+          type: 'cold_resume',
+          messages: persistedState!.messages,
+          model: persistedState!.model,
+          mode: persistedState!.mode,
+          sdkSessionId: persistedState!.sdkSessionId,
+        });
       }
     }
 

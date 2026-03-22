@@ -53,13 +53,6 @@ resource storageDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
   scope: existingStorage
   properties: {
     workspaceId: logAnalyticsWorkspaceId
-    logs: [
-      {
-        categoryGroup: 'allLogs'
-        enabled: true
-        retentionPolicy: { enabled: false, days: 0 }
-      }
-    ]
     metrics: [
       {
         category: 'AllMetrics'

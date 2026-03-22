@@ -337,7 +337,7 @@
 
         <MessageList {chatStore} username={data.user?.login} onSendQueued={handleSendQueued} onCancelQueued={handleCancelQueued}>
           {#if chatStore.messages.length === 0}
-            <Banner />
+            <Banner username={data.user?.login} />
           {/if}
           <EnvInfo
             modelCount={modelCount}

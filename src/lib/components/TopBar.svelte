@@ -49,10 +49,7 @@
   {#if sessionTitle}
     <span class="title-text" title={sessionTitle}>{sessionTitle}</span>
   {:else}
-    <span class="brand-group" aria-label="Copilot Unleashed">
-      <img src="/img/logo-no-bg.svg" alt="" class="brand-icon" width="22" height="22" aria-hidden="true" />
-      <span class="brand-name">Copilot <span class="brand-accent">Unleashed</span></span>
-    </span>
+    <span class="title-text">New chat</span>
   {/if}
 
   <button class="model-pill" onclick={onOpenModelSheet} aria-label="Select model">
@@ -131,40 +128,6 @@
     min-width: 0;
     flex: 1;
     font-weight: 500;
-  }
-
-  /* ── Brand group (shown when no session title) ── */
-  .brand-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  .brand-icon {
-    flex-shrink: 0;
-    border-radius: 4px;
-    filter: drop-shadow(0 0 6px rgba(147, 51, 234, 0.55));
-  }
-
-  .brand-name {
-    font-family: var(--font-mono);
-    font-size: 0.95em;
-    font-weight: 700;
-    color: var(--fg);
-    letter-spacing: 0.01em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .brand-accent {
-    background: linear-gradient(90deg, #a78bfa, #22d3ee);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
   }
 
   /* ── Model pill ────────────────────────────────────────────────── */

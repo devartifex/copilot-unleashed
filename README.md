@@ -146,7 +146,81 @@ Open [localhost:3000](http://localhost:3000). Log in with GitHub. Done.
 azd up
 ```
 
-That's it. Container Apps, ACR, managed identity, TLS, monitoring — all provisioned automatically.
+That's it. Container Apps, ACR, Key Vault, managed identity, VNet, TLS, and monitoring — all provisioned automatically.
+
+### Required parameters
+
+`azd up` will prompt for these if not already set:
+
+| Parameter | How to set | Notes |
+|-----------|-----------|-------|
+| `GITHUB_CLIENT_ID` | `azd env set GITHUB_CLIENT_ID <id>` | Your GitHub OAuth App client ID |
+| `SESSION_SECRET` | auto-generated as `newGuid()` if omitted | 32+ char random string |
+
+### Deployer IP (required for `azd deploy` with private ACR)
+
+The default infrastructure uses a **Premium ACR with public network access disabled** and a private endpoint. This blocks `azd deploy` pushes from your local machine. Set your current public IP before deploying:
+
+```bash
+azd env set DEPLOYER_IP_ADDRESS "$(curl -s https://api.ipify.org)"
+azd up
+```
+
+The ACR firewall will allow only that IP (`defaultAction: Deny`, single `Allow` rule). All other public access remains blocked. For CI/CD pipelines, set `DEPLOYER_IP_ADDRESS` to the runner's outbound IP in the same way.
+
+### Optional: VAPID keys for push notifications
+
+```bash
+node scripts/generate-vapid-keys.mjs
+azd env set VAPID_PUBLIC_KEY  "<key>"
+azd env set VAPID_PRIVATE_KEY "<key>"
+azd env set VAPID_SUBJECT     "mailto:you@example.com"
+```
+
+### Bootstrapping secrets in Key Vault
+
+`azd provision` stores `GITHUB_CLIENT_ID`, `SESSION_SECRET`, and (optionally) VAPID keys as secrets in Azure Key Vault. The Container App reads them at runtime via the managed identity — no secrets in environment variables or container image.
+
+### Troubleshooting `azd up`
+
+<details>
+<summary>Container App fails with MANIFEST_UNKNOWN image tag</summary>
+
+If provisioning fails mid-run, the `.azure/<env>/.env` may hold a stale `SERVICE_WEB_IMAGE_NAME` pointing to a tag that no longer exists in a newly-recreated ACR. Clear it before retrying:
+
+```bash
+azd env set SERVICE_WEB_IMAGE_NAME ""
+azd up
+```
+
+`azd provision` will deploy with the placeholder image; `azd deploy` pushes the real image immediately after.
+
+</details>
+
+<details>
+<summary>ACR push fails with 403 Forbidden / IP not allowed</summary>
+
+Set your public IP and re-provision to open the ACR firewall:
+
+```bash
+azd env set DEPLOYER_IP_ADDRESS "$(curl -s https://api.ipify.org)"
+azd provision   # updates ACR network rules
+azd deploy      # push succeeds
+```
+
+</details>
+
+<details>
+<summary>Container App fails: unable to fetch secret from Key Vault</summary>
+
+This means the Key Vault secret doesn't exist yet (typically on a fresh deploy). Ensure `GITHUB_CLIENT_ID` is set and run `azd provision` again — it will create the secrets in Key Vault as part of infra creation.
+
+```bash
+azd env set GITHUB_CLIENT_ID "<your-id>"
+azd provision
+```
+
+</details>
 
 ---
 

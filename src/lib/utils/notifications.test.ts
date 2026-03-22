@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { notify } from '$lib/utils/notifications';
 
+// Ensure push-notifications side-effects are not triggered by notify()
+vi.mock('$lib/utils/push-notifications', () => ({
+	subscribeToPush: vi.fn(),
+	isPushSupported: vi.fn(() => true),
+}));
+
 interface MockNotificationInstance {
 	onclick: (() => void) | null;
 	close: ReturnType<typeof vi.fn>;
@@ -96,6 +102,20 @@ describe('notify', () => {
 			expect(Notification.requestPermission).toHaveBeenCalledTimes(1);
 			expect(Notification).toHaveBeenCalledTimes(1);
 		});
+	});
+
+	it('does not trigger subscribeToPush as a side-effect when permission is granted', async () => {
+		const { subscribeToPush } = await import('$lib/utils/push-notifications');
+		setDocumentHidden(true);
+		const { Notification } = installNotificationMock('default');
+		Notification.requestPermission.mockResolvedValueOnce('granted');
+
+		notify('Approval needed');
+		await vi.waitFor(() => {
+			expect(Notification.requestPermission).toHaveBeenCalledTimes(1);
+		});
+
+		expect(subscribeToPush).not.toHaveBeenCalled();
 	});
 
 	it('does nothing when permission is denied', () => {

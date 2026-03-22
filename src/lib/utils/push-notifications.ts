@@ -42,6 +42,12 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
 		return null;
 	}
 
+	// Return existing subscription if already subscribed (idempotent)
+	const existing = await getPushSubscription();
+	if (existing) {
+		return existing;
+	}
+
 	// Request notification permission
 	const permission = await Notification.requestPermission();
 	if (permission !== 'granted') {

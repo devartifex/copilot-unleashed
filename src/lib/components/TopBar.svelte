@@ -10,7 +10,6 @@
     activeSkillCount: number;
     onToggleSidebar: () => void;
     onOpenModelSheet: () => void;
-    onNewChat: () => void;
   }
 
   const {
@@ -21,7 +20,6 @@
     activeSkillCount,
     onToggleSidebar,
     onOpenModelSheet,
-    onNewChat,
   }: Props = $props();
 
   const connectionDotClass = $derived.by(() => {
@@ -73,13 +71,6 @@
       ⚡ {activeSkillCount}
     </span>
   {/if}
-
-  <button class="tb-btn newchat-btn" onclick={onNewChat} aria-label="New chat">
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 13.5V16H5.5L14 7.5L11 4.5L3 13.5Z"/>
-      <path d="M14 2L16 4L14 7.5L11 4.5L14 2Z"/>
-    </svg>
-  </button>
 </div>
 
 <style>

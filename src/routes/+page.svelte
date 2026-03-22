@@ -313,7 +313,6 @@
       {activeSkillCount}
       onToggleSidebar={() => sidebarOpen = true}
       onOpenModelSheet={() => modelSheetOpen = true}
-      onNewChat={handleNewChat}
     />
 
     <div class="terminal">

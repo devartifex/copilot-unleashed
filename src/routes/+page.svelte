@@ -29,6 +29,7 @@
   let sessionsOpen = $state(false);
   let modelSheetOpen = $state(false);
   let sessionsLoading = $state(false);
+  let sessionLoading = $state(true);
 
   const modelCount = $derived(chatStore.models.size);
   const toolCount = $derived(chatStore.tools.length);
@@ -80,12 +81,20 @@
         // directly in the 'connected' message — no timer/delay needed.
         if (msg.type === 'connected') {
           if (msg.sdkSessionId) {
+            // Session will be restored — keep sessionLoading true until cold_resume/session_resumed
             console.log('[PAGE] connected with sdkSessionId, resuming', msg.sdkSessionId);
             wsStore.resumeSession(msg.sdkSessionId, settings.mcpServers.length > 0 ? settings.mcpServers : undefined);
           } else {
+            // No previous session — show new chat immediately
+            sessionLoading = false;
             console.log('[PAGE] connected without sdkSessionId, creating new session');
             requestNewSession();
           }
+        }
+
+        // Session fully loaded — clear loading state
+        if (msg.type === 'cold_resume' || msg.type === 'session_created' || msg.type === 'session_resumed') {
+          sessionLoading = false;
         }
 
         // Auto-request new session if reconnected without one (warm reconnect, session was cleaned up)
@@ -302,42 +311,50 @@
     />
 
     <div class="terminal">
-      {#if chatStore.plan.exists}
-        <PlanPanel
-          plan={chatStore.plan}
-          onUpdatePlan={(content) => wsStore.updatePlan(content)}
-          onDeletePlan={() => wsStore.deletePlan()}
-        />
-      {/if}
-
-      <MessageList {chatStore} username={data.user?.login} onSendQueued={handleSendQueued} onCancelQueued={handleCancelQueued}>
-        {#if chatStore.messages.length === 0}
-          <Banner />
-        {/if}
-        <EnvInfo
-          modelCount={modelCount}
-          toolCount={toolCount}
-          mcpServerCount={mcpServerCount}
-          currentAgent={chatStore.currentAgent}
-          sessionTitle={chatStore.sessionTitle}
-          contextInfo={chatStore.contextInfo}
-          sessionTotals={chatStore.sessionTotals}
-        />
-      </MessageList>
-
-      {#if chatStore.pendingPermissions.length > 0}
-        {#each chatStore.pendingPermissions as perm (perm.requestId)}
-          <PermissionPrompt
-            requestId={perm.requestId}
-            kind={perm.kind}
-            toolName={perm.toolName}
-            toolArgs={perm.toolArgs}
-            onRespond={handlePermissionResponse}
+      {#if sessionLoading}
+        <div class="session-loading">
+          <img src="/img/logo-no-bg.svg" alt="" class="loading-logo" aria-hidden="true" />
+          <span class="loading-text">Restoring session…</span>
+        </div>
+      {:else}
+        {#if chatStore.plan.exists}
+          <PlanPanel
+            plan={chatStore.plan}
+            onUpdatePlan={(content) => wsStore.updatePlan(content)}
+            onDeletePlan={() => wsStore.deletePlan()}
           />
-        {/each}
+        {/if}
+
+        <MessageList {chatStore} username={data.user?.login} onSendQueued={handleSendQueued} onCancelQueued={handleCancelQueued}>
+          {#if chatStore.messages.length === 0}
+            <Banner />
+          {/if}
+          <EnvInfo
+            modelCount={modelCount}
+            toolCount={toolCount}
+            mcpServerCount={mcpServerCount}
+            currentAgent={chatStore.currentAgent}
+            sessionTitle={chatStore.sessionTitle}
+            contextInfo={chatStore.contextInfo}
+            sessionTotals={chatStore.sessionTotals}
+          />
+        </MessageList>
+
       {/if}
 
-      <ChatInput
+        {#if chatStore.pendingPermissions.length > 0}
+          {#each chatStore.pendingPermissions as perm (perm.requestId)}
+            <PermissionPrompt
+              requestId={perm.requestId}
+              kind={perm.kind}
+              toolName={perm.toolName}
+              toolArgs={perm.toolArgs}
+              onRespond={handlePermissionResponse}
+            />
+          {/each}
+        {/if}
+
+        <ChatInput
         connectionState={wsStore.connectionState}
         sessionReady={wsStore.sessionReady}
         isStreaming={chatStore.isStreaming}
@@ -472,5 +489,38 @@
 
   @media (orientation: landscape) and (max-height: 500px) {
     .terminal { padding: var(--sp-1) var(--sp-3); }
+  }
+
+  /* ── Session loading state ───────────────────────────────────────────── */
+  .session-loading {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-3);
+  }
+
+  .loading-logo {
+    width: 56px;
+    height: 56px;
+    animation: pulse-logo 1.4s ease-in-out infinite;
+    opacity: 0.7;
+  }
+
+  .loading-text {
+    color: var(--fg-muted);
+    font-size: 0.85em;
+    animation: fade-in-text 0.5s ease;
+  }
+
+  @keyframes pulse-logo {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.08); opacity: 0.9; }
+  }
+
+  @keyframes fade-in-text {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 </style>

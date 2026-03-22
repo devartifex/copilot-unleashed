@@ -19,11 +19,11 @@ const RECONNECT_DEBOUNCE_MS = 500;
 const HEARTBEAT_INTERVAL = 25_000;
 const HEARTBEAT_TIMEOUT = 5_000;
 
-// Unique ID for this browser tab — persisted in sessionStorage to survive hard refreshes
-const TAB_ID = typeof sessionStorage !== 'undefined'
-  ? sessionStorage.getItem('copilot-tab-id') ?? (() => {
+// Unique ID for this browser tab — persisted in localStorage to survive browser close/reopen for session resume
+const TAB_ID = typeof localStorage !== 'undefined'
+  ? localStorage.getItem('copilot-tab-id') ?? (() => {
       const id = crypto.randomUUID();
-      sessionStorage.setItem('copilot-tab-id', id);
+      localStorage.setItem('copilot-tab-id', id);
       return id;
     })()
   : crypto.randomUUID();

@@ -1,8 +1,14 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { checkAuth } from '$lib/server/auth/guard.js';
 import { logSecurity } from '$lib/server/security-log';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ locals, request }) => {
+	const auth = checkAuth(locals.session);
+	if (!auth.authenticated) {
+		return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+	}
+
 	try {
 		const body = await request.json();
 		const { message, source, lineno, colno, stack, type } = body ?? {};

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bracketGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+
+    <linearGradient id="sparkGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f43f5e" />
+      <stop offset="50%" stop-color="#f97316" />
+      <stop offset="100%" stop-color="#fde047" />
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <path d="M 260 126 L 110 256 L 260 386"
+        fill="none"
+        stroke="url(#bracketGrad)"
+        stroke-width="36"
+        stroke-linecap="round"
+        stroke-linejoin="round" />
+
+  <path d="M 180 166
+           Q 180 256 460 140
+           Q 180 256 180 346
+           Q 180 256 110 256
+           Q 180 256 180 166 Z"
+        fill="url(#sparkGrad)"
+        filter="url(#glow)" />
+
+  <path d="M 410 75 Q 410 90 425 90 Q 410 90 410 105 Q 410 90 395 90 Q 410 90 410 75 Z"
+        fill="#fde047" />
+
+  <path d="M 460 190 Q 460 200 470 200 Q 460 200 460 210 Q 460 200 450 200 Q 460 200 460 190 Z"
+        fill="#f97316" />
+
+  <path d="M 320 358 Q 320 370 332 370 Q 320 370 320 382 Q 320 370 308 370 Q 320 370 320 358 Z"
+        fill="#818cf8" />
+</svg>

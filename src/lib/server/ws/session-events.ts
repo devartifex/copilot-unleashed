@@ -1,11 +1,25 @@
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
+import { WebSocket } from 'ws';
 import { poolSend, type PoolEntry } from './session-pool.js';
 import { normalizeQuotaSnapshots } from './quota.js';
 import { getSessionStateDir } from '../copilot/session-metadata.js';
+import { chatStateStore } from '../chat-state-singleton.js';
+import { sendPushToUser } from '../push/sender.js';
+import { subscriptionStore } from '../push-singleton.js';
 
-export function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: string): void {
+export function wireSessionEvents(
+  session: any,
+  entry: PoolEntry,
+  sessionId?: string,
+  userLogin?: string,
+  tabId?: string,
+): void {
+  // Accumulate assistant deltas so we can persist the full message on turn_end
+  let pendingAssistantContent = '';
+
   session.on('assistant.message_delta', (event: any) => {
+    pendingAssistantContent += event.data.deltaContent ?? '';
     poolSend(entry, { type: 'delta', content: event.data.deltaContent });
   });
   session.on('assistant.reasoning_delta', (event: any) => {
@@ -22,6 +36,27 @@ export function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: st
     entry.isProcessing = false;
     poolSend(entry, { type: 'turn_end' });
     poolSend(entry, { type: 'done' });
+
+    // Persist the accumulated assistant message (fire-and-forget)
+    if (userLogin && tabId && pendingAssistantContent) {
+      chatStateStore.appendMessage(userLogin, tabId, {
+        type: 'assistant',
+        content: pendingAssistantContent,
+        timestamp: Date.now(),
+      }).catch(() => {});
+    }
+
+    // Push notification when browser is closed
+    if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+      sendPushToUser(userLogin, {
+        title: 'Response ready',
+        body: pendingAssistantContent?.trim().slice(0, 100) || 'Your Copilot response is ready',
+        url: '/',
+        tag: 'response-ready',
+      }, subscriptionStore).catch(() => {});
+    }
+
+    pendingAssistantContent = '';
   });
   session.on('tool.execution_start', (event: any) => {
     console.log('[TOOL] execution_start:', event.data.toolName, 'mcp:', event.data.mcpServerName, '/', event.data.mcpToolName);
@@ -41,6 +76,25 @@ export function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: st
   session.on('session.error', (event: any) => {
     console.error('[SESSION] error event:', event.data.message);
     poolSend(entry, { type: 'error', message: event.data.message });
+
+    // Persist error for audit trail (fire-and-forget)
+    if (userLogin && tabId) {
+      chatStateStore.appendMessage(userLogin, tabId, {
+        type: 'error',
+        content: event.data.message,
+        timestamp: Date.now(),
+      }).catch(() => {});
+    }
+
+    // Push notification when browser is closed
+    if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+      sendPushToUser(userLogin, {
+        title: 'Something went wrong',
+        body: event.data.message?.slice(0, 100) || 'An error occurred in your Copilot session',
+        url: '/',
+        tag: 'session-error',
+      }, subscriptionStore).catch(() => {});
+    }
   });
   session.on('session.title_changed', (event: any) => {
     poolSend(entry, { type: 'title_changed', title: event.data.title });
@@ -133,6 +187,16 @@ export function wireSessionEvents(session: any, entry: PoolEntry, sessionId?: st
   });
   session.on('elicitation.requested', (event: any) => {
     poolSend(entry, { type: 'elicitation_requested', question: event.data?.question, choices: event.data?.choices, allowFreeform: event.data?.allowFreeform });
+
+    // Push notification when browser is closed
+    if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+      sendPushToUser(userLogin, {
+        title: 'Copilot is asking you something',
+        body: event.data?.question?.slice(0, 100) || 'Your input is needed',
+        url: '/',
+        tag: 'elicitation-requested',
+      }, subscriptionStore).catch(() => {});
+    }
   });
   session.on('elicitation.completed', (event: any) => {
     poolSend(entry, { type: 'elicitation_completed', answer: event.data?.answer });

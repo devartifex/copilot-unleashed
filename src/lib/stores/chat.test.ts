@@ -100,7 +100,7 @@ describe('createChatStore', () => {
     expect(store.sessionTitle).toBe('Current session');
     expect(store.contextInfo).toEqual({ tokenLimit: 32000, currentTokens: 1200, messagesLength: 4 });
     expect(store.pendingUserInput).toMatchObject({ pending: true, question: 'Continue?' });
-    expect(store.pendingPermission).toMatchObject({ requestId: 'perm-1', toolName: 'bash' });
+    expect(store.pendingPermissions).toEqual([expect.objectContaining({ requestId: 'perm-1', toolName: 'bash' })]);
 
     store.clearPendingUserInput();
     store.clearPendingPermission();
@@ -115,7 +115,7 @@ describe('createChatStore', () => {
     expect(store.sessionTitle).toBeNull();
     expect(store.contextInfo).toBeNull();
     expect(store.pendingUserInput).toBeNull();
-    expect(store.pendingPermission).toBeNull();
+    expect(store.pendingPermissions).toEqual([]);
     expect(store.sessionDetail).toBeNull();
   });
 
@@ -374,8 +374,7 @@ describe('createChatStore', () => {
     expect(store.isWaiting).toBe(false);
     expect(store.currentStreamContent).toBe('');
     expect(store.pendingUserInput).toBeNull();
-    expect(store.pendingPermission).toBeNull();
-    expect(notifyMock).toHaveBeenCalledWith('Copilot is asking you something', {
+    expect(store.pendingPermissions).toEqual([]);    expect(notifyMock).toHaveBeenCalledWith('Copilot is asking you something', {
       body: 'Need approval?',
       tag: 'user-input',
       requireInteraction: true,

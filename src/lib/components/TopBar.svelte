@@ -10,7 +10,6 @@
     activeSkillCount: number;
     onToggleSidebar: () => void;
     onOpenModelSheet: () => void;
-    onNewChat: () => void;
   }
 
   const {
@@ -21,7 +20,6 @@
     activeSkillCount,
     onToggleSidebar,
     onOpenModelSheet,
-    onNewChat,
   }: Props = $props();
 
   const connectionDotClass = $derived.by(() => {
@@ -50,7 +48,7 @@
     <span class="title-text" title={sessionTitle}>{sessionTitle}</span>
   {:else}
     <span class="brand-group" aria-label="Copilot Unleashed">
-      <img src="/img/logo.png" alt="" class="brand-icon" width="22" height="22" aria-hidden="true" />
+      <img src="/img/logo-no-bg.svg" alt="" class="brand-icon" width="22" height="22" aria-hidden="true" />
       <span class="brand-name">Copilot <span class="brand-accent">Unleashed</span></span>
     </span>
   {/if}
@@ -73,13 +71,6 @@
       ⚡ {activeSkillCount}
     </span>
   {/if}
-
-  <button class="tb-btn newchat-btn" onclick={onNewChat} aria-label="New chat">
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 13.5V16H5.5L14 7.5L11 4.5L3 13.5Z"/>
-      <path d="M14 2L16 4L14 7.5L11 4.5L14 2Z"/>
-    </svg>
-  </button>
 </div>
 
 <style>
@@ -165,6 +156,13 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  /* Hide brand text on mobile, show only logo */
+  @media (max-width: 767px) {
+    .brand-name {
+      display: none;
+    }
   }
 
   /* ── Model pill ────────────────────────────────────────────────── */

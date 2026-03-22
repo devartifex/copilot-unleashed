@@ -1,6 +1,9 @@
+import { WebSocket } from 'ws';
 import { poolSend, type PoolEntry } from './session-pool.js';
+import { sendPushToUser } from '../push/sender.js';
+import { subscriptionStore } from '../push-singleton.js';
 
-export function makeUserInputHandler(entry: PoolEntry) {
+export function makeUserInputHandler(entry: PoolEntry, userLogin?: string) {
   return (request: any) => {
     return new Promise<{ answer: string; wasFreeform: boolean }>((resolve) => {
       entry.userInputResolve = resolve;
@@ -12,6 +15,16 @@ export function makeUserInputHandler(entry: PoolEntry) {
       };
       entry.pendingUserInputPrompt = prompt;
       poolSend(entry, prompt);
+
+      // Push notification when browser is closed
+      if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+        sendPushToUser(userLogin, {
+          title: 'Copilot is asking you something',
+          body: request.question?.slice(0, 100) || 'User input is needed',
+          url: '/',
+          tag: 'user-input-request',
+        }, subscriptionStore).catch(() => {});
+      }
     });
   };
 }
@@ -92,7 +105,7 @@ export function extractPermissionDisplay(request: any): {
   }
 }
 
-export function makePermissionHandler(entry: PoolEntry) {
+export function makePermissionHandler(entry: PoolEntry, userLogin?: string) {
   return (request: any) => {
     const { kind, toolName, toolArgs } = extractPermissionDisplay(request);
 
@@ -106,20 +119,21 @@ export function makePermissionHandler(entry: PoolEntry) {
 
     return new Promise<{ kind: 'approved' } | { kind: 'denied-interactively-by-user'; feedback?: string }>((resolve) => {
       const timeout = setTimeout(() => {
-        entry.permissionResolve = null;
-        entry.pendingPermissionPrompt = null;
+        entry.permissionResolves.delete(requestId);
+        entry.pendingPermissionPrompts.delete(requestId);
         resolve({ kind: 'denied-interactively-by-user', feedback: 'Permission request timed out' });
       }, PERMISSION_TIMEOUT_MS);
 
-      entry.permissionResolve = (decision: string) => {
+      entry.permissionResolves.set(requestId, (decision: string) => {
         clearTimeout(timeout);
-        entry.pendingPermissionPrompt = null;
+        entry.pendingPermissionPrompts.delete(requestId);
+        entry.permissionResolves.delete(requestId);
         resolve(
           decision === 'allow'
             ? { kind: 'approved' }
             : { kind: 'denied-interactively-by-user', feedback: 'User denied' },
         );
-      };
+      });
 
       const prompt = {
         type: 'permission_request',
@@ -128,8 +142,18 @@ export function makePermissionHandler(entry: PoolEntry) {
         toolName,
         toolArgs,
       };
-      entry.pendingPermissionPrompt = prompt;
+      entry.pendingPermissionPrompts.set(requestId, prompt);
       poolSend(entry, prompt);
+
+      // Push notification when browser is closed
+      if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+        sendPushToUser(userLogin, {
+          title: 'Tool approval needed',
+          body: `${kind}: ${toolName}`.slice(0, 100),
+          url: '/',
+          tag: 'permission-request',
+        }, subscriptionStore).catch(() => {});
+      }
     });
   };
 }

@@ -1,20 +1,39 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('$lib/server/auth/guard', () => ({
+	checkAuth: vi.fn(),
+}));
+
 vi.mock('$lib/server/security-log', () => ({
 	logSecurity: vi.fn(),
 }));
 
 import { POST } from './+server';
+import { checkAuth } from '$lib/server/auth/guard';
 import { logSecurity } from '$lib/server/security-log';
 
-function createEvent(request: Request) {
-	return { request } as any;
+function createEvent(request: Request, session?: Record<string, unknown>) {
+	return { locals: { session }, request } as any;
 }
 
 describe('POST /api/client-error', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(checkAuth).mockReturnValue({ authenticated: true, user: { login: 'testuser' } } as any);
+	});
+
+	it('returns 401 when not authenticated', async () => {
+		vi.mocked(checkAuth).mockReturnValue({ authenticated: false } as any);
+		const request = new Request('http://localhost/api/client-error', {
+			method: 'POST',
+			body: JSON.stringify({ message: 'Boom' }),
+			headers: { 'content-type': 'application/json' },
+		});
+
+		const response = await POST(createEvent(request));
+
+		expect(response.status).toBe(401);
 	});
 
 	it('accepts valid client error reports', async () => {

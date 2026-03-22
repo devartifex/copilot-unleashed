@@ -42,7 +42,7 @@ export interface ChatStore {
   readonly fleetAgents: Array<{ agentId: string; agentType: string; status: 'running' | 'completed' | 'failed'; error?: string }>;
   readonly sessionTitle: string | null;
   readonly pendingUserInput: UserInputState | null;
-  readonly pendingPermission: PermissionRequestState | null;
+  readonly pendingPermissions: PermissionRequestState[];
 
   // Data lists
   readonly models: Map<string, ModelInfo>;
@@ -75,7 +75,7 @@ export interface ChatStore {
   sendQueuedMessage(id: string): { content: string; attachments?: Attachment[] } | null;
   cancelQueuedMessage(id: string): void;
   flushQueue(): { content: string; attachments?: Attachment[] } | null;
-  clearPendingPermission(): void;
+  clearPendingPermission(requestId?: string): void;
   clearPendingUserInput(): void;
 }
 
@@ -105,7 +105,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   let sessionTitle = $state<string | null>(null);
   let currentSessionId = $state<string | null>(null);
   let pendingUserInput = $state<UserInputState | null>(null);
-  let pendingPermission = $state<PermissionRequestState | null>(null);
+  let pendingPermissions = $state<PermissionRequestState[]>([]);
 
   // ── Data lists ──────────────────────────────────────────────────────────
   let models = $state(new Map<string, ModelInfo>());
@@ -185,6 +185,44 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     switch (msg.type) {
       case 'connected':
         break;
+
+      case 'cold_resume': {
+        // Restore persisted chat history from server-side storage
+        if (Array.isArray(msg.messages) && msg.messages.length > 0) {
+          const restored: ChatMessage[] = msg.messages
+            .filter(
+              (m: Record<string, unknown>) =>
+                m.type === 'user' || m.type === 'assistant' || m.type === 'error',
+            )
+            .map((m: Record<string, unknown>) => ({
+              id: genId(),
+              role:
+                m.type === 'user'
+                  ? ('user' as const)
+                  : m.type === 'assistant'
+                    ? ('assistant' as const)
+                    : ('error' as const),
+              content: typeof m.content === 'string' ? m.content : '',
+              timestamp: typeof m.timestamp === 'number' ? m.timestamp : Date.now(),
+            }));
+
+          if (restored.length > 0) {
+            messages = restored;
+            addInfoMessage('Session restored from previous visit');
+          }
+        }
+
+        // Restore model/mode if provided
+        if (msg.model) currentModel = msg.model;
+        if (
+          msg.mode === 'interactive' ||
+          msg.mode === 'plan' ||
+          msg.mode === 'autopilot'
+        ) {
+          mode = msg.mode;
+        }
+        break;
+      }
 
       case 'session_created':
         currentModel = msg.model;
@@ -369,7 +407,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         isWaiting = false;
         currentStreamContent = '';
         // Don't clear pendingUserInput — the error may be unrelated to the ask_user flow
-        pendingPermission = null;
+        pendingPermissions = [];
         notify('Something went wrong', {
           body: msg.message,
           tag: 'error',
@@ -381,7 +419,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         isWaiting = false;
         currentStreamContent = '';
         pendingUserInput = null;
-        pendingPermission = null;
+        pendingPermissions = [];
         addInfoMessage('Response stopped');
         break;
 
@@ -405,12 +443,12 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'permission_request':
-        pendingPermission = {
+        pendingPermissions = [...pendingPermissions, {
           requestId: msg.requestId,
           kind: msg.kind,
           toolName: msg.toolName,
           toolArgs: msg.toolArgs,
-        };
+        }];
         notify(`Tool approval needed: ${msg.kind}`, {
           body: msg.toolName,
           tag: msg.requestId,
@@ -691,6 +729,13 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       case 'workspace_file_changed':
         addInfoMessage(`Workspace file ${msg.operation}d: ${msg.path}`);
         break;
+
+      case 'sessions_changed':
+        // Re-fetch session list when filesystem changes detected
+        if (sessions.length > 0) {
+          wsStore.listSessions();
+        }
+        break;
     }
   }
 
@@ -710,19 +755,26 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     sessionTitle = null;
     currentSessionId = null;
     pendingUserInput = null;
-    pendingPermission = null;
+    pendingPermissions = [];
     contextInfo = null;
     sessionDetail = null;
     baselineUsedRequests = null;
     sessionTotals = { ...emptyTotals };
+
+    // Notify server to delete persisted state
+    wsStore.send({ type: 'clear_chat' });
   }
 
   function addUserMessage(content: string, attachments?: Attachment[]): void {
     addMessage('user', content, attachments?.length ? { attachments } : undefined);
   }
 
-  function clearPendingPermission(): void {
-    pendingPermission = null;
+  function clearPendingPermission(requestId?: string): void {
+    if (requestId) {
+      pendingPermissions = pendingPermissions.filter((p) => p.requestId !== requestId);
+    } else {
+      pendingPermissions = [];
+    }
   }
 
   function clearPendingUserInput(): void {
@@ -774,7 +826,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     get fleetAgents() { return fleetAgents; },
     get sessionTitle() { return sessionTitle; },
     get pendingUserInput() { return pendingUserInput; },
-    get pendingPermission() { return pendingPermission; },
+    get pendingPermissions() { return pendingPermissions; },
 
     get models() { return models; },
     get tools() { return tools; },

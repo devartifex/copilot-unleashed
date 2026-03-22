@@ -48,7 +48,7 @@
     <!-- ── Branding hero ──────────────────────────────────────────────── -->
     <div class="hero">
       <div class="hero-logo">
-        <img class="copilot-icon" src="/img/logo.png" alt="Copilot Unleashed" />
+        <img class="copilot-icon" src="/img/logo-no-bg.svg" alt="Copilot Unleashed" />
       </div>
       <h1 class="hero-title">Copilot Unleashed</h1>
       <p class="hero-tagline">Multi-model AI chat powered by GitHub Copilot SDK</p>

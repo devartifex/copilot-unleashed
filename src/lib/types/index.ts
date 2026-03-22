@@ -137,6 +137,16 @@ export interface SessionDetail {
 export interface ConnectedMessage {
   type: 'connected';
   user: string;
+  sdkSessionId?: string | null;
+  hasPersistedState?: boolean;
+}
+
+export interface ColdResumeMessage {
+  type: 'cold_resume';
+  messages: Array<Record<string, unknown>>;
+  model: string;
+  mode: string;
+  sdkSessionId: string | null;
 }
 
 export interface SessionCreatedMessage {
@@ -551,6 +561,7 @@ export interface PongMessage {
 
 export type ServerMessage =
   | ConnectedMessage
+  | ColdResumeMessage
   | SessionCreatedMessage
   | SessionReconnectedMessage
   | TurnStartMessage
@@ -617,7 +628,14 @@ export type ServerMessage =
   | HookSessionStartMessage
   | HookSessionEndMessage
   | HookErrorMessage
-  | PongMessage;
+  | PongMessage
+  | SessionsChangedMessage;
+
+// ─── Session filesystem watcher ──────────────────────────────────────────────
+
+export interface SessionsChangedMessage {
+  type: 'sessions_changed';
+}
 
 // ─── File attachment (upload metadata) ───────────────────────────────────────
 
@@ -777,6 +795,10 @@ export interface DeletePlanMessage {
   type: 'delete_plan';
 }
 
+export interface ClearChatMessage {
+  type: 'clear_chat';
+}
+
 export type ClientMessage =
   | NewSessionMessage
   | SendMessage
@@ -800,7 +822,8 @@ export type ClientMessage =
   | GetPlanMessage
   | UpdatePlanMessage
   | DeletePlanMessage
-  | StartFleetMessage;
+  | StartFleetMessage
+  | ClearChatMessage;
 
 // ─── Chat message type for rendering ────────────────────────────────────────
 

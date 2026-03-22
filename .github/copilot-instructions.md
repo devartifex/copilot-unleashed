@@ -17,6 +17,10 @@ Self-hosted multi-model AI chat platform powered by the official `@github/copilo
 - **Settings**: Persisted server-side via `/api/settings` and mirrored in `localStorage`
 - **Deployment**: Docker container → Azure Container Apps via `azd up`
 
+### Deployment
+- **Azure**: VNet with subnets, Key Vault for secrets, Premium ACR, NFS volume with private endpoints; `COPILOT_CONFIG_DIR=/data/copilot-home`
+- **Local Docker**: Bind mount `~/.copilot` preserved for CLI sync; `COPILOT_CONFIG_DIR` stays at `/home/node/.copilot`
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -46,22 +50,53 @@ svelte.config.js                # SvelteKit config (adapter-node)
 vite.config.ts                  # Vite config
 vitest.config.ts                # Vitest config for colocated unit tests
 
+scripts/
+└── generate-vapid-keys.mjs     # VAPID key generation utility for push notifications
+static/
+├── manifest.json               # PWA manifest (name, icons, start_url, display: standalone)
+└── sw.js                       # Service worker: precaching, push handler, notification click
+infra/
+├── modules/
+│   ├── vnet.bicep              # Azure VNet with subnets for private endpoints
+│   └── key-vault.bicep         # Azure Key Vault for secrets management
+
 src/
 ├── app.html                    # SvelteKit shell (viewport, theme-color, PWA meta)
 ├── app.css                     # Global reset, design tokens, highlight.js theme
-├── hooks.server.ts             # Session bridge, CSP headers, rate limiting
+├── hooks.server.ts             # Session bridge, CSP headers, rate limiting, CSRF, token revalidation
 ├── hooks.server.test.ts        # Example colocated unit test pattern
 │
 ├── lib/
 │   ├── components/             # 20 Svelte 5 components (see ARCHITECTURE.md)
 │   ├── stores/                 # 4 rune stores: auth, chat, settings, ws
-│   ├── server/                 # 22 server files: auth, copilot, settings, skills, ws, security
+│   ├── server/                 # Server-only code
+│   │   ├── auth/
+│   │   │   ├── github.ts              # Device Flow OAuth (fetch-based)
+│   │   │   └── guard.ts               # Auth middleware + 30-min token revalidation
+│   │   ├── copilot/
+│   │   │   ├── client.ts              # CopilotClient factory
+│   │   │   └── session.ts             # Session config (model, reasoning, tools, hooks)
+│   │   ├── ws/
+│   │   │   ├── handler.ts             # WebSocket handler: 22+ message types, SDK events
+│   │   │   └── session-pool.ts        # Per-user session pool with TTL + buffer
+│   │   ├── push/
+│   │   │   ├── subscription-store.ts  # Push subscription CRUD per user (10 sub cap)
+│   │   │   └── sender.ts             # web-push wrapper with 60-min TTL, auto-cleanup
+│   │   ├── chat-state-store.ts        # Persistent chat state per user+tab (1000-msg cap, atomic writes)
+│   │   ├── session-watcher.ts         # fs.watch on session-state dir, 100ms debounce
+│   │   ├── init.ts                    # Server-side initialization (watcher + signal handlers)
+│   │   ├── config.ts                  # Env var validation (fail-fast)
+│   │   ├── security-log.ts            # Structured security event logging
+│   │   └── session-store.ts           # Express session ↔ SvelteKit bridge
 │   ├── types/index.ts          # All message types: 60 server + 18 client = 78 total
-│   └── utils/markdown.ts       # Shared markdown pipeline
+│   └── utils/
+│       ├── markdown.ts         # Shared markdown pipeline
+│       ├── push-client.ts      # Client-side push subscription management
+│       └── sw-register.ts      # Service worker registration
 │
 ├── routes/
 │   ├── +page.svelte            # Main page: login or full chat screen (1 page route)
-│   ├── +layout.svelte          # App shell layout
+│   ├── +layout.svelte          # App shell layout (registers service worker)
 │   ├── +layout.server.ts       # Root auth/session bootstrap
 │   ├── +error.svelte           # Route error boundary
 │   ├── auth/
@@ -76,8 +111,11 @@ src/
 │   │   ├── skills/+server.ts
 │   │   ├── upload/+server.ts
 │   │   ├── version/+server.ts
-│   │   └── sessions/sync/+server.ts
-│   └── health/+server.ts       # 12 +server.ts endpoint routes total
+│   │   ├── sessions/sync/+server.ts
+│   │   ├── push/subscribe/+server.ts     # POST: register push subscription
+│   │   ├── push/unsubscribe/+server.ts   # POST: remove push subscription
+│   │   └── push/vapid-key/+server.ts     # GET: public VAPID key
+│   └── health/+server.ts       # 18 +server.ts endpoint routes total
 │
 └── **/*.test.ts                # Vitest unit tests live next to source files
 ```
@@ -105,6 +143,10 @@ src/
 - **Try-catch** in route handlers and WebSocket — return JSON errors to client
 - **Message type whitelist** — WebSocket handler validates against `VALID_MESSAGE_TYPES` Set
 - **Session disconnect** — use `session.disconnect()` (not deprecated `destroy()`)
+- **Atomic file writes** — ChatStateStore (and settings-store) writes to `.tmp` then renames, preventing partial reads on crash
+- **Session watcher** — `fs.watch` on session-state directory with 100ms debounce, broadcasts state changes to all connected WS clients
+- **Push on disconnect** — Push notifications triggered in `poolSend()` when the target user's WS is disconnected
+- **Cold resume** — Load persisted chat state from disk, resume SDK session via `client.resumeSession()`, replay messages to the client
 
 ### Security
 - CSP in hooks.server.ts: self + unsafe-inline (Svelte) + ws/wss + GitHub avatars
@@ -113,8 +155,11 @@ src/
 - XSS prevention: DOMPurify sanitizes all rendered markdown
 - Max message length: 10,000 chars (server-enforced)
 - Upload limits: 10MB per file, 5 files max, extension allowlist
-- SSRF prevention: internal IP range blocklist for custom webhook tools
+- SSRF prevention: internal IP range blocklist for custom webhook tools; `redirect:'manual'` on all outbound fetches
 - Token revalidation on WebSocket connect (catches revoked tokens)
+- All API endpoints require `checkAuth()` except `/health`
+- CSRF: Origin header required on mutation requests in production
+- Periodic token revalidation every 30 minutes (server-side interval)
 
 ### Environment Variables
 | Variable | Required | Default | Purpose |
@@ -126,6 +171,11 @@ src/
 | `NODE_ENV` | No | development | Dev vs prod behavior |
 | `ALLOWED_GITHUB_USERS` | No | — | Comma-separated GitHub usernames |
 | `TOKEN_MAX_AGE_MS` | No | 86400000 | Force re-auth interval (24h) |
+| `CHAT_STATE_PATH` | No | ./data/chat-state | Directory for persisted chat state files |
+| `VAPID_PUBLIC_KEY` | No | — | VAPID public key for web push (generate with `scripts/generate-vapid-keys.mjs`) |
+| `VAPID_PRIVATE_KEY` | No | — | VAPID private key for web push |
+| `VAPID_SUBJECT` | No | — | VAPID subject (mailto: or https: URL) |
+| `PUSH_STORE_PATH` | No | ./data/push-subscriptions | Directory for push subscription storage |
 
 ## Build & Run
 
@@ -138,7 +188,6 @@ npm install && npm run build && npm start
 
 # Development
 npm run dev                      # Docker Compose development stack
-npm run dev:local                # Local Vite dev server after building server-side TypeScript
 
 # Type check
 npm run check                    # svelte-check

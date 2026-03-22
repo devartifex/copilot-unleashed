@@ -6,19 +6,27 @@ import { VALID_MODES } from '../constants.js';
 import { parseMcpServers } from '../mcp-servers.js';
 import { wireSessionEvents } from '../session-events.js';
 import { makeUserInputHandler, makePermissionHandler } from '../permissions.js';
+import { chatStateStore } from '../../chat-state-singleton.js';
 import type { MessageContext } from '../types.js';
+
+function rawTabId(ctx: MessageContext): string {
+  return ctx.poolKey.split(':').slice(1).join(':');
+}
 
 export async function handleNewSession(msg: any, ctx: MessageContext): Promise<void> {
   const { connectionEntry, githubToken } = ctx;
+
+  // Delete old persisted state before creating new session
+  chatStateStore.delete(ctx.userLogin, rawTabId(ctx));
 
   if (connectionEntry.session) {
     try { await connectionEntry.session.disconnect(); } catch { /* ignore */ }
     connectionEntry.session = null;
   }
   connectionEntry.userInputResolve = null;
-  connectionEntry.permissionResolve = null;
+  connectionEntry.permissionResolves.clear();
   connectionEntry.pendingUserInputPrompt = null;
-  connectionEntry.pendingPermissionPrompt = null;
+  connectionEntry.pendingPermissionPrompts.clear();
 
   try {
     const customInstructions = typeof msg.customInstructions === 'string'
@@ -82,9 +90,9 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       excludedTools,
       customTools,
       infiniteSessions,
-      onUserInputRequest: makeUserInputHandler(connectionEntry),
+      onUserInputRequest: makeUserInputHandler(connectionEntry, ctx.userLogin),
       permissionMode,
-      onPermissionRequest: makePermissionHandler(connectionEntry),
+      onPermissionRequest: makePermissionHandler(connectionEntry, ctx.userLogin),
       mcpServers,
       configDir: config.copilotConfigDir,
       skillDirectories,
@@ -93,7 +101,7 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       onHookEvent: (message) => poolSend(connectionEntry, message),
     });
 
-    wireSessionEvents(connectionEntry.session, connectionEntry, connectionEntry.session?.sessionId);
+    wireSessionEvents(connectionEntry.session, connectionEntry, connectionEntry.session?.sessionId, ctx.userLogin, rawTabId(ctx));
 
     // Set initial mode on the SDK session
     if (msg.mode && VALID_MODES.has(msg.mode)) {
@@ -109,6 +117,23 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       model: msg.model,
       sessionId: connectionEntry.session?.sessionId,
     });
+
+    // Store metadata for resume
+    connectionEntry.sdkSessionId = connectionEntry.session?.sessionId ?? null;
+    connectionEntry.model = msg.model ?? null;
+    connectionEntry.mode = msg.mode ?? 'interactive';
+
+    // Persist initial state (fire-and-forget)
+    chatStateStore.save(ctx.userLogin, rawTabId(ctx), {
+      userId: ctx.userLogin,
+      tabId: rawTabId(ctx),
+      sdkSessionId: connectionEntry.session?.sessionId ?? null,
+      model: msg.model ?? 'gpt-4.1',
+      mode: msg.mode ?? 'interactive',
+      messages: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }).catch(() => {});
   } catch (err: any) {
     console.error('Session creation error:', err.message);
     poolSend(connectionEntry, {

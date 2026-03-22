@@ -1,6 +1,6 @@
 {
   "name": "copilot-unleashed",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Copilot Unleashed — Self-hosted multi-model AI chat powered by the GitHub Copilot SDK",
   "main": "build/index.js",
   "scripts": {
@@ -8,7 +8,7 @@
     "build": "npm run build:server && vite build",
     "start": "node server.js",
     "dev": "docker compose up --build",
-    "dev:local": "npm run build:server && vite dev",
+
     "dev:down": "docker compose down",
     "preview": "npm run build && node --env-file=.env server.js",
     "bundle-sessions": "node scripts/bundle-sessions.mjs",
@@ -50,6 +50,7 @@
     "session-file-store": "^1.5.0",
     "svelte": "^5.53.9",
     "vite": "^7.3.1",
+    "web-push": "^3.6.7",
     "ws": "^8.18.0"
   },
   "lint-staged": {
@@ -66,11 +67,13 @@
     "@types/express-session": "^1.18.0",
     "@types/node": "^20.17.0",
     "@types/session-file-store": "^1.2.6",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "^8.5.13",
     "@vitest/coverage-v8": "^4.1.0",
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",
     "lint-staged": "^16.3.3",
+    "sharp": "^0.34.5",
     "svelte-check": "^4.4.5",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",

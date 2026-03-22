@@ -183,6 +183,7 @@ function buildCustomTools(customTools: CustomToolDefinition[]) {
           headers: { 'Content-Type': 'application/json', ...tool.headers },
           body: tool.method === 'POST' ? JSON.stringify(args) : undefined,
           signal: AbortSignal.timeout(30_000),
+          redirect: 'manual',
         });
         if (!response.ok) throw new Error(`Tool failed: ${response.status}`);
         return await response.json();

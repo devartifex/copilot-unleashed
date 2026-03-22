@@ -29,6 +29,7 @@
   let sessionsOpen = $state(false);
   let modelSheetOpen = $state(false);
   let sessionsLoading = $state(false);
+  let sessionLoading = $state(true);
 
   const modelCount = $derived(chatStore.models.size);
   const toolCount = $derived(chatStore.tools.length);
@@ -76,13 +77,33 @@
         console.log(`[PAGE] WS message received: type=${msg.type}`, msg);
         chatStore.handleServerMessage(msg);
 
-        // Auto-request new session on first connect
+        // The server pre-loads persisted state and includes sdkSessionId
+        // directly in the 'connected' message — no timer/delay needed.
         if (msg.type === 'connected') {
-          console.log('[PAGE] Got connected, calling requestNewSession()');
+          if (msg.sdkSessionId) {
+            // Session will be restored — keep sessionLoading true until cold_resume/session_resumed
+            console.log('[PAGE] connected with sdkSessionId, resuming', msg.sdkSessionId);
+            wsStore.resumeSession(msg.sdkSessionId, settings.mcpServers.length > 0 ? settings.mcpServers : undefined);
+          } else {
+            // No previous session — show new chat immediately
+            sessionLoading = false;
+            console.log('[PAGE] connected without sdkSessionId, creating new session');
+            requestNewSession();
+          }
+        }
+
+        // Session fully loaded — clear loading state
+        if (msg.type === 'cold_resume' || msg.type === 'session_created' || msg.type === 'session_resumed' || msg.type === 'session_reconnected') {
+          sessionLoading = false;
+        }
+
+        // Resume failed — clear loading and fall back to new session
+        if (msg.type === 'error' && sessionLoading) {
+          sessionLoading = false;
           requestNewSession();
         }
 
-        // Auto-request new session if reconnected without one
+        // Auto-request new session if reconnected without one (warm reconnect, session was cleaned up)
         if (msg.type === 'session_reconnected' && !msg.hasSession) {
           console.log('[PAGE] Got session_reconnected without session, calling requestNewSession()');
           requestNewSession();
@@ -262,10 +283,11 @@
   }
 
   function handlePermissionResponse(requestId: string, decision: 'allow' | 'deny' | 'always_allow'): void {
-    const kind = chatStore.pendingPermission?.kind ?? '';
-    const toolName = chatStore.pendingPermission?.toolName ?? '';
+    const perm = chatStore.pendingPermissions.find((p) => p.requestId === requestId);
+    const kind = perm?.kind ?? '';
+    const toolName = perm?.toolName ?? '';
     wsStore.respondToPermission(requestId, kind, toolName, decision);
-    chatStore.clearPendingPermission();
+    chatStore.clearPendingPermission(requestId);
   }
 
   function handleToggleSkill(skillName: string, enabled: boolean): void {
@@ -291,44 +313,57 @@
       {activeSkillCount}
       onToggleSidebar={() => sidebarOpen = true}
       onOpenModelSheet={() => modelSheetOpen = true}
-      onNewChat={handleNewChat}
     />
 
     <div class="terminal">
-      {#if chatStore.plan.exists}
-        <PlanPanel
-          plan={chatStore.plan}
-          onUpdatePlan={(content) => wsStore.updatePlan(content)}
-          onDeletePlan={() => wsStore.deletePlan()}
-        />
-      {/if}
-
-      <MessageList {chatStore} username={data.user?.login} onSendQueued={handleSendQueued} onCancelQueued={handleCancelQueued}>
-        {#if chatStore.messages.length === 0}
-          <Banner />
+      {#if sessionLoading}
+        <div class="session-loading">
+          {#each Array(3) as _, i (i)}
+            <div class="loading-skeleton">
+              <div class="skeleton skeleton-bar" style:width={i === 0 ? '60%' : i === 1 ? '85%' : '45%'}></div>
+              <div class="skeleton skeleton-bar-sm" style:width={i === 0 ? '40%' : i === 1 ? '55%' : '30%'}></div>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        {#if chatStore.plan.exists}
+          <PlanPanel
+            plan={chatStore.plan}
+            onUpdatePlan={(content) => wsStore.updatePlan(content)}
+            onDeletePlan={() => wsStore.deletePlan()}
+          />
         {/if}
-        <EnvInfo
-          modelCount={modelCount}
-          toolCount={toolCount}
-          mcpServerCount={mcpServerCount}
-          currentAgent={chatStore.currentAgent}
-          sessionTitle={chatStore.sessionTitle}
-          contextInfo={chatStore.contextInfo}
-          sessionTotals={chatStore.sessionTotals}
-        />
-      </MessageList>
 
-      {#if chatStore.pendingPermission}
-        <PermissionPrompt
-          requestId={chatStore.pendingPermission.requestId}
-          kind={chatStore.pendingPermission.kind}
-          toolName={chatStore.pendingPermission.toolName}
-          toolArgs={chatStore.pendingPermission.toolArgs}
-          onRespond={handlePermissionResponse}
-        />
+        <MessageList {chatStore} username={data.user?.login} onSendQueued={handleSendQueued} onCancelQueued={handleCancelQueued}>
+          {#if chatStore.messages.length === 0}
+            <Banner username={data.user?.login} />
+          {/if}
+          <EnvInfo
+            modelCount={modelCount}
+            toolCount={toolCount}
+            mcpServerCount={mcpServerCount}
+            currentAgent={chatStore.currentAgent}
+            sessionTitle={chatStore.sessionTitle}
+            contextInfo={chatStore.contextInfo}
+            sessionTotals={chatStore.sessionTotals}
+          />
+        </MessageList>
+
       {/if}
 
-      <ChatInput
+        {#if chatStore.pendingPermissions.length > 0}
+          {#each chatStore.pendingPermissions as perm (perm.requestId)}
+            <PermissionPrompt
+              requestId={perm.requestId}
+              kind={perm.kind}
+              toolName={perm.toolName}
+              toolArgs={perm.toolArgs}
+              onRespond={handlePermissionResponse}
+            />
+          {/each}
+        {/if}
+
+        <ChatInput
         connectionState={wsStore.connectionState}
         sessionReady={wsStore.sessionReady}
         isStreaming={chatStore.isStreaming}
@@ -463,5 +498,32 @@
 
   @media (orientation: landscape) and (max-height: 500px) {
     .terminal { padding: var(--sp-1) var(--sp-3); }
+  }
+
+  /* ── Session loading skeleton ──────────────────────────────────────── */
+  .session-loading {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    padding: var(--sp-4) 0;
+    max-width: 92%;
+  }
+
+  .loading-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: var(--sp-2) var(--sp-3);
+    border-left: 3px solid var(--border);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+
+  .skeleton-bar {
+    height: 14px;
+  }
+
+  .skeleton-bar-sm {
+    height: 10px;
   }
 </style>

@@ -61,6 +61,9 @@
   let selectedFiles = $state<File[]>([]);
   let isUploading = $state(false);
   let attachMenuOpen = $state(false);
+  let attachBtnEl: HTMLButtonElement | undefined = $state();
+  let attachMenuX = $state(0);
+  let attachMenuY = $state(0);
 
   // @ file mention autocomplete state
   let mentionOpen = $state(false);
@@ -292,6 +295,11 @@
   }
 
   function toggleAttachMenu() {
+    if (!attachMenuOpen && attachBtnEl) {
+      const rect = attachBtnEl.getBoundingClientRect();
+      attachMenuX = rect.left;
+      attachMenuY = rect.top;
+    }
     attachMenuOpen = !attachMenuOpen;
   }
 
@@ -680,6 +688,35 @@
     tabindex={-1}
   />
 
+  {#if selectedFiles.length > 0}
+    <div class="file-preview-row">
+      {#each selectedFiles as file, i (file.name + i)}
+        <div class="file-chip">
+          {#if isImageFile(file)}
+            <img
+              class="file-chip-thumb"
+              src={URL.createObjectURL(file)}
+              alt={file.name}
+              onload={(e) => URL.revokeObjectURL((e.currentTarget as HTMLImageElement).src)}
+            />
+          {:else}
+            <span class="file-chip-icon" aria-hidden="true">📄</span>
+          {/if}
+          <span class="file-chip-name">{file.name}</span>
+          {#if !isImageFile(file)}
+            <span class="file-chip-size">{formatFileSize(file.size)}</span>
+          {/if}
+          <button class="file-chip-remove" onclick={() => removeFile(i)} aria-label="Remove {file.name}">×</button>
+        </div>
+      {/each}
+    </div>
+    {#if hasImageAttachments && !supportsVision}
+      <div class="vision-warning" role="alert">
+        ⚠️ Current model may not support image analysis
+      </div>
+    {/if}
+  {/if}
+
   <div class="input-container" class:user-input-active={!!pendingUserInput}>
     {#if pendingUserInput}
       <div class="user-input-banner">
@@ -692,35 +729,6 @@
           </div>
         {/if}
       </div>
-    {/if}
-
-    {#if selectedFiles.length > 0}
-      <div class="file-preview-row">
-        {#each selectedFiles as file, i (file.name + i)}
-          <div class="file-chip">
-            {#if isImageFile(file)}
-              <img
-                class="file-chip-thumb"
-                src={URL.createObjectURL(file)}
-                alt={file.name}
-                onload={(e) => URL.revokeObjectURL((e.currentTarget as HTMLImageElement).src)}
-              />
-            {:else}
-              <span class="file-chip-icon" aria-hidden="true">📄</span>
-            {/if}
-            <span class="file-chip-name">{file.name}</span>
-            {#if !isImageFile(file)}
-              <span class="file-chip-size">{formatFileSize(file.size)}</span>
-            {/if}
-            <button class="file-chip-remove" onclick={() => removeFile(i)} aria-label="Remove {file.name}">×</button>
-          </div>
-        {/each}
-      </div>
-      {#if hasImageAttachments && !supportsVision}
-        <div class="vision-warning" role="alert">
-          ⚠️ Current model may not support image analysis
-        </div>
-      {/if}
     {/if}
 
     <textarea
@@ -830,6 +838,7 @@
         {#if !pendingUserInput}
           <div class="attach-wrapper">
           <button
+            bind:this={attachBtnEl}
             class="icon-btn attach-btn"
             onclick={toggleAttachMenu}
             disabled={isDisabled || selectedFiles.length >= MAX_FILES}
@@ -846,7 +855,7 @@
             <!-- a11y: presentation backdrop — click-to-dismiss is a mouse convenience; keyboard Escape handled by attach menu -->
             <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
             <div class="attach-backdrop" onclick={closeAttachMenu} role="presentation"></div>
-            <div class="attach-menu" role="menu">
+            <div class="attach-menu" role="menu" style="left:{attachMenuX}px;top:{attachMenuY}px">
               <button class="attach-menu-item" role="menuitem" onclick={handleCameraCapture}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="1" y="4" width="14" height="10" rx="2"/>
@@ -1486,14 +1495,13 @@
   }
 
   .attach-menu {
-    position: absolute;
-    bottom: calc(100% + var(--sp-2));
-    left: 0;
+    position: fixed;
+    transform: translateY(calc(-100% - var(--sp-2)));
     background: var(--bg-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
-    z-index: 11;
+    z-index: 1000;
     min-width: 160px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     animation: menuFadeIn 0.12s ease;
@@ -1571,7 +1579,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-1);
-    padding: 0 0 var(--sp-2);
+    padding: var(--sp-2) var(--sp-1) 0;
     overflow-x: auto;
     scrollbar-width: none;
   }

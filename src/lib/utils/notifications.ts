@@ -9,6 +9,8 @@
  * - Clicking any notification focuses the tab and closes the notification.
  */
 
+import { subscribeToPush, isPushSupported } from './push-notifications.js';
+
 export interface NotifyOptions {
   body?: string;
   tag?: string;
@@ -43,6 +45,11 @@ export function notify(title: string, opts: NotifyOptions = {}): void {
     Notification.requestPermission().then((perm) => {
       if (perm === 'granted') {
         fireNotification(title, opts);
+
+        // Also set up push subscription for when the browser is closed
+        if (isPushSupported()) {
+          subscribeToPush().catch(() => {});
+        }
       }
     });
   }

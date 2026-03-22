@@ -51,8 +51,9 @@ Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, 
 - **Image vision** — attach images alongside code and documents; vision-capable models analyze them inline
 - **File & directory attachments** — drop in code files, images, CSVs, or whole directories with `@` mention autocomplete
 - **Issue & PR references** — type `#` to search and reference GitHub issues/PRs across all your repos
-- **Persistent sessions** — resume any conversation, on any device, with full checkpoint history
-- **CLI ↔ Browser sync** — sessions started in the Copilot CLI appear in the browser and vice versa
+- **Persistent sessions** — resume any conversation on any device with full checkpoint history; chat state survives browser close via server-side storage with cold resume from disk
+- **CLI ↔ Browser sync** — sessions started in the Copilot CLI appear in the browser and vice versa, with automatic filesystem watcher and Docker bind mount for real-time sync
+- **Push notifications** — Web Push alerts when the browser is closed; triggers on response ready, errors, permission prompts, and user input; full PWA support (iOS 16.4+ requires "Add to Home Screen" from Safari)
 - **Plan mode** — agent creates an editable execution plan before acting; bidirectional sync with `plan.md` on disk
 - **Fleet mode** — launch multi-agent parallel execution with per-agent status tracking
 - **Quota tracking** — see premium request usage, remaining balance, and reset date at a glance
@@ -143,7 +144,81 @@ Open [localhost:3000](http://localhost:3000). Log in with GitHub. Done.
 azd up
 ```
 
-That's it. Container Apps, ACR, managed identity, TLS, monitoring — all provisioned automatically.
+That's it. Container Apps, ACR, Key Vault, managed identity, VNet, TLS, and monitoring — all provisioned automatically.
+
+### Required parameters
+
+`azd up` will prompt for these if not already set:
+
+| Parameter | How to set | Notes |
+|-----------|-----------|-------|
+| `GITHUB_CLIENT_ID` | `azd env set GITHUB_CLIENT_ID <id>` | Your GitHub OAuth App client ID |
+| `SESSION_SECRET` | auto-generated as `newGuid()` if omitted | 32+ char random string |
+
+### Deployer IP (required for `azd deploy` with private ACR)
+
+The default infrastructure uses a **Premium ACR with public network access disabled** and a private endpoint. This blocks `azd deploy` pushes from your local machine. Set your current public IP before deploying:
+
+```bash
+azd env set DEPLOYER_IP_ADDRESS "$(curl -s https://api.ipify.org)"
+azd up
+```
+
+The ACR firewall will allow only that IP (`defaultAction: Deny`, single `Allow` rule). All other public access remains blocked. For CI/CD pipelines, set `DEPLOYER_IP_ADDRESS` to the runner's outbound IP in the same way.
+
+### Optional: VAPID keys for push notifications
+
+```bash
+node scripts/generate-vapid-keys.mjs
+azd env set VAPID_PUBLIC_KEY  "<key>"
+azd env set VAPID_PRIVATE_KEY "<key>"
+azd env set VAPID_SUBJECT     "mailto:you@example.com"
+```
+
+### Bootstrapping secrets in Key Vault
+
+`azd provision` stores `GITHUB_CLIENT_ID`, `SESSION_SECRET`, and (optionally) VAPID keys as secrets in Azure Key Vault. The Container App reads them at runtime via the managed identity — no secrets in environment variables or container image.
+
+### Troubleshooting `azd up`
+
+<details>
+<summary>Container App fails with MANIFEST_UNKNOWN image tag</summary>
+
+If provisioning fails mid-run, the `.azure/<env>/.env` may hold a stale `SERVICE_WEB_IMAGE_NAME` pointing to a tag that no longer exists in a newly-recreated ACR. Clear it before retrying:
+
+```bash
+azd env set SERVICE_WEB_IMAGE_NAME ""
+azd up
+```
+
+`azd provision` will deploy with the placeholder image; `azd deploy` pushes the real image immediately after.
+
+</details>
+
+<details>
+<summary>ACR push fails with 403 Forbidden / IP not allowed</summary>
+
+Set your public IP and re-provision to open the ACR firewall:
+
+```bash
+azd env set DEPLOYER_IP_ADDRESS "$(curl -s https://api.ipify.org)"
+azd provision   # updates ACR network rules
+azd deploy      # push succeeds
+```
+
+</details>
+
+<details>
+<summary>Container App fails: unable to fetch secret from Key Vault</summary>
+
+This means the Key Vault secret doesn't exist yet (typically on a fresh deploy). Ensure `GITHUB_CLIENT_ID` is set and run `azd provision` again — it will create the secrets in Key Vault as part of infra creation.
+
+```bash
+azd env set GITHUB_CLIENT_ID "<your-id>"
+azd provision
+```
+
+</details>
 
 ---
 
@@ -170,8 +245,21 @@ That's it. Container Apps, ACR, managed identity, TLS, monitoring — all provis
 | `SESSION_STORE_PATH` | `/data/sessions` | Persistent session directory |
 | `SETTINGS_STORE_PATH` | `/data/settings` | Per-user settings directory |
 | `COPILOT_CONFIG_DIR` | `~/.copilot` | Copilot session-state directory (share with CLI for bidirectional sync) |
+| `CHAT_STATE_PATH` | `.chat-state` (dev) / `/data/chat-state` (prod) | Persisted chat state storage |
+| `VAPID_PUBLIC_KEY` | — | VAPID public key (base64url) — required for push notifications |
+| `VAPID_PRIVATE_KEY` | — | VAPID private key (base64url) — required for push notifications |
+| `VAPID_SUBJECT` | `mailto:admin@example.com` | VAPID subject identifier |
+| `PUSH_STORE_PATH` | `/data/push-subscriptions` | Push subscription storage path |
 
 </details>
+
+### Generate VAPID keys (for push notifications)
+
+```bash
+node scripts/generate-vapid-keys.mjs
+```
+
+Copy the output into your `.env` file. Push notifications require all three VAPID variables (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`).
 
 ---
 
@@ -179,7 +267,7 @@ That's it. Container Apps, ACR, managed identity, TLS, monitoring — all provis
 
 Copilot Unleashed and the GitHub Copilot CLI share the same session-state directory (`~/.copilot/session-state/`). By default, the app reads from the same location the CLI uses — so any session started in the terminal is available in the browser the moment you open the Sessions panel.
 
-> **Note:** When running via Docker (`npm run dev`), the `docker-compose.yml` mounts `~/.copilot` read-only into the container. If you use `npm run dev:local` (no Docker), the app reads directly from your host `~/.copilot` with no extra config needed.
+> **Note:** When running via Docker (`npm run dev`), the `docker-compose.yml` mounts `~/.copilot` read-only into the container.
 
 ### How it works
 
@@ -303,8 +391,36 @@ Scopes: `copilot` (API access) + `read:user` (avatar) + `repo` (SDK tools need i
 - Structured security event logging
 - Optional user allowlist via `ALLOWED_GITHUB_USERS`
 - CodeQL scanning + secret scanning via GitHub Advanced Security
+- All API endpoints require GitHub authentication — no anonymous access
+- Periodic token revalidation ensures revoked tokens are caught promptly
+- **Azure**: VNet isolation for Container Apps, Key Vault for secrets management, Premium ACR with private endpoints
 
 </details>
+
+---
+
+## Data Persistence
+
+All stateful data survives container restarts when volumes are configured correctly.
+
+| Data | Path (default) | Survives restart? |
+|------|----------------|:-:|
+| SDK sessions & checkpoints | `COPILOT_CONFIG_DIR` (`~/.copilot`) | ✅ with volume |
+| App session metadata | `SESSION_STORE_PATH` (`/data/sessions`) | ✅ with volume |
+| Per-user settings | `SETTINGS_STORE_PATH` (`/data/settings`) | ✅ with volume |
+| Chat history | `CHAT_STATE_PATH` (`/data/chat-state`) | ✅ with volume |
+| Push subscriptions | `PUSH_STORE_PATH` (`/data/push-subscriptions`) | ✅ with volume |
+
+**Local Docker:** Use a named volume for `/data` and a bind mount for `~/.copilot` (enables CLI ↔ Browser sync).
+
+```yaml
+# docker-compose.yml
+volumes:
+  - app-data:/data                          # sessions, settings, chat state, push subs
+  - ~/.copilot:/home/node/.copilot          # SDK session-state (shared with CLI)
+```
+
+**Azure Container Apps:** Use an NFS-backed Azure Files mount at `/data`. The Bicep infrastructure provisions this automatically via `azd up`.
 
 ---
 

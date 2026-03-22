@@ -12,6 +12,7 @@ import {
 } from './session-pool.js';
 import { VALID_MESSAGE_TYPES, HEARTBEAT_INTERVAL, RATE_LIMITED_TYPES, WS_RATE_LIMIT_MAX, WS_RATE_LIMIT_WINDOW_MS } from './constants.js';
 import { messageHandlers } from './message-handlers/index.js';
+import { chatStateStore } from '../chat-state-singleton.js';
 import type { SessionMiddleware, MessageContext } from './types.js';
 
 export { cleanupAllSessions, cleanupUserSessions } from './session-pool.js';
@@ -120,12 +121,28 @@ export function setupWebSocket(
         isProcessing: entry.isProcessing,
       });
 
+      // Restore chat history from persisted state so the UI is populated
+      try {
+        const persistedState = await chatStateStore.load(userLogin, tabId);
+        if (persistedState && persistedState.messages.length > 0) {
+          poolSend(entry, {
+            type: 'cold_resume',
+            messages: persistedState.messages,
+            model: persistedState.model,
+            mode: persistedState.mode,
+            sdkSessionId: persistedState.sdkSessionId,
+          });
+        }
+      } catch (err) {
+        console.error('[WS-SERVER] Warm reconnect history load failed:', err);
+      }
+
       // Re-send pending prompts so the user can respond on the new connection
       if (entry.pendingUserInputPrompt && entry.userInputResolve) {
         poolSend(entry, entry.pendingUserInputPrompt);
       }
-      if (entry.pendingPermissionPrompt && entry.permissionResolve) {
-        poolSend(entry, entry.pendingPermissionPrompt);
+      for (const prompt of entry.pendingPermissionPrompts.values()) {
+        poolSend(entry, prompt);
       }
     } else {
       // Create new pool entry — enforce per-user session cap
@@ -138,11 +155,35 @@ export function setupWebSocket(
       entry = createPoolEntry(client, ws);
       sessionPool.set(poolKey, entry);
 
-      console.log('[WS-SERVER] Sending connected to', poolKey);
+      // Load persisted state BEFORE sending connected so the client gets
+      // sdkSessionId in a single message and can decide immediately
+      // whether to resume or create a new session (no timer/delay needed).
+      let persistedState: Awaited<ReturnType<typeof chatStateStore.load>> = null;
+      try {
+        persistedState = await chatStateStore.load(userLogin, tabId);
+      } catch (err) {
+        console.error('[WS-SERVER] Cold resume load failed:', err);
+      }
+
+      const hasPersistedState = !!(persistedState && persistedState.messages.length > 0);
+      console.log('[WS-SERVER] Sending connected to', poolKey, 'persisted:', hasPersistedState);
       poolSend(entry, {
         type: 'connected',
         user: userLogin,
+        sdkSessionId: hasPersistedState ? persistedState!.sdkSessionId : null,
+        hasPersistedState,
       });
+
+      // Send full chat history for UI restoration
+      if (hasPersistedState) {
+        poolSend(entry, {
+          type: 'cold_resume',
+          messages: persistedState!.messages,
+          model: persistedState!.model,
+          mode: persistedState!.mode,
+          sdkSessionId: persistedState!.sdkSessionId,
+        });
+      }
     }
 
     // Capture entry reference for this connection's handlers

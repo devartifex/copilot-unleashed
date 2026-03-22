@@ -1,6 +1,10 @@
 import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { getSessionById } from '$lib/server/session-store';
+import { checkAuth, revalidateTokenIfStale } from '$lib/server/auth/guard.js';
+import { initServerSideEffects } from '$lib/server/init.js';
+
+initServerSideEffects();
 
 // Extract express-session from the bridge and attach to event.locals
 const sessionHandle: Handle = async ({ event, resolve }) => {
@@ -28,11 +32,15 @@ const securityHeaders: Handle = async ({ event, resolve }) => {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
-      "connect-src 'self' ws: wss:",
+      "connect-src 'self' ws: wss: https://*.push.services.mozilla.com https://*.push.apple.com https://fcm.googleapis.com https://*.notify.windows.com",
       "worker-src 'self' blob:",
       "img-src 'self' data: https://avatars.githubusercontent.com",
       "font-src 'self'",
       "frame-ancestors 'none'",
+      "form-action 'self'",
+      "base-uri 'self'",
+      "manifest-src 'self'",
+      "object-src 'none'",
     ].join('; '));
 
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -61,6 +69,13 @@ const csrfProtection: Handle = async ({ event, resolve }) => {
     const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
     const expected = new URL(baseUrl).origin;
     if (origin !== expected) {
+      return new Response('Forbidden', { status: 403 });
+    }
+  } else {
+    // Reject state-changing requests without Origin in production.
+    // Exempt /api/sessions/sync which uses Bearer token auth from scripts.
+    const path = event.url.pathname;
+    if (!path.startsWith('/api/sessions/sync')) {
       return new Response('Forbidden', { status: 403 });
     }
   }
@@ -104,4 +119,34 @@ const rateLimit: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
-export const handle: Handle = sequence(sessionHandle, csrfProtection, securityHeaders, rateLimit);
+// Periodic token revalidation — verify revoked tokens against GitHub API
+const tokenRevalidation: Handle = async ({ event, resolve }) => {
+  const path = event.url.pathname;
+
+  // Skip auth routes (they handle their own token logic)
+  if (path.startsWith('/auth/')) {
+    return resolve(event);
+  }
+
+  const session = event.locals.session;
+  if (!session) {
+    return resolve(event);
+  }
+
+  const auth = checkAuth(session);
+  if (!auth.authenticated) {
+    return resolve(event);
+  }
+
+  const result = await revalidateTokenIfStale(session);
+  if (!result.valid) {
+    return new Response(JSON.stringify({ error: 'Token revoked. Please sign in again.' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  return resolve(event);
+};
+
+export const handle: Handle = sequence(sessionHandle, tokenRevalidation, csrfProtection, securityHeaders, rateLimit);

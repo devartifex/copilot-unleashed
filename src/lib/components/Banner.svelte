@@ -1,61 +1,84 @@
 <script lang="ts">
-  // no props needed — banner is always rendered
+  interface Props {
+    username?: string;
+  }
+
+  const { username }: Props = $props();
 </script>
 
 <div class="banner-box">
   <div class="banner-inner">
-    <div class="banner-header">
-      <span class="banner-version">Copilot SDK v0.1.32</span>
+    <img src="/img/logo-no-bg.svg" alt="" class="banner-logo" aria-hidden="true" />
+    <h2 class="banner-greeting">
+      {#if username}
+        Hello, {username}
+      {:else}
+        How can I help?
+      {/if}
+    </h2>
+    <p class="banner-sub">Describe a task to get started.</p>
+    <div class="banner-hints">
+      <span class="hint">Switch modes or models from the top bar</span>
+      <span class="hint-sep">·</span>
+      <span class="hint">AI may make mistakes — always verify</span>
     </div>
-    <div class="banner-sub">Describe a task to get started.</div>
-    <div class="banner-tip">Switch modes or models from the top bar.</div>
-    <div class="banner-warn">Copilot uses AI. Always verify suggestions.</div>
   </div>
 </div>
 
 <style>
   .banner-box {
-    border: 1px solid var(--mode-border, var(--border-accent));
-    border-radius: var(--radius-md);
-    margin: var(--sp-2) 0;
-    background: linear-gradient(135deg, var(--mode-banner-bg, rgba(110, 64, 201, 0.08)), transparent 60%);
-    overflow: hidden;
-    transition: border-color 0.3s ease;
+    display: flex;
+    justify-content: center;
+    padding: var(--sp-6) 0 var(--sp-4);
   }
 
   .banner-inner {
-    padding: var(--sp-3) var(--sp-4);
-  }
-
-  .banner-header {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: var(--sp-3);
-    margin-bottom: var(--sp-2);
+    gap: var(--sp-2);
+    max-width: 320px;
+    text-align: center;
   }
 
-  .banner-version {
-    font-size: 0.78em;
-    color: var(--cyan);
-    opacity: 0.7;
+  .banner-logo {
+    width: 48px;
+    height: 48px;
+    opacity: 0.8;
+    margin-bottom: var(--sp-1);
+    filter: drop-shadow(0 0 16px rgba(210, 168, 255, 0.25));
+  }
+
+  .banner-greeting {
+    font-family: var(--font-mono);
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--fg);
+    margin: 0;
   }
 
   .banner-sub {
     color: var(--fg-muted);
     font-size: 0.88em;
+    margin: 0;
+  }
+
+  .banner-hints {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--sp-1);
     margin-top: var(--sp-1);
   }
 
-  .banner-tip {
+  .hint {
     color: var(--fg-dim);
-    font-size: 0.82em;
-    margin-top: var(--sp-2);
+    font-size: 0.75em;
   }
 
-  .banner-warn {
+  .hint-sep {
     color: var(--fg-dim);
-    font-size: 0.78em;
-    margin-top: var(--sp-1);
-    opacity: 0.8;
+    font-size: 0.75em;
+    opacity: 0.4;
   }
 </style>

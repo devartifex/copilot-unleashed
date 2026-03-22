@@ -30,19 +30,64 @@ Instead, please use [GitHub's private vulnerability reporting](https://docs.gith
 
 ## Security Architecture
 
-This application follows security best practices:
+This application follows security best practices.
 
-- **Authentication**: GitHub Device Flow OAuth (no client secret stored)
-- **Session security**: httpOnly, secure (prod), sameSite cookies with server-side session storage
+### Authentication Hardening
+
+- **GitHub Device Flow OAuth**: Public client — no client secret required or stored
 - **Session fixation**: `session.regenerate()` after successful GitHub auth
 - **Token handling**: GitHub tokens stored server-side only, never sent to browser
-- **Token freshness**: tokens expire after 7 days (configurable); re-auth required
-- **Token revalidation**: WebSocket connections validate GitHub token against GitHub's API on connect (catches revoked tokens)
-- **XSS prevention**: DOMPurify sanitizes all dynamic content; CSP restricts script sources
+- **Token freshness**: tokens expire after 7 days (configurable via `TOKEN_MAX_AGE_MS`); re-auth required
+- **Authenticated endpoints**: All API endpoints require GitHub authentication via `checkAuth()`. Only `/health` remains public (infrastructure health check)
+- **Periodic token revalidation**: GitHub tokens validated every 30 minutes via `revalidateTokenIfStale()` (`GET /user` API) to catch revoked tokens. Previously only validated on WebSocket connect
+
+### Session Security
+
+- **httpOnly, secure, sameSite cookies**: Session cookies use `httpOnly`, `secure` (production), and `sameSite: lax`
+- **SESSION_SECRET required in production**: `SESSION_SECRET` is now required when `NODE_ENV=production` — server fails fast (throws) on missing value
+- **File-based session store**: Server-side file-based session store with 24-hour TTL replaces in-memory sessions for persistence across restarts
+- **Rolling sessions**: `maxAge` resets on each request, keeping active users authenticated
+
+### CSP Hardening
+
+- **Content-Security-Policy**: Restrictive CSP set in `hooks.server.ts` — `self` + `unsafe-inline` (required by Svelte) + `ws`/`wss` + GitHub avatar domains
+- **XSS prevention**: DOMPurify sanitizes all rendered markdown; CSP restricts script sources
 - **Subresource Integrity**: All CDN scripts use SRI hashes
-- **Rate limiting**: 200 requests per 15 minutes per IP
-- **WebSocket**: Origin validation, session-based auth, message type whitelist, 10K char limit
-- **Infrastructure**: Managed identity for registry pull, HTTPS-only ingress, secrets stored natively in Container Apps (encrypted at rest)
+- **Additional CSP directives**: `form-action 'self'`, `base-uri 'self'`, `object-src 'none'` added to prevent clickjacking and form hijacking. `manifest-src 'self'` for PWA. Push service endpoints (`*.push.services.mozilla.com`, `*.push.apple.com`, `fcm.googleapis.com`, `*.notify.windows.com`) added to `connect-src`
+
+### SSRF Protection
+
+- **URL validation**: Custom webhook and MCP tool URLs validated — HTTPS-only, private/internal IP ranges blocked
+- **Redirect prevention**: Webhook and MCP URL fetches use `redirect: 'manual'` to prevent redirect-based SSRF to internal IPs
+
+### CSRF Protection
+
+- **SvelteKit built-in CSRF**: SvelteKit's built-in CSRF checking enabled
+- **Origin header enforcement**: State-changing requests (POST/PUT/DELETE) rejected without `Origin` header in production, layered on top of SvelteKit's CSRF checking. Exception: `/api/sessions/sync` allows Bearer token auth without Origin header (for CLI scripts)
+
+### Rate Limiting & WebSocket
+
+- **Rate limiting**: 200 requests per 15 minutes per IP (Map-based)
+- **WebSocket**: Origin validation, session-based auth, message type whitelist, 10K char message limit
+- **Token revalidation on connect**: WebSocket connections validate GitHub token against GitHub's API
+
+### Push Notification Security
+
+- **VAPID key management**: VAPID keys stored in Azure Key Vault (production) or environment variables (local development)
+- **Authenticated subscriptions**: All push API endpoints (`/api/push/*`) require GitHub authentication
+- **HTTPS endpoint validation**: Push subscription endpoints must use HTTPS
+- **Minimal payloads**: Push payloads contain no sensitive data — only notification titles and bodies
+
+### Azure Infrastructure Security
+
+- **Managed identity**: Used for ACR registry pull — no credentials stored in config
+- **HTTPS-only ingress**: Azure Container Apps enforces HTTPS
+- **VNet isolation**: All Azure resources placed within a Virtual Network (3 subnets: `snet-apps`, `snet-pe`, `snet-storage`)
+- **Key Vault for secrets**: All secrets (SESSION_SECRET, VAPID keys, GitHub Client ID) stored in Azure Key Vault — no inline secrets in Container App configuration
+- **Premium ACR**: Private endpoint with public access denied
+- **Azure Files NFS**: VNet rules and RootSquash enabled for session storage
+- **Private endpoints**: All data-plane resources use private endpoints
+- **Diagnostic settings**: Audit logging enabled on Container Apps Environment, ACR, Storage Account, and Key Vault
 
 ## GitHub Secret Scanning
 

@@ -10,6 +10,12 @@ services:
       - BASE_URL=http://localhost:3000
       - SESSION_STORE_PATH=/data/sessions
       - SETTINGS_STORE_PATH=/data/settings
+      - CHAT_STATE_PATH=/data/chat-state
+      - PUSH_STORE_PATH=/data/push-subscriptions
+      # VAPID keys (generate with: node scripts/generate-vapid-keys.mjs)
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:admin@example.com}
       - COPILOT_CONFIG_DIR=/home/node/.copilot
     volumes:
       - copilot-data:/data

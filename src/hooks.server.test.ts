@@ -21,8 +21,10 @@ interface MockEvent {
 type MockResolve = (event: MockEvent) => Promise<Response>;
 type HookHandle = (input: { event: MockEvent; resolve: MockResolve }) => Promise<Response>;
 
-const { mockGetSessionById } = vi.hoisted(() => ({
+const { mockGetSessionById, mockCheckAuth, mockRevalidateTokenIfStale } = vi.hoisted(() => ({
 	mockGetSessionById: vi.fn<(sessionId: string) => SessionLike | undefined>(),
+	mockCheckAuth: vi.fn<() => { authenticated: boolean; user: { login: string } | null; error?: string }>(() => ({ authenticated: false, user: null })),
+	mockRevalidateTokenIfStale: vi.fn(async () => ({ valid: true })),
 }));
 
 vi.mock('@sveltejs/kit/hooks', () => ({
@@ -47,6 +49,11 @@ vi.mock('@sveltejs/kit/hooks', () => ({
 
 vi.mock('$lib/server/session-store', () => ({
 	getSessionById: mockGetSessionById,
+}));
+
+vi.mock('$lib/server/auth/guard.js', () => ({
+	checkAuth: mockCheckAuth,
+	revalidateTokenIfStale: mockRevalidateTokenIfStale,
 }));
 
 const originalNodeEnv = process.env.NODE_ENV;
@@ -104,6 +111,8 @@ beforeEach(() => {
 	vi.useFakeTimers();
 	vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
 	mockGetSessionById.mockReset();
+	mockCheckAuth.mockReset().mockReturnValue({ authenticated: false, user: null });
+	mockRevalidateTokenIfStale.mockReset().mockResolvedValue({ valid: true });
 	vi.spyOn(console, 'log').mockImplementation(() => undefined);
 	setEnv('NODE_ENV');
 	setEnv('BASE_URL');
@@ -231,7 +240,7 @@ describe('handle', () => {
 			expect(resolve).toHaveBeenCalledTimes(1);
 		});
 
-		it('allows state-changing requests without an origin header', async () => {
+		it('rejects state-changing requests without an origin header in production', async () => {
 			setProductionEnv();
 			const handle = await loadHandle();
 			const resolve = createResolve();
@@ -241,7 +250,26 @@ describe('handle', () => {
 				resolve,
 			});
 
+			expect(response.status).toBe(403);
+			expect(await response.text()).toBe('Forbidden');
+			expect(resolve).not.toHaveBeenCalled();
+		});
+
+		it('exempts /api/sessions/sync from missing-origin rejection', async () => {
+			setProductionEnv();
+			const handle = await loadHandle();
+			const resolve = createResolve(200, 'Synced');
+
+			const response = await handle({
+				event: createEvent({
+					method: 'POST',
+					url: 'http://localhost:3000/api/sessions/sync',
+				}),
+				resolve,
+			});
+
 			expect(response.status).toBe(200);
+			expect(await response.text()).toBe('Synced');
 			expect(resolve).toHaveBeenCalledTimes(1);
 		});
 
@@ -355,6 +383,95 @@ describe('handle', () => {
 
 			const resetResponse = await handle({ event: createEvent({ ip }), resolve });
 			expect(resetResponse.status).toBe(200);
+		});
+	});
+
+	describe('token revalidation', () => {
+		it('returns 401 when revalidation reports an invalid token', async () => {
+			const session = { githubToken: 'revoked-token', githubUser: { login: 'octocat' } };
+			mockGetSessionById.mockReturnValue(session);
+			mockCheckAuth.mockReturnValue({ authenticated: true, user: { login: 'octocat' } });
+			mockRevalidateTokenIfStale.mockResolvedValue({ valid: false });
+
+			const handle = await loadHandle();
+			const resolve = createResolve();
+			const event = createEvent({
+				url: 'http://localhost/api/models',
+				headers: { 'x-session-id': 'session-123' },
+			});
+
+			const response = await handle({ event, resolve });
+
+			expect(response.status).toBe(401);
+			const body = await response.json();
+			expect(body.error).toContain('Token revoked');
+			expect(resolve).not.toHaveBeenCalled();
+		});
+
+		it('passes through when revalidation reports a valid token', async () => {
+			const session = { githubToken: 'good-token', githubUser: { login: 'octocat' } };
+			mockGetSessionById.mockReturnValue(session);
+			mockCheckAuth.mockReturnValue({ authenticated: true, user: { login: 'octocat' } });
+			mockRevalidateTokenIfStale.mockResolvedValue({ valid: true });
+
+			const handle = await loadHandle();
+			const resolve = createResolve();
+			const event = createEvent({
+				url: 'http://localhost/api/models',
+				headers: { 'x-session-id': 'session-123' },
+			});
+
+			const response = await handle({ event, resolve });
+
+			expect(response.status).toBe(200);
+			expect(resolve).toHaveBeenCalledTimes(1);
+		});
+
+		it('skips revalidation for auth routes', async () => {
+			const session = { githubToken: 'token', githubUser: { login: 'octocat' } };
+			mockGetSessionById.mockReturnValue(session);
+			mockCheckAuth.mockReturnValue({ authenticated: true, user: { login: 'octocat' } });
+
+			const handle = await loadHandle();
+			const resolve = createResolve();
+			const event = createEvent({
+				url: 'http://localhost/auth/device/start',
+				headers: { 'x-session-id': 'session-123' },
+			});
+
+			const response = await handle({ event, resolve });
+
+			expect(response.status).toBe(200);
+			expect(mockRevalidateTokenIfStale).not.toHaveBeenCalled();
+		});
+
+		it('skips revalidation when there is no session', async () => {
+			const handle = await loadHandle();
+			const resolve = createResolve();
+			const event = createEvent({ url: 'http://localhost/api/models' });
+
+			const response = await handle({ event, resolve });
+
+			expect(response.status).toBe(200);
+			expect(mockRevalidateTokenIfStale).not.toHaveBeenCalled();
+		});
+
+		it('skips revalidation when checkAuth reports unauthenticated', async () => {
+			const session = { githubToken: 'token', githubUser: { login: 'octocat' } };
+			mockGetSessionById.mockReturnValue(session);
+			mockCheckAuth.mockReturnValue({ authenticated: false, user: null, error: 'expired' });
+
+			const handle = await loadHandle();
+			const resolve = createResolve();
+			const event = createEvent({
+				url: 'http://localhost/api/models',
+				headers: { 'x-session-id': 'session-123' },
+			});
+
+			const response = await handle({ event, resolve });
+
+			expect(response.status).toBe(200);
+			expect(mockRevalidateTokenIfStale).not.toHaveBeenCalled();
 		});
 	});
 });

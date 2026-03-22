@@ -28,7 +28,8 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
     connectionEntry.session = null;
   }
   connectionEntry.userInputResolve = null;
-  connectionEntry.permissionResolve = null;
+  connectionEntry.permissionResolves.clear();
+  connectionEntry.pendingPermissionPrompts.clear();
   connectionEntry.isProcessing = false;
 
   try {
@@ -70,7 +71,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
       connectionEntry.session = await connectionEntry.client.resumeSession(sessionId, {
         onPermissionRequest: (await import('@github/copilot-sdk')).approveAll,
         streaming: true,
-        onUserInputRequest: makeUserInputHandler(connectionEntry),
+        onUserInputRequest: makeUserInputHandler(connectionEntry, ctx.userLogin),
         hooks: buildSessionHooks((message) => poolSend(connectionEntry, message)),
         configDir: resolvedConfigDir,
         mcpServers: mcpServersConfig as any,
@@ -96,7 +97,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
 
       connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, {
         customInstructions: context,
-        onUserInputRequest: makeUserInputHandler(connectionEntry),
+        onUserInputRequest: makeUserInputHandler(connectionEntry, ctx.userLogin),
         permissionMode: 'approve_all',
         configDir: resolvedConfigDir,
         mcpServers: resumeMcpServers,
@@ -105,7 +106,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
       console.log(`[RESUME] Fallback session created for ${sessionId} with context injection`);
     }
 
-    wireSessionEvents(connectionEntry.session, connectionEntry, sessionId);
+    wireSessionEvents(connectionEntry.session, connectionEntry, sessionId, ctx.userLogin, ctx.poolKey.split(':').slice(1).join(':'));
 
     // Read and send the restored session's mode to the client
     try {
@@ -116,7 +117,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
         if (modeResult.mode === 'autopilot') {
           connectionEntry.session.registerPermissionHandler(approveAll);
         } else {
-          connectionEntry.session.registerPermissionHandler(makePermissionHandler(connectionEntry));
+          connectionEntry.session.registerPermissionHandler(makePermissionHandler(connectionEntry, ctx.userLogin));
         }
       }
     } catch {

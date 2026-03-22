@@ -1,8 +1,0 @@
-{
-  "containerAppsEnvironment": "cae-",
-  "containerRegistry": "cr",
-  "resourceGroup": "rg-",
-  "managedIdentity": "mi-",
-  "monitoring": "mon-",
-  "storageAccount": "st"
-}

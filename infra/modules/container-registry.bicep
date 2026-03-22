@@ -6,6 +6,11 @@ param location string
 
 param tags object = {}
 
+@description('Deployer public IP address for azd deploy push access. Leave empty to keep ACR fully private.')
+param deployerIpAddress string = ''
+
+var hasDeployerIp = !empty(deployerIpAddress)
+
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: name
   location: location
@@ -15,6 +20,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
   }
   properties: {
     adminUserEnabled: false
+    publicNetworkAccess: hasDeployerIp ? 'Enabled' : 'Disabled'
   }
 }
 

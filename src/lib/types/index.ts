@@ -173,10 +173,14 @@ export interface DeltaMessage {
 
 export interface TurnEndMessage {
   type: 'turn_end';
+  /** True when this message was replayed from the server buffer after reconnecting. */
+  replayed?: boolean;
 }
 
 export interface DoneMessage {
   type: 'done';
+  /** True when this message was replayed from the server buffer after reconnecting. */
+  replayed?: boolean;
 }
 
 export interface ReasoningDeltaMessage {

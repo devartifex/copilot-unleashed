@@ -31,6 +31,10 @@
   let sessionsLoading = $state(false);
   let sessionLoading = $state(true);
 
+  // Use the confirmed model from the active session; fall back to the user's saved preference
+  // so the TopBar/ModelSheet show the correct model immediately before session_created arrives.
+  const effectiveModel = $derived(chatStore.currentModel || settings.selectedModel || 'gpt-4.1');
+
   const modelCount = $derived(chatStore.models.size);
   const toolCount = $derived(chatStore.tools.length);
   const mcpServerCount = $derived(
@@ -247,9 +251,8 @@
 
   function handleSetReasoning(effort: ReasoningEffort): void {
     settings.reasoningEffort = effort;
-    // Restart session with new reasoning effort
-    chatStore.clearMessages();
-    requestNewSession();
+    // Persist the preference — will be applied on the next new session.
+    // Do NOT restart the current session: that would wipe the chat history.
   }
 
   function handleLogout(): void {
@@ -306,7 +309,7 @@
 {#if data.authenticated}
   <div class="screen" style={modeStyle}>
     <TopBar
-      currentModel={chatStore.currentModel}
+      currentModel={effectiveModel}
       connectionState={wsStore.connectionState}
       sessionTitle={chatStore.sessionTitle}
       quotaSnapshots={chatStore.quotaSnapshots}
@@ -400,7 +403,7 @@
     <ModelSheet
       open={modelSheetOpen}
       models={chatStore.models}
-      currentModel={chatStore.currentModel}
+      currentModel={effectiveModel}
       reasoningEffort={chatStore.reasoningEffort ?? settings.reasoningEffort}
       onSetModel={handleSetModel}
       onSetReasoning={handleSetReasoning}

@@ -303,10 +303,14 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
       case 'turn_end':
       case 'done':
-        notify('Response ready', {
-          body: currentStreamContent.trim().slice(0, 100) || undefined,
-          tag: 'response-ready',
-        });
+        // Skip client-side notification for replayed messages: the server already sent a
+        // push notification while the client was unreachable (iOS backgrounded / WS closed).
+        if (!msg.replayed) {
+          notify('Response ready', {
+            body: currentStreamContent.trim().slice(0, 100) || undefined,
+            tag: 'response-ready',
+          });
+        }
         finalizeStream();
         break;
 

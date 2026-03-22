@@ -23,9 +23,23 @@ export async function handlePermissionResponse(msg: any, ctx: MessageContext): P
   const { connectionEntry } = ctx;
 
   const requestId = typeof msg.requestId === 'string' ? msg.requestId : '';
-  const permResolve = requestId
-    ? connectionEntry.permissionResolves.get(requestId)
-    : connectionEntry.permissionResolves.values().next().value ?? null;
+  let resolvedKey: string | undefined;
+  let permResolve: ((decision: string) => void) | undefined;
+  if (requestId) {
+    const resolved = connectionEntry.permissionResolves.get(requestId);
+    if (resolved) {
+      resolvedKey = requestId;
+      permResolve = resolved;
+    }
+  } else {
+    // Fallback: resolve the oldest pending permission (insertion-order first entry).
+    // Clients should always send a requestId; this path is a safety net only.
+    for (const [key, resolve] of connectionEntry.permissionResolves) {
+      resolvedKey = key;
+      permResolve = resolve;
+      break;
+    }
+  }
 
   if (!permResolve) {
     poolSend(connectionEntry, { type: 'error', message: 'No pending permission request' });
@@ -44,9 +58,9 @@ export async function handlePermissionResponse(msg: any, ctx: MessageContext): P
   if (decision === 'always_deny') {
     connectionEntry.permissionPreferences.set(prefKey, 'deny');
   }
-  if (requestId) {
-    connectionEntry.permissionResolves.delete(requestId);
-    connectionEntry.pendingPermissionPrompts.delete(requestId);
+  if (resolvedKey) {
+    connectionEntry.permissionResolves.delete(resolvedKey);
+    connectionEntry.pendingPermissionPrompts.delete(resolvedKey);
   }
   permResolve(decision.replace('always_', ''));
 }

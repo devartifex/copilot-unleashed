@@ -20,6 +20,8 @@ export async function handleListSessions(msg: any, ctx: MessageContext): Promise
       rawList.map(async (s: any) => {
         const id = s.sessionId ?? s.id;
         const enriched = await enrichSessionMetadata(id, s.context, s.isRemote);
+        // Strip unhelpful cwd values (container home dir, root, etc.)
+        const cwd = enriched.cwd && enriched.cwd !== '/home/node' && enriched.cwd !== '/' ? enriched.cwd : undefined;
         return {
           id,
           title: s.summary ?? s.title,
@@ -27,6 +29,7 @@ export async function handleListSessions(msg: any, ctx: MessageContext): Promise
           model: s.model,
           source: 'sdk' as const,
           ...enriched,
+          cwd,
         };
       }),
     );
@@ -38,8 +41,14 @@ export async function handleListSessions(msg: any, ctx: MessageContext): Promise
     console.log('[DEBUG list_sessions] Filesystem found', fsSessions.length, 'sessions');
     const sdkIds = new Set(sdkSessions.map((s) => s.id));
     const extraSessions = fsSessions.filter((s) => !sdkIds.has(s.id)).map((s) => ({ ...s, source: 'filesystem' as const }));
-    const list = [...sdkSessions, ...extraSessions];
-    console.log('[DEBUG list_sessions] Sending', list.length, 'total (SDK:', sdkSessions.length, '+ FS extra:', extraSessions.length, ')');
+    const allSessions = [...sdkSessions, ...extraSessions];
+
+    // Filter out sessions with no meaningful content — these are SDK-internal
+    // empty sessions created at startup or after disconnects that were never used.
+    const list = allSessions.filter((s) =>
+      s.title || s.checkpointCount > 0 || s.hasPlan || (s.cwd && s.cwd !== '/home/node'),
+    );
+    console.log('[DEBUG list_sessions] Sending', list.length, 'total (SDK:', sdkSessions.length, '+ FS extra:', extraSessions.length, ', filtered out:', allSessions.length - list.length, ')');
 
     poolSend(connectionEntry, { type: 'sessions', sessions: list });
   } catch (err: any) {

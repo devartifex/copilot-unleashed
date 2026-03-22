@@ -404,4 +404,569 @@ export interface SubagentSelectedMessage {
   agentName: string;
 }
 
-{
+export interface SubagentDeselectedMessage {
+  type: 'subagent_deselected';
+  agentName?: string;
+}
+
+export interface InfoMessage {
+  type: 'info';
+  message: string;
+}
+
+export interface ElicitationRequestedMessage {
+  type: 'elicitation_requested';
+  question: string;
+  choices?: string[];
+  allowFreeform: boolean;
+}
+
+export interface ElicitationCompletedMessage {
+  type: 'elicitation_completed';
+  answer?: string;
+}
+
+export interface ExitPlanModeRequestedMessage {
+  type: 'exit_plan_mode_requested';
+}
+
+export interface ExitPlanModeCompletedMessage {
+  type: 'exit_plan_mode_completed';
+}
+
+export interface ContextInfoMessage {
+  type: 'context_info';
+  tokenLimit: number;
+  currentTokens: number;
+  messagesLength: number;
+}
+
+export interface ReasoningChangedMessage {
+  type: 'reasoning_changed';
+  effort: ReasoningEffort;
+}
+
+export interface SessionShutdownMessage {
+  type: 'session_shutdown';
+  totalPremiumRequests?: number;
+  totalApiDurationMs?: number;
+  sessionStartTime?: string;
+}
+
+export interface SessionIdleMessage {
+  type: 'session_idle';
+  backgroundTasks?: {
+    agents: Array<{ agentId: string; agentType: string }>;
+  };
+}
+
+export interface TaskCompleteMessage {
+  type: 'task_complete';
+  summary?: string;
+}
+
+export interface TruncationMessage {
+  type: 'truncation';
+  tokenLimit: number;
+  preTruncationTokens: number;
+  preTruncationMessages: number;
+  postTruncationTokens: number;
+  postTruncationMessages: number;
+}
+
+export interface ToolPartialResultMessage {
+  type: 'tool_partial_result';
+  toolCallId: string;
+  partialOutput: string;
+}
+
+export interface ContextChangedMessage {
+  type: 'context_changed';
+  cwd: string;
+  gitRoot?: string;
+  repository?: string;
+  branch?: string;
+}
+
+export interface WorkspaceFileChangedMessage {
+  type: 'workspace_file_changed';
+  path: string;
+  operation: 'create' | 'update';
+}
+
+export interface FleetStartedMessage {
+  type: 'fleet_started';
+  started: boolean;
+}
+
+export interface FleetStatusMessage {
+  type: 'fleet_status';
+  agents: Array<{ agentId: string; agentType: string }>;
+}
+
+export interface HookPreToolMessage {
+  type: 'hook_pre_tool';
+  toolName: string;
+  toolArgs?: unknown;
+}
+
+export interface HookPostToolMessage {
+  type: 'hook_post_tool';
+  toolName: string;
+  toolArgs?: unknown;
+}
+
+export interface HookSessionStartMessage {
+  type: 'hook_session_start';
+  source: string;
+}
+
+export interface HookSessionEndMessage {
+  type: 'hook_session_end';
+  reason: string;
+}
+
+export interface HookUserPromptMessage {
+  type: 'hook_user_prompt';
+  prompt: string;
+}
+
+export interface HookErrorMessage {
+  type: 'hook_error';
+  error: string;
+  errorContext: string;
+  recoverable: boolean;
+}
+
+export type HookMessage =
+  | HookPreToolMessage
+  | HookPostToolMessage
+  | HookUserPromptMessage
+  | HookSessionStartMessage
+  | HookSessionEndMessage
+  | HookErrorMessage;
+
+export interface SessionUsageTotals {
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalCost: number;
+  totalDurationMs: number;
+  apiCalls: number;
+  premiumRequests: number;
+}
+
+/** Server heartbeat response to client-side ping */
+export interface PongMessage {
+  type: 'pong';
+}
+
+export type ServerMessage =
+  | ConnectedMessage
+  | ColdResumeMessage
+  | SessionCreatedMessage
+  | SessionReconnectedMessage
+  | TurnStartMessage
+  | DeltaMessage
+  | TurnEndMessage
+  | DoneMessage
+  | ReasoningDeltaMessage
+  | ReasoningDoneMessage
+  | IntentMessage
+  | ToolStartMessage
+  | ToolProgressMessage
+  | ToolEndMessage
+  | ModelsMessage
+  | ModeChangedMessage
+  | ModelChangedMessage
+  | TitleChangedMessage
+  | UsageMessage
+  | WarningMessage
+  | ErrorMessage
+  | AbortedMessage
+  | UserInputRequestMessage
+  | PermissionRequestMessage
+  | ToolsMessage
+  | AgentsMessage
+  | AgentChangedMessage
+  | QuotaMessage
+  | SessionsMessage
+  | SessionDetailMessage
+  | SessionHistoryMessage
+  | SessionResumedMessage
+  | SessionDeletedMessage
+  | PlanMessage
+  | PlanChangedMessage
+  | PlanUpdatedMessage
+  | PlanDeletedMessage
+  | CompactionStartMessage
+  | CompactionCompleteMessage
+  | CompactionResultMessage
+  | SkillInvokedMessage
+  | SubagentStartMessage
+  | SubagentEndMessage
+  | SubagentFailedMessage
+  | SubagentSelectedMessage
+  | SubagentDeselectedMessage
+  | InfoMessage
+  | ElicitationRequestedMessage
+  | ElicitationCompletedMessage
+  | ExitPlanModeRequestedMessage
+  | ExitPlanModeCompletedMessage
+  | ContextInfoMessage
+  | ReasoningChangedMessage
+  | SessionShutdownMessage
+  | SessionIdleMessage
+  | TaskCompleteMessage
+  | TruncationMessage
+  | ToolPartialResultMessage
+  | ContextChangedMessage
+  | WorkspaceFileChangedMessage
+  | FleetStartedMessage
+  | FleetStatusMessage
+  | HookPreToolMessage
+  | HookPostToolMessage
+  | HookUserPromptMessage
+  | HookSessionStartMessage
+  | HookSessionEndMessage
+  | HookErrorMessage
+  | PongMessage
+  | SessionsChangedMessage;
+
+// ─── Session filesystem watcher ──────────────────────────────────────────────
+
+export interface SessionsChangedMessage {
+  type: 'sessions_changed';
+}
+
+// ─── File attachment (upload metadata) ───────────────────────────────────────
+
+export interface FileAttachment {
+  path: string;
+  name: string;
+  size: number;
+  type: string;
+}
+
+// ─── SDK attachment types (file, directory, selection) ───────────────────────
+
+export type Attachment =
+  | { type: 'file'; path: string; name: string; displayName?: string }
+  | { type: 'directory'; path: string; name: string; displayName?: string }
+  | {
+      type: 'selection';
+      filePath: string;
+      name: string;
+      displayName: string;
+      selection?: {
+        start: { line: number; character: number };
+        end: { line: number; character: number };
+      };
+      text?: string;
+    };
+
+// ─── Outgoing client messages (discriminated union on `type`) ────────────────
+
+export interface InfiniteSessionsConfig {
+  enabled: boolean;
+  backgroundThreshold: number;
+  bufferThreshold: number;
+}
+
+export interface NewSessionMessage {
+  type: 'new_session';
+  model: string;
+  mode?: SessionMode;
+  reasoningEffort?: ReasoningEffort;
+  customInstructions?: string;
+  excludedTools?: string[];
+  customTools?: CustomToolDefinition[];
+  mcpServers?: McpServerDefinition[];
+  disabledSkills?: string[];
+  customAgents?: CustomAgentDefinition[];
+  infiniteSessions?: InfiniteSessionsConfig;
+}
+
+export type MessageDeliveryMode = 'immediate' | 'enqueue';
+
+export interface SendMessage {
+  type: 'message';
+  content: string;
+  attachments?: Attachment[];
+  mode?: MessageDeliveryMode;
+}
+
+export interface ListModelsMessage {
+  type: 'list_models';
+}
+
+export interface SetModeMessage {
+  type: 'set_mode';
+  mode: SessionMode;
+}
+
+export interface AbortClientMessage {
+  type: 'abort';
+}
+
+export interface SetModelMessage {
+  type: 'set_model';
+  model: string;
+}
+
+export interface SetReasoningMessage {
+  type: 'set_reasoning';
+  effort: ReasoningEffort;
+}
+
+export interface UserInputResponseMessage {
+  type: 'user_input_response';
+  answer: string;
+  wasFreeform: boolean;
+}
+
+export interface PermissionResponseMessage {
+  type: 'permission_response';
+  requestId: string;
+  kind: string;
+  toolName: string;
+  decision: 'allow' | 'deny' | 'always_allow' | 'always_deny';
+}
+
+export interface ListToolsMessage {
+  type: 'list_tools';
+  model?: string;
+}
+
+export interface ListAgentsMessage {
+  type: 'list_agents';
+}
+
+export interface SelectAgentMessage {
+  type: 'select_agent';
+  name: string;
+}
+
+export interface DeselectAgentMessage {
+  type: 'deselect_agent';
+}
+
+export interface GetQuotaMessage {
+  type: 'get_quota';
+}
+
+export interface CompactMessage {
+  type: 'compact';
+}
+
+export interface ListSessionsMessage {
+  type: 'list_sessions';
+}
+
+export interface ResumeSessionMessage {
+  type: 'resume_session';
+  sessionId: string;
+  mcpServers?: McpServerDefinition[];
+}
+
+export interface DeleteSessionMessage {
+  type: 'delete_session';
+  sessionId: string;
+}
+
+export interface GetSessionDetailMessage {
+  type: 'get_session_detail';
+  sessionId: string;
+}
+
+export interface GetPlanMessage {
+  type: 'get_plan';
+}
+
+export interface UpdatePlanMessage {
+  type: 'update_plan';
+  content: string;
+}
+
+export interface StartFleetMessage {
+  type: 'start_fleet';
+  prompt: string;
+}
+
+export interface DeletePlanMessage {
+  type: 'delete_plan';
+}
+
+export interface ClearChatMessage {
+  type: 'clear_chat';
+}
+
+export type ClientMessage =
+  | NewSessionMessage
+  | SendMessage
+  | ListModelsMessage
+  | SetModeMessage
+  | AbortClientMessage
+  | SetModelMessage
+  | SetReasoningMessage
+  | UserInputResponseMessage
+  | PermissionResponseMessage
+  | ListToolsMessage
+  | ListAgentsMessage
+  | SelectAgentMessage
+  | DeselectAgentMessage
+  | GetQuotaMessage
+  | CompactMessage
+  | ListSessionsMessage
+  | ResumeSessionMessage
+  | DeleteSessionMessage
+  | GetSessionDetailMessage
+  | GetPlanMessage
+  | UpdatePlanMessage
+  | DeletePlanMessage
+  | StartFleetMessage
+  | ClearChatMessage;
+
+// ─── Chat message type for rendering ────────────────────────────────────────
+
+export type ChatMessageRole =
+  | 'user'
+  | 'assistant'
+  | 'tool'
+  | 'info'
+  | 'warning'
+  | 'error'
+  | 'intent'
+  | 'usage'
+  | 'skill'
+  | 'subagent'
+  | 'fleet'
+  | 'reasoning'
+  | 'queued';
+
+export interface ChatMessage {
+  id: string;
+  role: ChatMessageRole;
+  content: string;
+  timestamp: number;
+  toolCallId?: string;
+  toolName?: string;
+  toolStatus?: ToolCallStatus;
+  toolProgressMessage?: string;
+  toolProgressMessages?: string[];
+  mcpServerName?: string;
+  mcpToolName?: string;
+  agentName?: string;
+  skillName?: string;
+  fleetAgents?: Array<{ agentId: string; agentType: string; status: 'running' | 'completed' | 'failed'; error?: string }>;
+  inputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  duration?: number;
+  cost?: number;
+  quotaSnapshots?: QuotaSnapshots;
+  copilotUsage?: CopilotUsageItem[];
+  attachments?: Attachment[];
+}
+
+// ─── Tool call tracking ─────────────────────────────────────────────────────
+
+export type ToolCallStatus = 'running' | 'progress' | 'complete' | 'failed';
+
+export interface ToolCallState {
+  id: string;
+  name: string;
+  mcpServerName?: string;
+  mcpToolName?: string;
+  status: ToolCallStatus;
+  message?: string;
+  progressMessages?: string[];
+}
+
+// ─── User input request state ───────────────────────────────────────────────
+
+export interface UserInputState {
+  pending: boolean;
+  question: string;
+  choices?: string[];
+  allowFreeform: boolean;
+}
+
+// ─── Permission request state ───────────────────────────────────────────────
+
+export interface PermissionRequestState {
+  requestId: string;
+  kind: string;
+  toolName: string;
+  toolArgs: Record<string, unknown>;
+}
+
+// ─── Context info state ─────────────────────────────────────────────────────
+
+export interface ContextInfo {
+  tokenLimit: number;
+  currentTokens: number;
+  messagesLength: number;
+}
+
+// ─── Plan state ─────────────────────────────────────────────────────────────
+
+export interface PlanState {
+  exists: boolean;
+  content: string;
+  path?: string;
+}
+
+// ─── New session configuration ──────────────────────────────────────────────
+
+export interface NewSessionConfig {
+  model: string;
+  mode?: SessionMode;
+  reasoningEffort?: ReasoningEffort;
+  customInstructions?: string;
+  excludedTools?: string[];
+  customTools?: CustomToolDefinition[];
+  mcpServers?: McpServerDefinition[];
+  disabledSkills?: string[];
+  customAgents?: CustomAgentDefinition[];
+  infiniteSessions?: InfiniteSessionsConfig;
+}
+
+// ─── Settings (persisted to localStorage) ───────────────────────────────────
+
+export interface PersistedSettings {
+  model: string;
+  mode: SessionMode;
+  reasoningEffort: ReasoningEffort;
+  customInstructions: string;
+  excludedTools: string[];
+  customTools: CustomToolDefinition[];
+  mcpServers?: McpServerDefinition[];
+  disabledSkills?: string[];
+  customAgents?: CustomAgentDefinition[];
+  infiniteSessions?: InfiniteSessionsConfig;
+}
+
+// ─── Custom agent definitions ───────────────────────────────────────────────
+
+export interface CustomAgentDefinition {
+  name: string;
+  displayName?: string;
+  description?: string;
+  tools?: string[];
+  prompt: string;
+}
+
+// ─── Skill definitions ──────────────────────────────────────────────────────
+
+export interface SkillDefinition {
+  name: string;
+  description: string;
+  directory: string;
+  license?: string;
+  allowedTools?: string;
+}

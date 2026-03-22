@@ -37,7 +37,7 @@ This application follows security best practices.
 - **GitHub Device Flow OAuth**: Public client — no client secret required or stored
 - **Session fixation**: `session.regenerate()` after successful GitHub auth
 - **Token handling**: GitHub tokens stored server-side only, never sent to browser
-- **Token freshness**: tokens expire after 7 days (configurable via `TOKEN_MAX_AGE_MS`); re-auth required
+- **Token freshness**: tokens expire after 24 hours (configurable via `TOKEN_MAX_AGE_MS`); re-auth required
 - **Authenticated endpoints**: All API endpoints require GitHub authentication via `checkAuth()`. Only `/health` remains public (infrastructure health check)
 - **Periodic token revalidation**: GitHub tokens validated every 30 minutes via `revalidateTokenIfStale()` (`GET /user` API) to catch revoked tokens. Previously only validated on WebSocket connect
 
@@ -52,7 +52,7 @@ This application follows security best practices.
 
 - **Content-Security-Policy**: Restrictive CSP set in `hooks.server.ts` — `self` + `unsafe-inline` (required by Svelte) + `ws`/`wss` + GitHub avatar domains
 - **XSS prevention**: DOMPurify sanitizes all rendered markdown; CSP restricts script sources
-- **Subresource Integrity**: All CDN scripts use SRI hashes
+- **Subresource Integrity**: All dependencies are bundled at build time via Vite — no CDN scripts
 - **Additional CSP directives**: `form-action 'self'`, `base-uri 'self'`, `object-src 'none'` added to prevent clickjacking and form hijacking. `manifest-src 'self'` for PWA. Push service endpoints (`*.push.services.mozilla.com`, `*.push.apple.com`, `fcm.googleapis.com`, `*.notify.windows.com`) added to `connect-src`
 
 ### SSRF Protection
@@ -82,12 +82,9 @@ This application follows security best practices.
 
 - **Managed identity**: Used for ACR registry pull — no credentials stored in config
 - **HTTPS-only ingress**: Azure Container Apps enforces HTTPS
-- **VNet isolation**: All Azure resources placed within a Virtual Network (3 subnets: `snet-apps`, `snet-pe`, `snet-storage`)
-- **Key Vault for secrets**: All secrets (SESSION_SECRET, VAPID keys, GitHub Client ID) stored in Azure Key Vault — no inline secrets in Container App configuration
-- **Premium ACR**: Private endpoint with public access denied
-- **Azure Files NFS**: VNet rules and RootSquash enabled for session storage
-- **Private endpoints**: All data-plane resources use private endpoints
-- **Diagnostic settings**: Audit logging enabled on Container Apps Environment, ACR, Storage Account, and Key Vault
+- **Key Vault for secrets**: All secrets (SESSION_SECRET, VAPID keys, GitHub Client ID) stored in Azure Key Vault (RBAC-only) — no inline secrets in Container App configuration
+- **Basic ACR**: Public access conditional on deployer IP parameter
+- **Monitoring**: Container Apps Environment logs to Log Analytics workspace
 
 ## GitHub Secret Scanning
 
@@ -106,7 +103,7 @@ If you deploy your own instance:
 3. **Set `NODE_ENV=production`** — enables secure cookies and trust proxy
 4. **Set `BASE_URL`** — must match your actual deployment URL for origin validation
 5. **Restrict access** (recommended) — set `ALLOWED_GITHUB_USERS=user1,user2` to limit who can log in
-6. **Review token lifetime** — default is 7 days; customize with `TOKEN_MAX_AGE_MS`
+6. **Review token lifetime** — default is 24 hours; customize with `TOKEN_MAX_AGE_MS`
 7. **Enable HTTPS** — required in production (Azure Container Apps provides this automatically)
 8. **Monitor logs** — security events are logged as structured JSON to stdout
 9. **Set IP restrictions** (optional) — use `ipRestrictions` Bicep param to lock ACA ingress to known IPs

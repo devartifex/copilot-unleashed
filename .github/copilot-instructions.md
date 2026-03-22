@@ -18,7 +18,7 @@ Self-hosted multi-model AI chat platform powered by the official `@github/copilo
 - **Deployment**: Docker container → Azure Container Apps via `azd up`
 
 ### Deployment
-- **Azure**: VNet with subnets, Key Vault for secrets, Premium ACR, NFS volume with private endpoints; `COPILOT_CONFIG_DIR=/data/copilot-home`
+- **Azure**: Key Vault (RBAC-only) for secrets, Basic ACR, EmptyDir volume; `COPILOT_CONFIG_DIR=/data/copilot-home`
 - **Local Docker**: Bind mount `~/.copilot` preserved for CLI sync; `COPILOT_CONFIG_DIR` stays at `/home/node/.copilot`
 
 ## Tech Stack
@@ -32,7 +32,7 @@ Self-hosted multi-model AI chat platform powered by the official `@github/copilo
 | AI Engine | `@github/copilot-sdk` ^0.1.32 |
 | WebSocket | `ws` ^8.18 via custom server.js |
 | Markdown | `marked` + `dompurify` + `highlight.js` (npm, bundled by Vite) |
-| Security | Helmet-like CSP in hooks.server.ts, rate limiting, DOMPurify |
+| Security | Custom CSP/HSTS in hooks.server.ts, rate limiting, DOMPurify |
 | Sessions | express-session bridged to SvelteKit locals |
 | Build | `npm run build` (`tsc -p tsconfig.node.json` + `vite build`) → `build/` via adapter-node |
 | Testing | Vitest (colocated `*.test.ts`) + Playwright (Desktop Chrome, Pixel 7, iPhone 14) |
@@ -57,8 +57,11 @@ static/
 └── sw.js                       # Service worker: precaching, push handler, notification click
 infra/
 ├── modules/
-│   ├── vnet.bicep              # Azure VNet with subnets for private endpoints
-│   └── key-vault.bicep         # Azure Key Vault for secrets management
+│   ├── container-apps.bicep    # Container Apps Environment + App (Consumption, scale-to-zero)
+│   ├── container-registry.bicep # Azure Container Registry (Basic SKU)
+│   ├── key-vault.bicep         # Azure Key Vault (RBAC-only, secrets management)
+│   ├── managed-identity.bicep  # User-assigned MI (AcrPull + Key Vault Secrets User)
+│   └── monitoring.bicep        # Log Analytics workspace
 
 src/
 ├── app.html                    # SvelteKit shell (viewport, theme-color, PWA meta)

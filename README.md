@@ -82,7 +82,7 @@ Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, 
 
 > *"Is the auth bug ticket still open? If so, find the related PRs and summarize the discussion"* → calls your project tracker, then searches GitHub.
 
-**Deploy for your team.** One `azd up`. Everyone logs in with their own GitHub account, gets isolated sessions. No shared API keys, no shared context.
+**Self-host for personal use.** One `azd up`. Optionally share with a trusted team via `ALLOWED_GITHUB_USERS`. Everyone logs in with their own GitHub account — no shared API keys, no shared context.
 
 ---
 
@@ -144,7 +144,7 @@ Open [localhost:3000](http://localhost:3000). Log in with GitHub. Done.
 azd up
 ```
 
-That's it. Container Apps, ACR, Key Vault, managed identity, VNet, TLS, and monitoring — all provisioned automatically.
+That's it. Container Apps, ACR (Basic), Key Vault, managed identity, Log Analytics, and TLS — all provisioned automatically.
 
 ### Required parameters
 
@@ -155,16 +155,16 @@ That's it. Container Apps, ACR, Key Vault, managed identity, VNet, TLS, and moni
 | `GITHUB_CLIENT_ID` | `azd env set GITHUB_CLIENT_ID <id>` | Your GitHub OAuth App client ID |
 | `SESSION_SECRET` | auto-generated as `newGuid()` if omitted | 32+ char random string |
 
-### Deployer IP (required for `azd deploy` with private ACR)
+### Deployer IP (required for ACR push access)
 
-The default infrastructure uses a **Premium ACR with public network access disabled** and a private endpoint. This blocks `azd deploy` pushes from your local machine. Set your current public IP before deploying:
+The infrastructure uses a **Basic SKU ACR** with a deployer IP allowlist for push access. Set your current public IP before deploying:
 
 ```bash
 azd env set DEPLOYER_IP_ADDRESS "$(curl -s https://api.ipify.org)"
 azd up
 ```
 
-The ACR firewall will allow only that IP (`defaultAction: Deny`, single `Allow` rule). All other public access remains blocked. For CI/CD pipelines, set `DEPLOYER_IP_ADDRESS` to the runner's outbound IP in the same way.
+The ACR firewall will allow only that IP for push operations. Container Apps pull images via managed identity. For CI/CD pipelines, set `DEPLOYER_IP_ADDRESS` to the runner's outbound IP in the same way.
 
 ### Optional: VAPID keys for push notifications
 
@@ -393,7 +393,7 @@ Scopes: `copilot` (API access) + `read:user` (avatar) + `repo` (SDK tools need i
 - CodeQL scanning + secret scanning via GitHub Advanced Security
 - All API endpoints require GitHub authentication — no anonymous access
 - Periodic token revalidation ensures revoked tokens are caught promptly
-- **Azure**: VNet isolation for Container Apps, Key Vault for secrets management, Premium ACR with private endpoints
+- **Azure**: Key Vault (RBAC-only) for secrets management, Basic ACR with deployer IP allowlist, managed identity for registry pull
 
 </details>
 
@@ -420,7 +420,7 @@ volumes:
   - ~/.copilot:/home/node/.copilot          # SDK session-state (shared with CLI)
 ```
 
-**Azure Container Apps:** Use an NFS-backed Azure Files mount at `/data`. The Bicep infrastructure provisions this automatically via `azd up`.
+**Azure Container Apps:** Uses an EmptyDir volume at `/data`. Data survives container restarts but **not** replica replacement or scaling events. The Bicep infrastructure provisions this automatically via `azd up`.
 
 ---
 

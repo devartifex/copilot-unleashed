@@ -28,11 +28,11 @@ Browser (Svelte 5 SPA)
 | AI Engine | `@github/copilot-sdk` ^0.1.32 |
 | Real-time | WebSocket (`ws` ^8.18) via custom `server.js` entry |
 | Markdown | `marked` + `dompurify` + `highlight.js` |
-| Security | Helmet (CSP, HSTS), rate limiting, DOMPurify |
+| Security | Custom CSP/HSTS headers in hooks.server.ts, rate limiting, DOMPurify |
 | Sessions | express-session bridged to SvelteKit via `x-session-id` header |
 | Build | Vite → `build/` via adapter-node |
 | Container | Multi-stage Dockerfile (builder + runtime) |
-| IaC | Bicep (Container Apps, ACR, Managed Identity) |
+| IaC | Bicep (Container Apps, ACR Basic, Key Vault RBAC, Managed Identity, Log Analytics) |
 | CI/CD | GitHub Actions (ci.yml + deploy.yml) |
 | Testing | Playwright (desktop + mobile viewports) |
 
@@ -244,7 +244,7 @@ volumes:
   - ~/.copilot:/home/node/.copilot   # Shares session-state with host CLI
 ```
 
-This enables bidirectional sync: sessions started in the host terminal's `copilot` CLI appear in the browser, and vice versa. In Azure deployments, the session-state directory lives on a persistent NFS mount instead (see [Filesystem Persistence](#filesystem-persistence-planned)).
+This enables bidirectional sync: sessions started in the host terminal's `copilot` CLI appear in the browser, and vice versa. In Azure deployments, the session-state directory lives on an EmptyDir volume (ephemeral, scoped to replica lifetime) instead (see [Filesystem Persistence](#filesystem-persistence-planned)).
 
 ## Component Architecture
 
@@ -385,7 +385,7 @@ All persistent application data lives under `/data`, with the layout varying by 
 
 | Deployment | `/data` mount | `COPILOT_CONFIG_DIR` | CLI sync |
 |-----------|--------------|---------------------|----------|
-| **Azure** | NFS file share (Premium Storage, VNet rules, RootSquash) | `/data/copilot-home` | N/A — no host CLI |
+| **Azure** | EmptyDir volume (ephemeral, scoped to replica lifetime) | `/data/copilot-home` | N/A — no host CLI |
 | **Local Docker** | Named volume (`copilot-data:/data`) | `/home/node/.copilot` (default) | Bind mount `~/.copilot:/home/node/.copilot` |
 | **Dev (no Docker)** | Local filesystem `./data/` | `~/.copilot` (default) | Shared natively — same filesystem |
 
@@ -402,22 +402,13 @@ services:
       - ~/.copilot:/home/node/.copilot   # Bind mount for CLI ↔ browser session sync
 ```
 
-In Azure, `COPILOT_CONFIG_DIR=/data/copilot-home` moves the SDK's session-state onto the NFS mount so sessions persist across container restarts and scale events.
+In Azure, `COPILOT_CONFIG_DIR=/data/copilot-home` moves the SDK's session-state onto the EmptyDir volume. Data persists across container restarts within the same replica, but is lost on replica replacement or scale-to-zero events.
 
 ### Azure Infrastructure Security
 
-Hardened Azure infrastructure with network isolation, secret management, and private endpoints for all PaaS services.
+Lightweight Azure infrastructure (~$10–20/mo) using RBAC and managed identity — no VNet or private endpoints.
 
-**VNet topology:**
-
-```
-VNet (10.0.0.0/16)
-├── snet-apps    (10.0.0.0/23)   # Container Apps Environment (delegated)
-├── snet-pe      (10.0.2.0/24)   # Private Endpoints (ACR, Key Vault)
-└── snet-storage (10.0.3.0/24)   # Storage NFS (service endpoints)
-```
-
-**Key Vault** replaces inline Bicep secret values:
+**Key Vault** (RBAC-only, publicNetworkAccess enabled) replaces inline Bicep secret values:
 
 | Secret | Source |
 |--------|--------|
@@ -428,12 +419,14 @@ VNet (10.0.0.0/16)
 
 Container Apps access secrets via Managed Identity → Key Vault references (no secrets in environment variables or Bicep parameters).
 
-**Private endpoints and network rules:**
+**Resource configuration:**
 
-| Resource | Access |
-|----------|--------|
-| **ACR** (Premium SKU) | Private endpoint in `snet-pe`, public access disabled |
-| **Storage** (NFS file share) | VNet rules on `snet-storage`, RootSquash enabled |
-| **Key Vault** | Private endpoint in `snet-pe`, network ACL deny-all + VNet exception |
+| Resource | Configuration |
+|----------|---------------|
+| **ACR** (Basic SKU) | Deployer IP allowlist, admin user disabled |
+| **Key Vault** | RBAC-only access policy, public network access enabled, network ACLs default Allow |
+| **Container Apps** | Scale-to-zero (0–1 replicas), EmptyDir volume for `/data` |
 
-**Diagnostic settings** are enabled on all resources (Container Apps Environment, ACR, Key Vault, Storage Account), streaming logs and metrics to a Log Analytics workspace for observability and audit.
+**Monitoring:** Log Analytics workspace collects container logs and metrics for observability and audit.
+
+**Bicep modules** (5 total): `container-apps`, `container-registry`, `key-vault`, `managed-identity`, `monitoring`.

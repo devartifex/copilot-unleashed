@@ -24,9 +24,9 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
     connectionEntry.session = null;
   }
   connectionEntry.userInputResolve = null;
-  connectionEntry.permissionResolve = null;
+  connectionEntry.permissionResolves.clear();
   connectionEntry.pendingUserInputPrompt = null;
-  connectionEntry.pendingPermissionPrompt = null;
+  connectionEntry.pendingPermissionPrompts.clear();
 
   try {
     const customInstructions = typeof msg.customInstructions === 'string'

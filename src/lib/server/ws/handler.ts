@@ -141,8 +141,8 @@ export function setupWebSocket(
       if (entry.pendingUserInputPrompt && entry.userInputResolve) {
         poolSend(entry, entry.pendingUserInputPrompt);
       }
-      if (entry.pendingPermissionPrompt && entry.permissionResolve) {
-        poolSend(entry, entry.pendingPermissionPrompt);
+      for (const prompt of entry.pendingPermissionPrompts.values()) {
+        poolSend(entry, prompt);
       }
     } else {
       // Create new pool entry — enforce per-user session cap

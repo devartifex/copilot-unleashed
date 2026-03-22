@@ -262,10 +262,11 @@
   }
 
   function handlePermissionResponse(requestId: string, decision: 'allow' | 'deny' | 'always_allow'): void {
-    const kind = chatStore.pendingPermission?.kind ?? '';
-    const toolName = chatStore.pendingPermission?.toolName ?? '';
+    const perm = chatStore.pendingPermissions.find((p) => p.requestId === requestId);
+    const kind = perm?.kind ?? '';
+    const toolName = perm?.toolName ?? '';
     wsStore.respondToPermission(requestId, kind, toolName, decision);
-    chatStore.clearPendingPermission();
+    chatStore.clearPendingPermission(requestId);
   }
 
   function handleToggleSkill(skillName: string, enabled: boolean): void {
@@ -318,14 +319,16 @@
         />
       </MessageList>
 
-      {#if chatStore.pendingPermission}
-        <PermissionPrompt
-          requestId={chatStore.pendingPermission.requestId}
-          kind={chatStore.pendingPermission.kind}
-          toolName={chatStore.pendingPermission.toolName}
-          toolArgs={chatStore.pendingPermission.toolArgs}
-          onRespond={handlePermissionResponse}
-        />
+      {#if chatStore.pendingPermissions.length > 0}
+        {#each chatStore.pendingPermissions as perm (perm.requestId)}
+          <PermissionPrompt
+            requestId={perm.requestId}
+            kind={perm.kind}
+            toolName={perm.toolName}
+            toolArgs={perm.toolArgs}
+            onRespond={handlePermissionResponse}
+          />
+        {/each}
       {/if}
 
       <ChatInput

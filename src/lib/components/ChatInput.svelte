@@ -680,6 +680,35 @@
     tabindex={-1}
   />
 
+  {#if selectedFiles.length > 0}
+    <div class="file-preview-row">
+      {#each selectedFiles as file, i (file.name + i)}
+        <div class="file-chip">
+          {#if isImageFile(file)}
+            <img
+              class="file-chip-thumb"
+              src={URL.createObjectURL(file)}
+              alt={file.name}
+              onload={(e) => URL.revokeObjectURL((e.currentTarget as HTMLImageElement).src)}
+            />
+          {:else}
+            <span class="file-chip-icon" aria-hidden="true">📄</span>
+          {/if}
+          <span class="file-chip-name">{file.name}</span>
+          {#if !isImageFile(file)}
+            <span class="file-chip-size">{formatFileSize(file.size)}</span>
+          {/if}
+          <button class="file-chip-remove" onclick={() => removeFile(i)} aria-label="Remove {file.name}">×</button>
+        </div>
+      {/each}
+    </div>
+    {#if hasImageAttachments && !supportsVision}
+      <div class="vision-warning" role="alert">
+        ⚠️ Current model may not support image analysis
+      </div>
+    {/if}
+  {/if}
+
   <div class="input-container" class:user-input-active={!!pendingUserInput}>
     {#if pendingUserInput}
       <div class="user-input-banner">
@@ -692,35 +721,6 @@
           </div>
         {/if}
       </div>
-    {/if}
-
-    {#if selectedFiles.length > 0}
-      <div class="file-preview-row">
-        {#each selectedFiles as file, i (file.name + i)}
-          <div class="file-chip">
-            {#if isImageFile(file)}
-              <img
-                class="file-chip-thumb"
-                src={URL.createObjectURL(file)}
-                alt={file.name}
-                onload={(e) => URL.revokeObjectURL((e.currentTarget as HTMLImageElement).src)}
-              />
-            {:else}
-              <span class="file-chip-icon" aria-hidden="true">📄</span>
-            {/if}
-            <span class="file-chip-name">{file.name}</span>
-            {#if !isImageFile(file)}
-              <span class="file-chip-size">{formatFileSize(file.size)}</span>
-            {/if}
-            <button class="file-chip-remove" onclick={() => removeFile(i)} aria-label="Remove {file.name}">×</button>
-          </div>
-        {/each}
-      </div>
-      {#if hasImageAttachments && !supportsVision}
-        <div class="vision-warning" role="alert">
-          ⚠️ Current model may not support image analysis
-        </div>
-      {/if}
     {/if}
 
     <textarea
@@ -1571,7 +1571,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-1);
-    padding: 0 0 var(--sp-2);
+    padding: var(--sp-2) var(--sp-1) 0;
     overflow-x: auto;
     scrollbar-width: none;
   }

@@ -119,20 +119,21 @@ export function makePermissionHandler(entry: PoolEntry, userLogin?: string) {
 
     return new Promise<{ kind: 'approved' } | { kind: 'denied-interactively-by-user'; feedback?: string }>((resolve) => {
       const timeout = setTimeout(() => {
-        entry.permissionResolve = null;
-        entry.pendingPermissionPrompt = null;
+        entry.permissionResolves.delete(requestId);
+        entry.pendingPermissionPrompts.delete(requestId);
         resolve({ kind: 'denied-interactively-by-user', feedback: 'Permission request timed out' });
       }, PERMISSION_TIMEOUT_MS);
 
-      entry.permissionResolve = (decision: string) => {
+      entry.permissionResolves.set(requestId, (decision: string) => {
         clearTimeout(timeout);
-        entry.pendingPermissionPrompt = null;
+        entry.pendingPermissionPrompts.delete(requestId);
+        entry.permissionResolves.delete(requestId);
         resolve(
           decision === 'allow'
             ? { kind: 'approved' }
             : { kind: 'denied-interactively-by-user', feedback: 'User denied' },
         );
-      };
+      });
 
       const prompt = {
         type: 'permission_request',
@@ -141,7 +142,7 @@ export function makePermissionHandler(entry: PoolEntry, userLogin?: string) {
         toolName,
         toolArgs,
       };
-      entry.pendingPermissionPrompt = prompt;
+      entry.pendingPermissionPrompts.set(requestId, prompt);
       poolSend(entry, prompt);
 
       // Push notification when browser is closed

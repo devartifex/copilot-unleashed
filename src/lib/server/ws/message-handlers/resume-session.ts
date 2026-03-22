@@ -28,7 +28,8 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
     connectionEntry.session = null;
   }
   connectionEntry.userInputResolve = null;
-  connectionEntry.permissionResolve = null;
+  connectionEntry.permissionResolves.clear();
+  connectionEntry.pendingPermissionPrompts.clear();
   connectionEntry.isProcessing = false;
 
   try {

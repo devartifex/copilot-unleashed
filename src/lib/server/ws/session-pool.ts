@@ -28,15 +28,16 @@ export interface PoolEntry {
   messageBuffer: Record<string, unknown>[];
   ttlTimer: NodeJS.Timeout | null;
   userInputResolve: ((response: { answer: string; wasFreeform: boolean }) => void) | null;
-  permissionResolve: ((decision: string) => void) | null;
+  /** Map of pending permission resolvers keyed by requestId — supports concurrent permission requests */
+  permissionResolves: Map<string, (decision: string) => void>;
   permissionPreferences: Map<string, 'allow' | 'deny'>;
   isProcessing: boolean;
   /** Monotonically increasing sequence number for message ordering */
   seq: number;
   /** Stored pending user input prompt for re-send on reconnect */
   pendingUserInputPrompt: Record<string, unknown> | null;
-  /** Stored pending permission prompt for re-send on reconnect */
-  pendingPermissionPrompt: Record<string, unknown> | null;
+  /** Map of pending permission prompts keyed by requestId — re-sent on reconnect */
+  pendingPermissionPrompts: Map<string, Record<string, unknown>>;
 }
 
 export const sessionPool = new Map<string, PoolEntry>();
@@ -52,12 +53,12 @@ export function createPoolEntry(client: CopilotClient, ws: WebSocket): PoolEntry
     messageBuffer: [],
     ttlTimer: null,
     userInputResolve: null,
-    permissionResolve: null,
+    permissionResolves: new Map(),
     permissionPreferences: new Map(),
     isProcessing: false,
     seq: 0,
     pendingUserInputPrompt: null,
-    pendingPermissionPrompt: null,
+    pendingPermissionPrompts: new Map(),
   };
 }
 
@@ -71,9 +72,9 @@ export async function destroyPoolEntry(entry: PoolEntry): Promise<void> {
     entry.session = null;
   }
   entry.userInputResolve = null;
-  entry.permissionResolve = null;
+  entry.permissionResolves.clear();
   entry.pendingUserInputPrompt = null;
-  entry.pendingPermissionPrompt = null;
+  entry.pendingPermissionPrompts.clear();
   entry.permissionPreferences.clear();
   try { await entry.client.stop(); } catch { /* ignore */ }
 }

@@ -73,11 +73,11 @@ describe('createPoolEntry', () => {
       messageBuffer: [],
       ttlTimer: null,
       userInputResolve: null,
-      permissionResolve: null,
+      permissionResolves: expect.any(Map),
       isProcessing: false,
       seq: 0,
       pendingUserInputPrompt: null,
-      pendingPermissionPrompt: null,
+      pendingPermissionPrompts: expect.any(Map),
     });
     expect(entry.permissionPreferences.size).toBe(0);
   });
@@ -137,7 +137,7 @@ describe('destroyPoolEntry', () => {
 
     entry.session = session;
     entry.userInputResolve = vi.fn();
-    entry.permissionResolve = vi.fn();
+    entry.permissionResolves.set('test-1', vi.fn());
     entry.permissionPreferences.set('shell', 'allow');
     entry.ttlTimer = setTimeout(() => {
       timerTriggered = true;
@@ -152,9 +152,9 @@ describe('destroyPoolEntry', () => {
     expect(entry.session).toBeNull();
     expect(entry.ttlTimer).toBeNull();
     expect(entry.userInputResolve).toBeNull();
-    expect(entry.permissionResolve).toBeNull();
+    expect(entry.permissionResolves.size).toBe(0);
     expect(entry.pendingUserInputPrompt).toBeNull();
-    expect(entry.pendingPermissionPrompt).toBeNull();
+    expect(entry.pendingPermissionPrompts.size).toBe(0);
     expect(entry.permissionPreferences.size).toBe(0);
   });
 

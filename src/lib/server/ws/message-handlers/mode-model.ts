@@ -51,10 +51,12 @@ export async function handleAbort(msg: any, ctx: MessageContext): Promise<void> 
       connectionEntry.userInputResolve = null;
       resolve({ answer: '', wasFreeform: false });
     }
-    if (connectionEntry.permissionResolve) {
-      const resolve = connectionEntry.permissionResolve;
-      connectionEntry.permissionResolve = null;
-      resolve('deny');
+    if (connectionEntry.permissionResolves.size > 0) {
+      for (const resolve of connectionEntry.permissionResolves.values()) {
+        resolve('deny');
+      }
+      connectionEntry.permissionResolves.clear();
+      connectionEntry.pendingPermissionPrompts.clear();
     }
 
     poolSend(connectionEntry, { type: 'aborted' });

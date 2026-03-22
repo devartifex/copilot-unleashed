@@ -22,7 +22,12 @@ export async function handleUserInputResponse(msg: any, ctx: MessageContext): Pr
 export async function handlePermissionResponse(msg: any, ctx: MessageContext): Promise<void> {
   const { connectionEntry } = ctx;
 
-  if (!connectionEntry.permissionResolve) {
+  const requestId = typeof msg.requestId === 'string' ? msg.requestId : '';
+  const permResolve = requestId
+    ? connectionEntry.permissionResolves.get(requestId)
+    : connectionEntry.permissionResolves.values().next().value ?? null;
+
+  if (!permResolve) {
     poolSend(connectionEntry, { type: 'error', message: 'No pending permission request' });
     return;
   }
@@ -39,8 +44,9 @@ export async function handlePermissionResponse(msg: any, ctx: MessageContext): P
   if (decision === 'always_deny') {
     connectionEntry.permissionPreferences.set(prefKey, 'deny');
   }
-  const permResolve = connectionEntry.permissionResolve;
-  connectionEntry.permissionResolve = null;
-  connectionEntry.pendingPermissionPrompt = null;
+  if (requestId) {
+    connectionEntry.permissionResolves.delete(requestId);
+    connectionEntry.pendingPermissionPrompts.delete(requestId);
+  }
   permResolve(decision.replace('always_', ''));
 }

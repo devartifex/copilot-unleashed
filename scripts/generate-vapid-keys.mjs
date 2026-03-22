@@ -21,6 +21,11 @@ console.log(`VAPID_PUBLIC_KEY=${vapidKeys.publicKey}`);
 console.log(`VAPID_SUBJECT=mailto:your-email@example.com`);
 
 if (showPrivate) {
+  console.log('');
+  console.log('# WARNING: The following VAPID_PRIVATE_KEY is sensitive.');
+  console.log('# It may be captured in shell history, CI logs, or terminal logs.');
+  console.log('# Prefer copying it directly into your secret store (e.g. .env, Key Vault)');
+  console.log('# and avoid committing or storing this output in version control.');
   console.log(`VAPID_PRIVATE_KEY=${vapidKeys.privateKey}`);
 } else {
   console.log('# VAPID_PRIVATE_KEY was generated but is hidden by default.');
@@ -35,6 +40,8 @@ console.log(`    - VAPID_PUBLIC_KEY=${vapidKeys.publicKey}`);
 console.log('    - VAPID_SUBJECT=mailto:your-email@example.com');
 
 if (showPrivate) {
+  console.log('    # WARNING: VAPID_PRIVATE_KEY is sensitive; avoid committing docker-compose.yml with this value.');
+  console.log('    # Store it in a secure secret manager or environment configuration.');
   console.log(`    - VAPID_PRIVATE_KEY=${vapidKeys.privateKey}`);
 } else {
   console.log('    # VAPID_PRIVATE_KEY was generated but is hidden by default.');

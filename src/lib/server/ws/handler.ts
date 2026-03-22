@@ -11,7 +11,7 @@ import {
   sessionPool, createPoolEntry, destroyPoolEntry, poolSend,
   isValidTabId, countUserSessions, evictOldestUserSession,
 } from './session-pool.js';
-import { VALID_MESSAGE_TYPES, HEARTBEAT_INTERVAL, RATE_LIMITED_TYPES, WS_RATE_LIMIT_MAX, WS_RATE_LIMIT_WINDOW_MS } from './constants.js';
+import { VALID_MESSAGE_TYPES, HEARTBEAT_INTERVAL, MAX_MISSED_PINGS, RATE_LIMITED_TYPES, WS_RATE_LIMIT_MAX, WS_RATE_LIMIT_WINDOW_MS } from './constants.js';
 import { messageHandlers } from './message-handlers/index.js';
 import { chatStateStore } from '../chat-state-singleton.js';
 import type { SessionMiddleware, MessageContext } from './types.js';
@@ -24,11 +24,15 @@ export function setupWebSocket(
 ): void {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
-  // Heartbeat — detect dead connections
+  // Heartbeat — detect dead connections (tolerates brief mobile background suspensions)
   const heartbeat = setInterval(() => {
-    wss.clients.forEach((ws: WebSocket & { isAlive?: boolean }) => {
-      if (ws.isAlive === false) return ws.terminate();
-      ws.isAlive = false;
+    wss.clients.forEach((ws: WebSocket & { missedPings?: number }) => {
+      const missed = ws.missedPings ?? 0;
+      if (missed >= MAX_MISSED_PINGS) {
+        console.log(`[WS-SERVER] Terminating connection after ${missed} missed pings`);
+        return ws.terminate();
+      }
+      ws.missedPings = missed + 1;
       ws.ping();
     });
   }, HEARTBEAT_INTERVAL);
@@ -37,8 +41,8 @@ export function setupWebSocket(
 
   wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     console.log('[WS-SERVER] New connection attempt from', req.socket.remoteAddress);
-    (ws as any).isAlive = true;
-    ws.on('pong', () => { (ws as any).isAlive = true; });
+    (ws as any).missedPings = 0;
+    ws.on('pong', () => { (ws as any).missedPings = 0; });
 
     // Validate WebSocket origin
     const origin = req.headers.origin;

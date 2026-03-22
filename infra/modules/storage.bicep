@@ -30,7 +30,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: false // NFS 4.1 uses TCP port 2049
     allowBlobPublicAccess: false
-    allowSharedKeyAccess: false // NFS uses network-level auth, no key needed
+    allowSharedKeyAccess: true // Required because downstream consumers use shared keys (e.g., azureFile accountKey mounts)
     networkAcls: !empty(storageSubnetId) ? {
       defaultAction: 'Deny'
       bypass: 'AzureServices'

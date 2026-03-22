@@ -24,11 +24,8 @@ param allowedGithubUsers string = ''
 @description('Log Analytics workspace ID for the environment')
 param logAnalyticsWorkspaceId string
 
-@description('Application Insights connection string')
-param appInsightsConnectionString string
-
-@description('Minimum number of replicas (0 for dev, 1+ for prod)')
-param minReplicas int = 1
+@description('Minimum number of replicas (0 = scale to zero when idle)')
+param minReplicas int = 0
 
 @description('Maximum number of replicas')
 param maxReplicas int = 3
@@ -39,32 +36,14 @@ param allowedOrigins string = ''
 @description('Comma-separated IP ranges to allow (CIDR notation, empty = allow all)')
 param ipRestrictions string = ''
 
-
-
 @description('CPU cores per container replica (e.g. 0.25, 0.5, 1, 2, 4)')
 param cpuCores string = '1'
 
 @description('Memory per container replica (e.g. 0.5Gi, 1Gi, 2Gi, 4Gi, 8Gi)')
 param memoryGi string = '2Gi'
 
-@description('Subnet ID for Container Apps environment VNet integration (empty = no VNet)')
-param containerAppsSubnetId string = ''
-
 @description('Key Vault URI (e.g., https://myvault.vault.azure.net/)')
 param keyVaultUri string = ''
-
-@description('Key Vault resource name for building secret URIs')
-param keyVaultName string = ''
-
-@description('Storage account name for volume mounts (empty = no volumes)')
-param storageAccountName string = ''
-
-@description('Azure Files share name')
-param storageShareName string = ''
-
-@description('Storage account key for mounting (empty = no volumes)')
-@secure()
-param storageAccountKey string = ''
 
 @secure()
 @description('VAPID public key for web push notifications')
@@ -80,7 +59,6 @@ param vapidSubject string = ''
 var hasAllowedUsers = !empty(allowedGithubUsers)
 var hasVapidKeys = !empty(vapidPublicKey) && !empty(vapidPrivateKey)
 var useKeyVault = !empty(keyVaultUri)
-var hasStorage = !empty(storageAccountName)
 
 var parsedIpRestrictions = empty(ipRestrictions) ? [] : split(ipRestrictions, ',')
 
@@ -96,29 +74,12 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
         sharedKey: listKeys(logAnalyticsWorkspaceId, '2023-09-01').primarySharedKey
       }
     }
-    vnetConfiguration: !empty(containerAppsSubnetId) ? {
-      infrastructureSubnetId: containerAppsSubnetId
-      internal: false
-    } : null
     workloadProfiles: [
       {
         name: 'Consumption'
         workloadProfileType: 'Consumption'
       }
     ]
-  }
-}
-
-resource envStorage 'Microsoft.App/managedEnvironments/storages@2024-03-01' = if (hasStorage) {
-  parent: containerAppsEnvironment
-  name: 'copilot-data'
-  properties: {
-    azureFile: {
-      accountName: storageAccountName
-      shareName: storageShareName
-      accountKey: storageAccountKey
-      accessMode: 'ReadWrite'
-    }
   }
 }
 
@@ -186,12 +147,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             value: sessionSecret
           }
         ],
-        [
-          {
-            name: 'appinsights-connection-string'
-            value: appInsightsConnectionString
-          }
-        ],
         hasAllowedUsers ? [
           {
             name: 'allowed-github-users'
@@ -222,13 +177,14 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       )
     }
     template: {
-      volumes: hasStorage ? [
+      // EmptyDir: ephemeral storage scoped to the replica lifetime.
+      // Data survives container restarts but not replica replacement/scaling events.
+      volumes: [
         {
           name: 'copilot-data'
-          storageName: 'copilot-data'
-          storageType: 'AzureFile'
+          storageType: 'EmptyDir'
         }
-      ] : []
+      ]
       containers: [
         {
           name: 'copilot-unleashed'
@@ -239,7 +195,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'BASE_URL', value: 'https://${name}.${containerAppsEnvironment.properties.defaultDomain}' }
             { name: 'GITHUB_CLIENT_ID', secretRef: 'github-client-id' }
             { name: 'SESSION_SECRET', secretRef: 'session-secret' }
-            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'appinsights-connection-string' }
             { name: 'COPILOT_CONFIG_DIR', value: '/data/copilot-home' }
             { name: 'CHAT_STATE_PATH', value: '/data/chat-state' }
             { name: 'PUSH_STORE_PATH', value: '/data/push-subscriptions' }
@@ -254,12 +209,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json(cpuCores)
             memory: memoryGi
           }
-          volumeMounts: hasStorage ? [
+          volumeMounts: [
             {
               volumeName: 'copilot-data'
               mountPath: '/data'
             }
-          ] : []
+          ]
           probes: [
             {
               type: 'Liveness'

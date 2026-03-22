@@ -7,6 +7,9 @@
     "githubClientId": { "value": "${GITHUB_CLIENT_ID}" },
     "containerAppImage": { "value": "${SERVICE_WEB_IMAGE_NAME}" },
     "resourceGroupName": { "value": "${AZURE_RESOURCE_GROUP}" },
-    "deployerIpAddress": { "value": "${DEPLOYER_IP_ADDRESS}" }
+    "deployerIpAddress": { "value": "${DEPLOYER_IP_ADDRESS}" },
+    "vapidPublicKey": { "value": "${VAPID_PUBLIC_KEY}" },
+    "vapidPrivateKey": { "value": "${VAPID_PRIVATE_KEY}" },
+    "vapidSubject": { "value": "${VAPID_SUBJECT}" }
   }
 }

@@ -52,13 +52,12 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
 	// Fetch VAPID public key from server
 	const response = await fetch('/api/push/vapid-key');
 	if (!response.ok) {
-		// 503 = VAPID not configured on this server; warn rather than error
-		console.warn('[PUSH] VAPID key not available:', response.status);
+		console.error('[PUSH] Failed to fetch VAPID key:', response.status);
 		return null;
 	}
 	const { publicKey } = await response.json();
 	if (!publicKey) {
-		console.warn('[PUSH] No VAPID public key configured');
+		console.error('[PUSH] No VAPID public key configured');
 		return null;
 	}
 

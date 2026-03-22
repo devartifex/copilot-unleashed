@@ -51,10 +51,8 @@ Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, 
 - **Image vision** — attach images alongside code and documents; vision-capable models analyze them inline
 - **File & directory attachments** — drop in code files, images, CSVs, or whole directories with `@` mention autocomplete
 - **Issue & PR references** — type `#` to search and reference GitHub issues/PRs across all your repos
-- **Persistent sessions** — resume any conversation, on any device, with full checkpoint history
-- **Session persistence** — chat history survives browser close; server-side storage with cold resume from disk, works across devices
-- **CLI ↔ Browser sync** — sessions started in the Copilot CLI appear in the browser and vice versa
-- **CLI ↔ Browser autosync** — sessions created in the Copilot CLI appear in the browser automatically via filesystem watcher and Docker bind mount
+- **Persistent sessions** — resume any conversation on any device with full checkpoint history; chat state survives browser close via server-side storage with cold resume from disk
+- **CLI ↔ Browser sync** — sessions started in the Copilot CLI appear in the browser and vice versa, with automatic filesystem watcher and Docker bind mount for real-time sync
 - **Push notifications** — Web Push alerts when the browser is closed; triggers on response ready, errors, permission prompts, and user input; full PWA support (iOS 16.4+ requires "Add to Home Screen" from Safari)
 - **Plan mode** — agent creates an editable execution plan before acting; bidirectional sync with `plan.md` on disk
 - **Fleet mode** — launch multi-agent parallel execution with per-agent status tracking

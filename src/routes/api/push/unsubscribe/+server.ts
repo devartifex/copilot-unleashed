@@ -9,8 +9,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const body = await request.json();
-	if (!body.endpoint) {
+	let body: unknown;
+	try {
+		body = await request.json();
+	} catch {
+		return json({ error: 'Invalid JSON body' }, { status: 400 });
+	}
+
+	const bodyObj = body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
+	const endpoint = typeof bodyObj?.endpoint === 'string' ? bodyObj.endpoint : null;
+	if (!endpoint) {
 		return json({ error: 'Endpoint required' }, { status: 400 });
 	}
 
@@ -19,6 +27,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ error: 'User not found' }, { status: 401 });
 	}
 
-	await subscriptionStore.delete(userId, body.endpoint);
+	await subscriptionStore.delete(userId, endpoint);
 	return json({ ok: true });
 };

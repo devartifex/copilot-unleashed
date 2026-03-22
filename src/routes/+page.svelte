@@ -93,8 +93,14 @@
         }
 
         // Session fully loaded — clear loading state
-        if (msg.type === 'cold_resume' || msg.type === 'session_created' || msg.type === 'session_resumed') {
+        if (msg.type === 'cold_resume' || msg.type === 'session_created' || msg.type === 'session_resumed' || msg.type === 'session_reconnected') {
           sessionLoading = false;
+        }
+
+        // Resume failed — clear loading and fall back to new session
+        if (msg.type === 'error' && sessionLoading) {
+          sessionLoading = false;
+          requestNewSession();
         }
 
         // Auto-request new session if reconnected without one (warm reconnect, session was cleaned up)
@@ -313,8 +319,12 @@
     <div class="terminal">
       {#if sessionLoading}
         <div class="session-loading">
-          <img src="/img/logo-no-bg.svg" alt="" class="loading-logo" aria-hidden="true" />
-          <span class="loading-text">Restoring session…</span>
+          {#each Array(3) as _, i (i)}
+            <div class="loading-skeleton">
+              <div class="skeleton skeleton-bar" style:width={i === 0 ? '60%' : i === 1 ? '85%' : '45%'}></div>
+              <div class="skeleton skeleton-bar-sm" style:width={i === 0 ? '40%' : i === 1 ? '55%' : '30%'}></div>
+            </div>
+          {/each}
         </div>
       {:else}
         {#if chatStore.plan.exists}
@@ -491,36 +501,30 @@
     .terminal { padding: var(--sp-1) var(--sp-3); }
   }
 
-  /* ── Session loading state ───────────────────────────────────────────── */
+  /* ── Session loading skeleton ──────────────────────────────────────── */
   .session-loading {
     flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
+    padding: var(--sp-4) 0;
+    max-width: 92%;
   }
 
-  .loading-logo {
-    width: 56px;
-    height: 56px;
-    animation: pulse-logo 1.4s ease-in-out infinite;
-    opacity: 0.7;
+  .loading-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: var(--sp-2) var(--sp-3);
+    border-left: 3px solid var(--border);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   }
 
-  .loading-text {
-    color: var(--fg-muted);
-    font-size: 0.85em;
-    animation: fade-in-text 0.5s ease;
+  .skeleton-bar {
+    height: 14px;
   }
 
-  @keyframes pulse-logo {
-    0%, 100% { transform: scale(1); opacity: 0.5; }
-    50% { transform: scale(1.08); opacity: 0.9; }
-  }
-
-  @keyframes fade-in-text {
-    from { opacity: 0; }
-    to { opacity: 1; }
+  .skeleton-bar-sm {
+    height: 10px;
   }
 </style>

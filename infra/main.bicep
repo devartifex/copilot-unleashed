@@ -25,11 +25,11 @@ param sessionSecret string = newGuid()
 
 param containerAppImage string = ''
 
-@description('Minimum replicas (0 = scale to zero when idle)')
-param minReplicas int = 0
+@description('Minimum replicas (1 = always-on, prevents scale-to-zero which wipes EmptyDir and drops WebSocket connections)')
+param minReplicas int = 1
 
-@description('Maximum replicas')
-param maxReplicas int = 3
+@description('Maximum replicas (1 = single instance, required because session state is in-memory per-process)')
+param maxReplicas int = 1
 
 @description('CPU cores per replica (e.g. 0.25, 0.5, 1, 2, 4)')
 param cpuCores string = '1'

@@ -57,14 +57,14 @@
       "type": "int",
       "defaultValue": 1,
       "metadata": {
-        "description": "Minimum replicas (0 for dev, 1+ for prod)"
+        "description": "Minimum replicas (1 = always-on, prevents scale-to-zero which wipes EmptyDir and drops WebSocket connections)"
       }
     },
     "maxReplicas": {
       "type": "int",
-      "defaultValue": 3,
+      "defaultValue": 1,
       "metadata": {
-        "description": "Maximum replicas"
+        "description": "Maximum replicas (1 = single instance, required because session state is in-memory per-process)"
       }
     },
     "cpuCores": {
@@ -1361,14 +1361,14 @@
               "type": "int",
               "defaultValue": 1,
               "metadata": {
-                "description": "Minimum number of replicas (0 for dev, 1+ for prod)"
+                "description": "Minimum replicas (1 = always-on, prevents scale-to-zero)"
               }
             },
             "maxReplicas": {
               "type": "int",
-              "defaultValue": 3,
+              "defaultValue": 1,
               "metadata": {
-                "description": "Maximum number of replicas"
+                "description": "Maximum replicas (1 = single instance, in-memory state)"
               }
             },
             "allowedOrigins": {
@@ -1537,6 +1537,9 @@
                     "targetPort": 3000,
                     "transport": "auto",
                     "allowInsecure": false,
+                    "stickySessions": {
+                      "affinity": "sticky"
+                    },
                     "corsPolicy": {
                       "allowedOrigins": "[if(empty(parameters('allowedOrigins')), createArray(format('https://{0}.{1}', parameters('name'), reference(resourceId('Microsoft.App/managedEnvironments', parameters('environmentName')), '2024-03-01').defaultDomain)), union(createArray(format('https://{0}.{1}', parameters('name'), reference(resourceId('Microsoft.App/managedEnvironments', parameters('environmentName')), '2024-03-01').defaultDomain)), split(parameters('allowedOrigins'), ',')))]",
                       "allowedMethods": [

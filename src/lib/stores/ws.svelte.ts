@@ -15,6 +15,7 @@ const INITIAL_RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_DELAY = 60_000;
 const UNAUTHORIZED_CODE = 4001;
 const REPLACED_CODE = 4002;
+const EVICTED_CODE = 4003;
 const RECONNECT_DEBOUNCE_MS = 500;
 const HEARTBEAT_INTERVAL = 25_000;
 const HEARTBEAT_TIMEOUT = 5_000;
@@ -265,6 +266,16 @@ export function createWsStore(): WsStore {
       // 4002 = replaced by a newer connection we opened — don't reconnect
       // (the newer socket is already active)
       if (event.code === REPLACED_CODE) {
+        return;
+      }
+
+      // 4003 = session evicted (too many sessions) — reconnect after a delay
+      // so the evicted pool entry is fully cleaned up server-side
+      if (event.code === EVICTED_CODE) {
+        notify('Session evicted — too many active sessions. Reconnecting…', {
+          tag: 'session-evicted',
+        });
+        scheduleReconnect();
         return;
       }
 

@@ -24,11 +24,11 @@ param allowedGithubUsers string = ''
 @description('Log Analytics workspace ID for the environment')
 param logAnalyticsWorkspaceId string
 
-@description('Minimum number of replicas (0 = scale to zero when idle)')
-param minReplicas int = 0
+@description('Minimum number of replicas (1 = always-on, prevents scale-to-zero which wipes EmptyDir and drops all WebSocket connections)')
+param minReplicas int = 1
 
-@description('Maximum number of replicas')
-param maxReplicas int = 3
+@description('Maximum number of replicas (1 = single instance, required because all session state is in-memory per-process)')
+param maxReplicas int = 1
 
 @description('Comma-separated allowed origins for CORS (empty = allow app domain only)')
 param allowedOrigins string = ''
@@ -103,6 +103,9 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 3000
         transport: 'auto'
         allowInsecure: false
+        stickySessions: {
+          affinity: 'sticky'
+        }
         corsPolicy: {
           allowedOrigins: empty(allowedOrigins) ? [
             'https://${name}.${containerAppsEnvironment.properties.defaultDomain}'

@@ -732,9 +732,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
       case 'sessions_changed':
         // Re-fetch session list when filesystem changes detected
-        if (sessions.length > 0) {
-          wsStore.listSessions();
-        }
+        wsStore.listSessions();
         break;
     }
   }

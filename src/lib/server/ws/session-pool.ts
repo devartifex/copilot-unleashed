@@ -176,6 +176,13 @@ export async function evictOldestUserSession(username: string): Promise<void> {
   if (oldestKey) {
     const entry = sessionPool.get(oldestKey);
     if (entry) {
+      // Notify the client before destroying so it can show a meaningful message
+      if (entry.ws && entry.ws.readyState === WebSocket.OPEN) {
+        try {
+          entry.ws.send(JSON.stringify({ type: 'error', message: 'Session evicted — too many active sessions. Please refresh to reconnect.' }));
+          entry.ws.close(4003, 'Session evicted');
+        } catch { /* ignore */ }
+      }
       await destroyPoolEntry(entry);
       sessionPool.delete(oldestKey);
     }

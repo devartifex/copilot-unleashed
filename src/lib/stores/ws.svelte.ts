@@ -300,7 +300,12 @@ export function createWsStore(): WsStore {
       ws = null;
 
       if (event.code === UNAUTHORIZED_CODE) {
-        window.location.reload();
+        // Hit the logout endpoint to clear the __copilot_auth cookie before
+        // reloading. Without this, the cookie restores the revoked token on
+        // reload and the user gets stuck in an auth loop instead of seeing
+        // the login screen.
+        fetch('/auth/logout', { method: 'POST' })
+          .finally(() => window.location.reload());
         return;
       }
 

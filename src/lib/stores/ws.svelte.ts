@@ -21,11 +21,15 @@ const RECONNECT_DEBOUNCE_MS = 500;
 const HEARTBEAT_INTERVAL = 25_000;
 const HEARTBEAT_TIMEOUT = 5_000;
 
-// Unique ID for this browser tab — persisted in localStorage to survive browser close/reopen for session resume
-const TAB_ID = typeof localStorage !== 'undefined'
-  ? localStorage.getItem('copilot-tab-id') ?? (() => {
+// Unique ID for this browser tab — persisted in sessionStorage to survive page
+// refreshes within the same tab while staying isolated across tabs and devices.
+// localStorage was previously used but Chrome/Edge sync it across devices, causing
+// two devices to share the same tabId → same pool key → the server would close the
+// older WebSocket (code 4002) whenever a new device connected.
+const TAB_ID = typeof sessionStorage !== 'undefined'
+  ? sessionStorage.getItem('copilot-tab-id') ?? (() => {
       const id = crypto.randomUUID();
-      localStorage.setItem('copilot-tab-id', id);
+      sessionStorage.setItem('copilot-tab-id', id);
       return id;
     })()
   : crypto.randomUUID();

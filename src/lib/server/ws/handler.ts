@@ -104,12 +104,14 @@ export function setupWebSocket(
       }
       entry.ws = ws;
 
-      // Replay only messages the client hasn't seen (based on sequence numbers)
+      // Replay only messages the client hasn't seen (based on sequence numbers).
+      // Mark each replayed message so the client can suppress duplicate notifications
+      // (the server already sent a push notification while the client was unreachable).
       const buffer = entry.messageBuffer.splice(0);
       for (const msg of buffer) {
         const msgSeq = typeof msg.seq === 'number' ? msg.seq : -1;
         if (msgSeq > lastSeq && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify(msg));
+          ws.send(JSON.stringify({ ...msg, replayed: true }));
         }
       }
 

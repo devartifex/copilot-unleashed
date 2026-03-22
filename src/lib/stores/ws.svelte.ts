@@ -10,6 +10,7 @@ import type {
   McpServerDefinition,
 } from '$lib/types/index.js';
 import { notify } from '$lib/utils/notifications.js';
+import { getPushSubscription } from '$lib/utils/push-notifications.js';
 
 const INITIAL_RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_DELAY = 60_000;
@@ -200,6 +201,23 @@ export function createWsStore(): WsStore {
 
   // ── Connection lifecycle ────────────────────────────────────────────────
 
+  /** Fire-and-forget: re-register the browser's push subscription with the server.
+   *  Called on every WS connect so the server recovers subscriptions lost on redeploy
+   *  (EmptyDir volumes are wiped when the container replica is replaced). */
+  async function reRegisterPushSubscription(): Promise<void> {
+    try {
+      const sub = await getPushSubscription();
+      if (!sub) return;
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub.toJSON()),
+      });
+    } catch {
+      // Non-fatal — push will self-heal on the next connect
+    }
+  }
+
   function connect(): void {
     if (typeof window === 'undefined') return;
 
@@ -230,6 +248,9 @@ export function createWsStore(): WsStore {
       hasConnectedOnce = true;
       clearReconnectTimer();
       startHeartbeat();
+      // Re-register push subscription after every connect/reconnect so the server
+      // always has it — EmptyDir storage is wiped on redeploy.
+      reRegisterPushSubscription();
     };
 
     socket.onmessage = (event: MessageEvent) => {

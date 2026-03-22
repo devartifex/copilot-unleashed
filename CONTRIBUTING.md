@@ -7,13 +7,12 @@ Thank you for your interest in contributing! This project is a self-hosted, mult
 1. Fork the repo and clone it
 2. Install dependencies: `npm install`
 3. Create a `.env` file (see README for required variables)
-4. Run in development mode: `npm run dev:local`
+4. Run in development mode: `npm run dev`
 
 ## Development
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dev:local` | Start Vite dev server |
 | `npm run dev` | Start via Docker Compose |
 | `npm run build` | Production build |
 | `npm run check` | Type check with svelte-check |

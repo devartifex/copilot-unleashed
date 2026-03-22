@@ -188,7 +188,6 @@ npm install && npm run build && npm start
 
 # Development
 npm run dev                      # Docker Compose development stack
-npm run dev:local                # Local Vite dev server after building server-side TypeScript
 
 # Type check
 npm run check                    # svelte-check

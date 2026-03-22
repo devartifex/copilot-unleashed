@@ -8,7 +8,7 @@
     "build": "npm run build:server && vite build",
     "start": "node server.js",
     "dev": "docker compose up --build",
-    "dev:local": "npm run build:server && vite dev",
+
     "dev:down": "docker compose down",
     "preview": "npm run build && node --env-file=.env server.js",
     "bundle-sessions": "node scripts/bundle-sessions.mjs",

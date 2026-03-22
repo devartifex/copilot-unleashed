@@ -267,7 +267,7 @@ Copy the output into your `.env` file. Push notifications require all three VAPI
 
 Copilot Unleashed and the GitHub Copilot CLI share the same session-state directory (`~/.copilot/session-state/`). By default, the app reads from the same location the CLI uses — so any session started in the terminal is available in the browser the moment you open the Sessions panel.
 
-> **Note:** When running via Docker (`npm run dev`), the `docker-compose.yml` mounts `~/.copilot` read-only into the container. If you use `npm run dev:local` (no Docker), the app reads directly from your host `~/.copilot` with no extra config needed.
+> **Note:** When running via Docker (`npm run dev`), the `docker-compose.yml` mounts `~/.copilot` read-only into the container.
 
 ### How it works
 

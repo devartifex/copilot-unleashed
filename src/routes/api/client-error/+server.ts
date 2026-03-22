@@ -6,7 +6,7 @@ import { logSecurity } from '$lib/server/security-log';
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const auth = checkAuth(locals.session);
 	if (!auth.authenticated) {
-		return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
 	try {

@@ -217,6 +217,7 @@ export function setupWebSocket(
 
         // Handle client-side heartbeat
         if (msg.type === 'ping') {
+          connectionEntry.lastPingAt = Date.now();
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'pong' }));
           }

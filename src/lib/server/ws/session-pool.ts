@@ -15,6 +15,9 @@ const CONTROL_MESSAGE_TYPES = new Set([
   'compaction_start', 'compaction_complete',
 ]);
 
+/** Threshold for considering a client connection stale (no ping received). */
+export const CLIENT_STALE_MS = 35_000;
+
 export interface PoolEntry {
   client: CopilotClient;
   session: any;
@@ -38,6 +41,8 @@ export interface PoolEntry {
   pendingUserInputPrompt: Record<string, unknown> | null;
   /** Map of pending permission prompts keyed by requestId — re-sent on reconnect */
   pendingPermissionPrompts: Map<string, Record<string, unknown>>;
+  /** Timestamp of the last client ping — used to detect backgrounded/suspended apps */
+  lastPingAt: number;
 }
 
 export const sessionPool = new Map<string, PoolEntry>();
@@ -59,6 +64,7 @@ export function createPoolEntry(client: CopilotClient, ws: WebSocket): PoolEntry
     seq: 0,
     pendingUserInputPrompt: null,
     pendingPermissionPrompts: new Map(),
+    lastPingAt: Date.now(),
   };
 }
 
@@ -77,6 +83,12 @@ export async function destroyPoolEntry(entry: PoolEntry): Promise<void> {
   entry.pendingPermissionPrompts.clear();
   entry.permissionPreferences.clear();
   try { await entry.client.stop(); } catch { /* ignore */ }
+}
+
+/** True when the client WS is closed or hasn't sent a ping recently (e.g. iOS backgrounded). */
+export function isClientUnreachable(entry: PoolEntry): boolean {
+  if (!entry.ws || entry.ws.readyState !== WebSocket.OPEN) return true;
+  return Date.now() - entry.lastPingAt > CLIENT_STALE_MS;
 }
 
 export function poolSend(entry: PoolEntry, data: Record<string, unknown>): void {

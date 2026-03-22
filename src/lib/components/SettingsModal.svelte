@@ -70,7 +70,17 @@
     onFetchSkills,
   }: Props = $props();
 
-  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'custom-agents' | 'custom-tools' | 'agents' | 'skills' | 'quota' | 'compact' | null;
+  import {
+    isPushSupported,
+    isStandalone,
+    subscribeToPush,
+    unsubscribeFromPush,
+    getPushSubscription,
+  } from '$lib/utils/push-notifications.js';
+
+  type NotificationStatus = 'unsupported' | 'not-standalone-ios' | 'denied' | 'prompt' | 'subscribed' | 'granted-no-push' | 'loading';
+
+  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'custom-agents' | 'custom-tools' | 'agents' | 'skills' | 'quota' | 'notifications' | 'compact' | null;
 
   let activeSection = $state<AccordionSection>(null);
   let instructionsDraft = $state('');
@@ -100,6 +110,71 @@
 
   const canAddMoreMcp = $derived(mcpServers.length < MAX_MCP_SERVERS);
   const canAddMoreAgents = $derived(customAgents.length < MAX_CUSTOM_AGENTS);
+
+  // ── Notification state ───────────────────────────────────────────────
+  let notificationStatus = $state<NotificationStatus>('loading');
+  let notificationBusy = $state(false);
+
+  function isIos(): boolean {
+    if (typeof navigator === 'undefined') return false;
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  async function refreshNotificationStatus(): Promise<void> {
+    if (typeof window === 'undefined') { notificationStatus = 'unsupported'; return; }
+    if (!isPushSupported()) {
+      // On iOS in-browser (not standalone), push is not available
+      if (isIos() && !isStandalone()) {
+        notificationStatus = 'not-standalone-ios';
+      } else {
+        notificationStatus = 'unsupported';
+      }
+      return;
+    }
+    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+      notificationStatus = 'denied';
+      return;
+    }
+    const sub = await getPushSubscription();
+    if (sub) { notificationStatus = 'subscribed'; return; }
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      notificationStatus = 'granted-no-push';
+      return;
+    }
+    notificationStatus = 'prompt';
+  }
+
+  async function handleEnableNotifications(): Promise<void> {
+    notificationBusy = true;
+    try {
+      const sub = await subscribeToPush();
+      if (sub) {
+        notificationStatus = 'subscribed';
+      } else if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+        notificationStatus = 'denied';
+      }
+    } finally {
+      notificationBusy = false;
+    }
+  }
+
+  async function handleDisableNotifications(): Promise<void> {
+    notificationBusy = true;
+    try {
+      await unsubscribeFromPush();
+      notificationStatus = 'prompt';
+    } finally {
+      notificationBusy = false;
+    }
+  }
+
+  // Refresh notification status when the accordion section opens
+  $effect(() => {
+    if (activeSection === 'notifications') {
+      refreshNotificationStatus();
+    }
+  });
 
   function mcpResetDraft(): void {
     mcpDraftName = '';
@@ -784,6 +859,51 @@
                 {/if}
               {:else}
                 <p class="settings-hint">No quota information available.</p>
+              {/if}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Notifications -->
+        <div class="settings-accordion">
+          <button
+            class="settings-accordion-btn"
+            class:open={activeSection === 'notifications'}
+            onclick={() => toggleSection('notifications')}
+          >
+            Notifications
+            <span class="accordion-chevron">▸</span>
+          </button>
+          {#if activeSection === 'notifications'}
+            <div class="settings-accordion-body">
+              {#if notificationStatus === 'loading'}
+                <p class="settings-hint">Checking notification status…</p>
+              {:else if notificationStatus === 'unsupported'}
+                <p class="settings-hint">Push notifications are not supported in this browser.</p>
+              {:else if notificationStatus === 'not-standalone-ios'}
+                <p class="settings-hint">
+                  To enable notifications on iOS, install this app first:
+                  tap the <strong>Share</strong> button, then <strong>Add to Home Screen</strong>.
+                </p>
+              {:else if notificationStatus === 'denied'}
+                <p class="settings-hint">
+                  Notification permission was blocked. To re-enable, open your browser or device settings and allow notifications for this site.
+                </p>
+              {:else if notificationStatus === 'subscribed'}
+                <p class="settings-hint">Push notifications are enabled. You'll be notified when responses arrive while the app is in the background.</p>
+                <button class="action-btn" onclick={handleDisableNotifications} disabled={notificationBusy}>
+                  {notificationBusy ? 'Disabling…' : 'Disable Notifications'}
+                </button>
+              {:else if notificationStatus === 'granted-no-push'}
+                <p class="settings-hint">Notifications are allowed but push is not set up. Tap below to enable push notifications.</p>
+                <button class="action-btn" onclick={handleEnableNotifications} disabled={notificationBusy}>
+                  {notificationBusy ? 'Enabling…' : 'Enable Push Notifications'}
+                </button>
+              {:else}
+                <p class="settings-hint">Get notified when responses arrive while the app is in the background.</p>
+                <button class="action-btn" onclick={handleEnableNotifications} disabled={notificationBusy}>
+                  {notificationBusy ? 'Enabling…' : 'Enable Notifications'}
+                </button>
               {/if}
             </div>
           {/if}

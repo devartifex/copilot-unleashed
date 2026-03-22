@@ -1,7 +1,6 @@
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
-import { WebSocket } from 'ws';
-import { poolSend, type PoolEntry } from './session-pool.js';
+import { poolSend, isClientUnreachable, type PoolEntry } from './session-pool.js';
 import { normalizeQuotaSnapshots } from './quota.js';
 import { getSessionStateDir } from '../copilot/session-metadata.js';
 import { chatStateStore } from '../chat-state-singleton.js';
@@ -46,8 +45,8 @@ export function wireSessionEvents(
       }).catch(() => {});
     }
 
-    // Push notification when browser is closed
-    if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+    // Push notification when client is unreachable (WS closed or app backgrounded)
+    if (isClientUnreachable(entry) && userLogin) {
       sendPushToUser(userLogin, {
         title: 'Response ready',
         body: pendingAssistantContent?.trim().slice(0, 100) || 'Your Copilot response is ready',
@@ -86,8 +85,8 @@ export function wireSessionEvents(
       }).catch(() => {});
     }
 
-    // Push notification when browser is closed
-    if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+    // Push notification when client is unreachable (WS closed or app backgrounded)
+    if (isClientUnreachable(entry) && userLogin) {
       sendPushToUser(userLogin, {
         title: 'Something went wrong',
         body: event.data.message?.slice(0, 100) || 'An error occurred in your Copilot session',
@@ -188,8 +187,8 @@ export function wireSessionEvents(
   session.on('elicitation.requested', (event: any) => {
     poolSend(entry, { type: 'elicitation_requested', question: event.data?.question, choices: event.data?.choices, allowFreeform: event.data?.allowFreeform });
 
-    // Push notification when browser is closed
-    if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+    // Push notification when client is unreachable (WS closed or app backgrounded)
+    if (isClientUnreachable(entry) && userLogin) {
       sendPushToUser(userLogin, {
         title: 'Copilot is asking you something',
         body: event.data?.question?.slice(0, 100) || 'Your input is needed',

@@ -159,6 +159,7 @@ describe('createChatStore', () => {
     expect(notifyMock).toHaveBeenCalledWith('Response ready', {
       body: 'Hello world',
       tag: 'response-ready',
+      force: false,
     });
   });
 
@@ -210,6 +211,7 @@ describe('createChatStore', () => {
     expect(notifyMock).toHaveBeenLastCalledWith('Response ready', {
       body: undefined,
       tag: 'response-ready',
+      force: true,
     });
   });
 

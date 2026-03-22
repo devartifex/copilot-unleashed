@@ -203,18 +203,33 @@ export function createWsStore(): WsStore {
 
   /** Fire-and-forget: re-register the browser's push subscription with the server.
    *  Called on every WS connect so the server recovers subscriptions lost on redeploy
-   *  (EmptyDir volumes are wiped when the container replica is replaced). */
+   *  (EmptyDir volumes are wiped when the container replica is replaced).
+   *  Retries once after a short delay to handle auth cookie restoration race. */
   async function reRegisterPushSubscription(): Promise<void> {
-    try {
-      const sub = await getPushSubscription();
-      if (!sub) return;
-      await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub.toJSON()),
-      });
-    } catch {
-      // Non-fatal — push will self-heal on the next connect
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const sub = await getPushSubscription();
+        if (!sub) return;
+        const res = await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sub.toJSON()),
+        });
+        if (res.ok) return;
+        // 401 on first attempt: auth cookie may still be restoring — retry after delay
+        if (res.status === 401 && attempt === 0) {
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        console.warn(`[PUSH] Re-registration failed: ${res.status}`);
+        return;
+      } catch {
+        if (attempt === 0) {
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        // Non-fatal — push will self-heal on the next connect
+      }
     }
   }
 

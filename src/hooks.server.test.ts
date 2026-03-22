@@ -15,6 +15,9 @@ interface MockEvent {
 	locals: {
 		session?: SessionLike | null;
 	};
+	cookies: {
+		delete: ReturnType<typeof vi.fn>;
+	};
 	getClientAddress: () => string;
 }
 
@@ -56,6 +59,19 @@ vi.mock('$lib/server/auth/guard.js', () => ({
 	revalidateTokenIfStale: mockRevalidateTokenIfStale,
 }));
 
+vi.mock('$lib/server/auth/auth-cookie.js', () => ({
+	unsealAuth: vi.fn(() => null),
+	parseCookieValue: vi.fn(() => undefined),
+	AUTH_COOKIE_NAME: '__copilot_auth',
+}));
+
+vi.mock('$lib/server/config.js', () => ({
+	config: {
+		sessionSecret: 'test-secret',
+		tokenMaxAge: 7 * 24 * 60 * 60 * 1000,
+	},
+}));
+
 const originalNodeEnv = process.env.NODE_ENV;
 const originalBaseUrl = process.env.BASE_URL;
 
@@ -93,6 +109,9 @@ function createEvent({
 		}),
 		url: requestUrl,
 		locals: {},
+		cookies: {
+			delete: vi.fn(),
+		},
 		getClientAddress: () => ip,
 	};
 }

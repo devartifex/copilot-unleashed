@@ -106,6 +106,10 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   let currentSessionId = $state<string | null>(null);
   let pendingUserInput = $state<UserInputState | null>(null);
   let pendingPermissions = $state<PermissionRequestState[]>([]);
+  // Tracks if the current turn involved tool execution (tool approval → tool run).
+  // Used to force-notify on turn_end even when the tab is visible, because the user
+  // had to briefly return to approve the tool and may have switched away again.
+  let hadToolExecution = false;
 
   // ── Data lists ──────────────────────────────────────────────────────────
   let models = $state(new Map<string, ModelInfo>());
@@ -240,6 +244,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         isReasoningStreaming = false;
         isWaiting = true;
         activeToolCalls = new Map();
+        hadToolExecution = false;
         break;
 
       case 'reasoning_delta':
@@ -264,6 +269,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
       case 'tool_start':
         isWaiting = false;
+        hadToolExecution = true;
         addMessage('tool', msg.toolName, {
           toolCallId: msg.toolCallId,
           toolName: msg.toolName,
@@ -309,8 +315,13 @@ export function createChatStore(wsStore: WsStore): ChatStore {
           notify('Response ready', {
             body: currentStreamContent.trim().slice(0, 100) || undefined,
             tag: 'response-ready',
+            // Force-notify after tool execution: the user may have briefly returned to
+            // approve a tool call and then switched away again — tab might be visible at
+            // the exact moment the response arrives, but they still want to know.
+            force: hadToolExecution,
           });
         }
+        hadToolExecution = false;
         finalizeStream();
         break;
 

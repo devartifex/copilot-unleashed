@@ -3,10 +3,13 @@ import session from 'express-session';
 import FileStoreFactory from 'session-file-store';
 import { setupWebSocket } from './dist/ws/handler.js';
 import { registerSession, deleteSessionById } from './dist/session-store.js';
+import { unsealAuth, parseCookieValue, AUTH_COOKIE_NAME } from './dist/auth/auth-cookie.js';
 
 const FileStore = FileStoreFactory(session);
 const isDev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000');
+const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-change-me';
+const tokenMaxAge = parseInt(process.env.TOKEN_MAX_AGE_MS || String(7 * 24 * 60 * 60 * 1000));
 
 // Set ORIGIN for SvelteKit adapter-node CSRF check before importing handler.
 // Without this, adapter-node defaults protocol to 'https', causing origin mismatch on plain HTTP.
@@ -22,7 +25,7 @@ if (!isDev && !process.env.SESSION_SECRET) {
 const sessionStorePath = process.env.SESSION_STORE_PATH || (isDev ? '.sessions' : '/data/sessions');
 const sessionMiddleware = session({
   store: new FileStore({ path: sessionStorePath, ttl: 86400, retries: 0, logFn: () => {} }),
-  secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   rolling: true,
@@ -31,12 +34,30 @@ const sessionMiddleware = session({
     httpOnly: true,
     secure: !isDev,
     sameSite: 'lax',
-    maxAge: parseInt(process.env.TOKEN_MAX_AGE_MS || String(7 * 24 * 60 * 60 * 1000)),
+    maxAge: tokenMaxAge,
   },
 });
 
+/** Restore auth from encrypted cookie when session file is missing (e.g. after EmptyDir wipe). */
+function restoreAuthFromCookie(req) {
+  if (req.session && !req.session.githubToken) {
+    const sealed = parseCookieValue(req.headers.cookie, AUTH_COOKIE_NAME);
+    if (sealed) {
+      const data = unsealAuth(sealed, sessionSecret, tokenMaxAge);
+      if (data) {
+        req.session.githubToken = data.githubToken;
+        req.session.githubUser = data.githubUser;
+        req.session.githubAuthTime = data.githubAuthTime;
+        req.session.save(() => {});
+        console.log(`[AUTH-COOKIE] Restored auth for user=${data.githubUser.login}`);
+      }
+    }
+  }
+}
+
 const server = createServer((req, res) => {
   sessionMiddleware(req, res, () => {
+    restoreAuthFromCookie(req);
     const sessionId = registerSession(req.session);
     req.headers['x-session-id'] = sessionId;
 

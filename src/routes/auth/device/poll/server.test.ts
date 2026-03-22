@@ -9,6 +9,9 @@ vi.mock('$lib/server/auth/github', () => ({
 vi.mock('$lib/server/config', () => ({
 	config: {
 		allowedUsers: [] as string[],
+		sessionSecret: 'test-secret',
+		isDev: true,
+		tokenMaxAge: 7 * 24 * 60 * 60 * 1000,
 	},
 }));
 
@@ -40,6 +43,10 @@ type MockSession = {
 function createEvent(session?: MockSession) {
 	return {
 		locals: { session },
+		cookies: {
+			set: vi.fn(),
+			delete: vi.fn(),
+		},
 		getClientAddress: () => '127.0.0.1',
 	} as any;
 }

@@ -4,8 +4,9 @@ import { pollForToken, validateGitHubToken } from '$lib/server/auth/github';
 import { config } from '$lib/server/config';
 import { logSecurity } from '$lib/server/security-log';
 import { clearDeviceFlow, saveSession } from '$lib/server/auth/session-utils';
+import { sealAuth, AUTH_COOKIE_NAME } from '$lib/server/auth/auth-cookie';
 
-export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
+export const POST: RequestHandler = async ({ locals, cookies, getClientAddress }) => {
 	if (!locals.session) {
 		return json({ error: 'No session available' }, { status: 500 });
 	}
@@ -69,6 +70,19 @@ export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 		console.log(`[POLL] auth success, saving session. user=${user.login} hasToken=${!!session.githubToken}`);
 		await saveSession(session);
 		console.log(`[POLL] session saved successfully`);
+
+		// Set encrypted auth cookie — survives session file loss on redeploy
+		const sealed = sealAuth(
+			{ githubToken: result.token, githubUser: user, githubAuthTime: session.githubAuthTime },
+			config.sessionSecret,
+		);
+		cookies.set(AUTH_COOKIE_NAME, sealed, {
+			path: '/',
+			httpOnly: true,
+			secure: !config.isDev,
+			sameSite: 'lax',
+			maxAge: Math.floor(config.tokenMaxAge / 1000),
+		});
 
 		logSecurity('info', 'auth_success', { user: user.login });
 		return json({ status: 'authorized', githubUser: user.login });

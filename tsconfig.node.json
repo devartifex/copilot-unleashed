@@ -14,5 +14,5 @@
     "sourceMap": true
   },
   "include": ["src/lib/server/**/*"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "src/lib/server/**/*.test.ts"]
 }

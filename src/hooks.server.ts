@@ -2,6 +2,8 @@ import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { getSessionById } from '$lib/server/session-store';
 import { checkAuth, revalidateTokenIfStale } from '$lib/server/auth/guard.js';
+import { unsealAuth, parseCookieValue, AUTH_COOKIE_NAME } from '$lib/server/auth/auth-cookie.js';
+import { config } from '$lib/server/config.js';
 import { initServerSideEffects } from '$lib/server/init.js';
 
 initServerSideEffects();
@@ -13,6 +15,22 @@ const sessionHandle: Handle = async ({ event, resolve }) => {
 	if (sessionId) {
 		const session = getSessionById(sessionId) ?? null;
 		console.log(`[HOOKS] session resolved: hasSession=${!!session} hasToken=${!!session?.githubToken} user=${session?.githubUser?.login ?? 'none'}`);
+
+		// Restore auth from encrypted cookie when session file was lost (e.g. deploy wipe)
+		if (session && !session.githubToken) {
+			const sealed = parseCookieValue(event.request.headers.get('cookie') ?? undefined, AUTH_COOKIE_NAME);
+			if (sealed) {
+				const data = unsealAuth(sealed, config.sessionSecret, config.tokenMaxAge);
+				if (data) {
+					session.githubToken = data.githubToken;
+					session.githubUser = data.githubUser;
+					session.githubAuthTime = data.githubAuthTime;
+					session.save(() => {});
+					console.log(`[HOOKS] Restored auth from cookie for user=${data.githubUser.login}`);
+				}
+			}
+		}
+
 		event.locals.session = session;
 	} else {
 		console.log(`[HOOKS] NO x-session-id header — session will be null`);
@@ -140,6 +158,8 @@ const tokenRevalidation: Handle = async ({ event, resolve }) => {
 
   const result = await revalidateTokenIfStale(session);
   if (!result.valid) {
+    // Token was revoked — clear encrypted auth cookie so it doesn't restore a dead token
+    event.cookies.delete(AUTH_COOKIE_NAME, { path: '/' });
     return new Response(JSON.stringify({ error: 'Token revoked. Please sign in again.' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },

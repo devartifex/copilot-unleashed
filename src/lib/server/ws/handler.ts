@@ -6,6 +6,7 @@ import { logSecurity } from '../security-log.js';
 import { validateGitHubToken } from '../auth/github.js';
 import { checkAuth } from '../auth/guard.js';
 import { clearAuth } from '../auth/session-utils.js';
+import { unsealAuth, parseCookieValue, AUTH_COOKIE_NAME } from '../auth/auth-cookie.js';
 import {
   sessionPool, createPoolEntry, destroyPoolEntry, poolSend,
   isValidTabId, countUserSessions, evictOldestUserSession,
@@ -57,6 +58,22 @@ export function setupWebSocket(
 
     const session = (req as any).session;
     console.log('[WS-SERVER] Session extracted:', !!session, 'token:', !!session?.githubToken, 'user:', session?.githubUser?.login);
+
+    // Restore auth from encrypted cookie when session file is missing (e.g. after EmptyDir wipe)
+    if (session && !session.githubToken) {
+      const sealed = parseCookieValue(req.headers.cookie, AUTH_COOKIE_NAME);
+      if (sealed) {
+        const data = unsealAuth(sealed, config.sessionSecret, config.tokenMaxAge);
+        if (data) {
+          session.githubToken = data.githubToken;
+          session.githubUser = data.githubUser;
+          session.githubAuthTime = data.githubAuthTime;
+          session.save(() => {});
+          console.log(`[WS-SERVER] Restored auth from cookie for user=${data.githubUser.login}`);
+        }
+      }
+    }
+
     const auth = checkAuth(session);
     console.log('[WS-SERVER] Auth check result:', auth.authenticated, auth.error || 'ok');
     if (!auth.authenticated) {

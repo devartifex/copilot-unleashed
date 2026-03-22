@@ -39,6 +39,8 @@
     onFetchAgents: () => void;
     onFetchQuota: () => void;
     onFetchSkills: () => void;
+    notificationsEnabled: boolean;
+    onToggleNotifications: (enabled: boolean) => void;
   }
 
   const {
@@ -68,6 +70,8 @@
     onFetchAgents,
     onFetchQuota,
     onFetchSkills,
+    notificationsEnabled,
+    onToggleNotifications,
   }: Props = $props();
 
   import {
@@ -134,10 +138,26 @@
     }
     if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
       notificationStatus = 'denied';
+      if (notificationsEnabled) onToggleNotifications(false);
       return;
     }
     const sub = await getPushSubscription();
-    if (sub) { notificationStatus = 'subscribed'; return; }
+    if (sub) {
+      notificationStatus = 'subscribed';
+      if (!notificationsEnabled) onToggleNotifications(true);
+      return;
+    }
+    // Settings say enabled but browser has no subscription — auto-re-subscribe
+    if (notificationsEnabled && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      notificationBusy = true;
+      try {
+        const newSub = await subscribeToPush();
+        notificationStatus = newSub ? 'subscribed' : 'granted-no-push';
+      } finally {
+        notificationBusy = false;
+      }
+      return;
+    }
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       notificationStatus = 'granted-no-push';
       return;
@@ -151,8 +171,10 @@
       const sub = await subscribeToPush();
       if (sub) {
         notificationStatus = 'subscribed';
+        onToggleNotifications(true);
       } else if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
         notificationStatus = 'denied';
+        onToggleNotifications(false);
       }
     } finally {
       notificationBusy = false;
@@ -164,6 +186,7 @@
     try {
       await unsubscribeFromPush();
       notificationStatus = 'prompt';
+      onToggleNotifications(false);
     } finally {
       notificationBusy = false;
     }

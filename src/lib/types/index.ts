@@ -949,6 +949,8 @@ export interface PersistedSettings {
   disabledSkills?: string[];
   customAgents?: CustomAgentDefinition[];
   infiniteSessions?: InfiniteSessionsConfig;
+  /** User preference for push notifications — persisted so it survives redeploys. */
+  notificationsEnabled?: boolean;
 }
 
 // ─── Custom agent definitions ───────────────────────────────────────────────

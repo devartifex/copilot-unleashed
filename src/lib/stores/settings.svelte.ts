@@ -28,6 +28,7 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   mcpServers: [],
   disabledSkills: [],
   infiniteSessions: { ...DEFAULT_INFINITE_SESSIONS },
+  notificationsEnabled: false,
 };
 
 const VALID_MODES = new Set<SessionMode>(['interactive', 'plan', 'autopilot']);
@@ -87,6 +88,7 @@ export interface SettingsStore {
   disabledSkills: string[];
   availableSkills: SkillDefinition[];
   infiniteSessions: InfiniteSessionsConfig;
+  notificationsEnabled: boolean;
   load(): void;
   save(): void;
   syncFromServer(): Promise<void>;
@@ -105,6 +107,7 @@ export function createSettingsStore(): SettingsStore {
   let disabledSkills = $state<string[]>([...(DEFAULT_SETTINGS.disabledSkills ?? [])]);
   let availableSkills = $state<SkillDefinition[]>([]);
   let infiniteSessions = $state<InfiniteSessionsConfig>({ ...DEFAULT_INFINITE_SESSIONS });
+  let notificationsEnabled = $state(DEFAULT_SETTINGS.notificationsEnabled ?? false);
 
   function load(): void {
     if (typeof localStorage === 'undefined') return;
@@ -130,6 +133,7 @@ export function createSettingsStore(): SettingsStore {
       mcpServers,
       disabledSkills,
       infiniteSessions,
+      notificationsEnabled,
     };
   }
 
@@ -170,6 +174,9 @@ export function createSettingsStore(): SettingsStore {
           ? Math.max(0, Math.min(1, is.bufferThreshold))
           : DEFAULT_INFINITE_SESSIONS.bufferThreshold,
       };
+    }
+    if (typeof parsed.notificationsEnabled === 'boolean') {
+      notificationsEnabled = parsed.notificationsEnabled;
     }
   }
 
@@ -273,6 +280,9 @@ export function createSettingsStore(): SettingsStore {
       };
       save();
     },
+
+    get notificationsEnabled() { return notificationsEnabled; },
+    set notificationsEnabled(v: boolean) { notificationsEnabled = v; save(); },
 
     load,
     save,

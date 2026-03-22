@@ -443,6 +443,8 @@
       onFetchAgents={() => wsStore.listAgents()}
       onFetchQuota={() => wsStore.getQuota()}
       onFetchSkills={() => settings.fetchSkills()}
+      notificationsEnabled={settings.notificationsEnabled}
+      onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
     />
 
     <SessionsSheet

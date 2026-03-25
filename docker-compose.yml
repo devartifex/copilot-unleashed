@@ -1,0 +1,31 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - BASE_URL=http://localhost:3000
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - SESSION_STORE_PATH=/data/sessions
+      - SETTINGS_STORE_PATH=/data/settings
+      - CHAT_STATE_PATH=/data/chat-state
+      - PUSH_STORE_PATH=/data/push-subscriptions
+      - BODY_SIZE_LIMIT=52428800
+      # VAPID keys (generate with: node scripts/generate-vapid-keys.mjs)
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:admin@example.com}
+      - COPILOT_CONFIG_DIR=/home/node/.copilot
+    volumes:
+      - copilot-data:/data
+      - ~/.copilot:/home/node/.copilot  # sync host CLI sessions into container
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "991"
+    restart: unless-stopped
+
+volumes:
+  copilot-data:

@@ -1,0 +1,22 @@
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { checkAuth } from '$lib/server/auth/guard.js';
+import { createRequire } from 'module';
+
+let sdkVersion = 'unknown';
+try {
+	const require = createRequire(import.meta.url);
+	const sdkPkg = require('@github/copilot-sdk/package.json') as { version: string };
+	sdkVersion = sdkPkg.version;
+} catch {
+	// keep 'unknown' if resolution fails
+}
+
+export const GET: RequestHandler = async ({ locals }) => {
+	const auth = checkAuth(locals.session);
+	if (!auth.authenticated) {
+		return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+	}
+
+	return json({ sdkVersion });
+};

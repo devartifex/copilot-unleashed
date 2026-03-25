@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": { "value": "${AZURE_ENV_NAME}" },
+    "location": { "value": "${AZURE_LOCATION}" },
+    "githubClientId": { "value": "${GITHUB_CLIENT_ID}" },
+    "containerAppImage": { "value": "${SERVICE_WEB_IMAGE_NAME}" },
+    "resourceGroupName": { "value": "${AZURE_RESOURCE_GROUP}" },
+    "deployerIpAddress": { "value": "${DEPLOYER_IP_ADDRESS}" },
+    "vapidPublicKey": { "value": "${VAPID_PUBLIC_KEY}" },
+    "vapidPrivateKey": { "value": "${VAPID_PRIVATE_KEY}" },
+    "vapidSubject": { "value": "${VAPID_SUBJECT}" }
+  }
+}

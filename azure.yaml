@@ -1,0 +1,21 @@
+name: copilot-unleashed
+metadata:
+  template: copilot-unleashed@2.0.0
+
+hooks:
+  preprovision:
+    shell: sh
+    run: scripts/set-deployer-ip.sh
+    continueOnError: true
+  predeploy:
+    shell: sh
+    run: node scripts/bundle-sessions.mjs
+    continueOnError: true
+
+services:
+  web:
+    project: .
+    host: containerapp
+    language: ts
+    docker:
+      path: ./Dockerfile

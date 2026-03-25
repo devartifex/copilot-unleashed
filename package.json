@@ -1,0 +1,81 @@
+{
+  "name": "copilot-unleashed",
+  "version": "1.0.0",
+  "description": "Copilot Unleashed — Self-hosted multi-model AI chat powered by the GitHub Copilot SDK",
+  "main": "build/index.js",
+  "scripts": {
+    "build:server": "tsc -p tsconfig.node.json",
+    "build": "npm run build:server && vite build",
+    "start": "node server.js",
+    "dev": "docker-compose up --build",
+    "dev:down": "docker-compose down",
+    "preview": "npm run build && node --env-file=.env server.js",
+    "bundle-sessions": "node scripts/bundle-sessions.mjs",
+    "sync:push": "node scripts/sync-push.mjs",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:unit:coverage": "vitest run --coverage",
+    "clean": "rm -rf build dist .svelte-kit",
+    "postinstall": "node scripts/patch-sdk.mjs",
+    "prepare": "husky"
+  },
+  "keywords": [
+    "copilot",
+    "github",
+    "ai-chat",
+    "multi-model",
+    "sveltekit",
+    "self-hosted",
+    "copilot-sdk"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^0.2.0",
+    "@sveltejs/adapter-node": "^5.5.4",
+    "@sveltejs/kit": "^2.55.0",
+    "dompurify": "^3.3.3",
+    "express-session": "^1.18.0",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.4",
+    "session-file-store": "^1.5.0",
+    "svelte": "^5.54.1",
+    "vite": "^8.0.1",
+    "web-push": "^3.6.7",
+    "ws": "^8.18.0"
+  },
+  "lint-staged": {
+    "*.{ts,svelte}": [
+      "vitest related --run"
+    ]
+  },
+  "overrides": {
+    "cookie": "^0.7.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@types/dompurify": "^3.2.0",
+    "@types/express-session": "^1.18.0",
+    "@types/node": "^25.5.0",
+    "@types/session-file-store": "^1.2.6",
+    "@types/web-push": "^3.6.4",
+    "@types/ws": "^8.5.13",
+    "@vitest/coverage-v8": "^4.1.0",
+    "husky": "^9.1.7",
+    "jsdom": "^29.0.1",
+    "lint-staged": "^16.4.0",
+    "sharp": "^0.34.5",
+    "svelte-check": "^4.4.5",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.0"
+  }
+}

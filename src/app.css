@@ -1,0 +1,130 @@
+@import 'highlight.js/styles/github-dark.css';
+
+/* Global reset and design tokens — extracted from public/css/style.css */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0d1117;
+  --bg-raised: #161b22;
+  --bg-overlay: #1c2128;
+  --fg: #e6edf3;
+  --fg-muted: #9ca3af;
+  --fg-dim: #848d97;
+  --purple: #d2a8ff;
+  --purple-dim: #8957e5;
+  --green: #3fb950;
+  --green-dim: #2ea043;
+  --red: #f85149;
+  --yellow: #e3b341;
+  --blue: #58a6ff;
+  --cyan: #56d4dd;
+  --orange: #f0883e;
+  --border: #3d444d;
+  --border-accent: #7c5cb5;
+  --shadow: rgba(0, 0, 0, 0.4);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+  --font-size: clamp(14px, 3.8vw, 16px);
+  --line-height: 1.6;
+  --indent: 16px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* ── Semantic color aliases ─────────────────────────────────────────────── */
+  --color-accent: var(--purple);
+  --color-accent-dim: var(--purple-dim);
+  --color-success: var(--green);
+  --color-success-dim: var(--green-dim);
+  --color-error: var(--red);
+  --color-warning: var(--yellow);
+  --color-info: var(--blue);
+
+  /* ── Typography scale ───────────────────────────────────────────────────── */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: var(--font-size);
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --leading-tight: 1.3;
+  --leading-normal: var(--line-height);
+  --leading-relaxed: 1.75;
+
+  /* ── Transition tokens ──────────────────────────────────────────────────── */
+  --duration-fast: 0.1s;
+  --duration-normal: 0.2s;
+  --duration-slow: 0.3s;
+  --ease-default: ease;
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  /* ── Elevation / shadow scale ───────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Thin modern scrollbars ───────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-dim);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ── Shared shimmer loading animation ─────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, var(--bg-raised) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Reduced motion: respect user preference ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

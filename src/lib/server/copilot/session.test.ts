@@ -238,6 +238,46 @@ describe('createCopilotSession', () => {
     );
   });
 
+  it('passes skipPermission through to defineTool when set', async () => {
+    const client = createClientMock();
+
+    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
+      customTools: [{
+        name: 'safe-tool',
+        description: 'Low-risk lookup',
+        webhookUrl: 'https://tools.example.com/safe',
+        method: 'GET',
+        headers: {},
+        parameters: {},
+        skipPermission: true,
+      }],
+    });
+
+    expect(defineToolMock).toHaveBeenCalledTimes(1);
+    expect(defineToolMock).toHaveBeenCalledWith('safe-tool', expect.objectContaining({
+      skipPermission: true,
+    }));
+  });
+
+  it('omits skipPermission from defineTool when not set', async () => {
+    const client = createClientMock();
+
+    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
+      customTools: [{
+        name: 'normal-tool',
+        description: 'Regular tool',
+        webhookUrl: 'https://tools.example.com/normal',
+        method: 'GET',
+        headers: {},
+        parameters: {},
+      }],
+    });
+
+    expect(defineToolMock).toHaveBeenCalledTimes(1);
+    const callArgs = defineToolMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(callArgs).not.toHaveProperty('skipPermission');
+  });
+
   it.each([
     'https://127.0.0.1/hook',
     'https://10.0.0.8/hook',

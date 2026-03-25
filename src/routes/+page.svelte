@@ -47,9 +47,7 @@
     return info?.capabilities?.supports?.vision === true;
   });
 
-  const activeSkillCount = $derived(
-    settings.availableSkills.length - settings.disabledSkills.length
-  );
+  const activeSkillCount = $derived(settings.availableSkills.length);
 
   const modeStyle = $derived.by(() => {
     switch (chatStore.mode) {
@@ -169,12 +167,10 @@
       model,
       mode: settings.selectedMode,
       ...(isReasoning && { reasoningEffort: settings.reasoningEffort }),
-      ...(settings.customInstructions.trim() && { customInstructions: settings.customInstructions.trim() }),
+      ...(settings.additionalInstructions.trim() && { customInstructions: settings.additionalInstructions.trim() }),
       ...(settings.excludedTools.length > 0 && { excludedTools: settings.excludedTools }),
       ...(settings.customTools.length > 0 && { customTools: settings.customTools }),
-      ...(settings.customAgents.length > 0 && { customAgents: settings.customAgents }),
       ...(settings.mcpServers.length > 0 && { mcpServers: settings.mcpServers.filter(s => s.enabled) }),
-      ...(settings.disabledSkills.length > 0 && { disabledSkills: settings.disabledSkills }),
       infiniteSessions: settings.infiniteSessions,
     });
   }
@@ -292,14 +288,6 @@
     wsStore.respondToPermission(requestId, kind, toolName, decision);
     chatStore.clearPendingPermission(requestId);
   }
-
-  function handleToggleSkill(skillName: string, enabled: boolean): void {
-    if (enabled) {
-      settings.disabledSkills = settings.disabledSkills.filter(s => s !== skillName);
-    } else {
-      settings.disabledSkills = [...settings.disabledSkills, skillName];
-    }
-  }
 </script>
 
 <svelte:head>
@@ -416,15 +404,13 @@
       agents={chatStore.agents}
       currentAgent={chatStore.currentAgent}
       quotaSnapshots={chatStore.quotaSnapshots}
-      customInstructions={settings.customInstructions}
+      additionalInstructions={settings.additionalInstructions}
       excludedTools={settings.excludedTools}
       customTools={settings.customTools}
-      customAgents={settings.customAgents}
       mcpServers={settings.mcpServers}
       availableSkills={settings.availableSkills}
-      disabledSkills={settings.disabledSkills}
       onClose={() => settingsOpen = false}
-      onSaveInstructions={(v) => { settings.customInstructions = v; }}
+      onSaveInstructions={(v) => { settings.additionalInstructions = v; }}
       onToggleTool={(name, enabled) => {
         if (enabled) {
           settings.excludedTools = settings.excludedTools.filter(t => t !== name);
@@ -433,9 +419,7 @@
         }
       }}
       onSaveCustomTools={(tools) => { settings.customTools = tools; }}
-      onSaveCustomAgents={(agents) => { settings.customAgents = agents; }}
       onSaveMcpServers={(servers) => { settings.mcpServers = servers; }}
-      onToggleSkill={handleToggleSkill}
       onSelectAgent={(name) => wsStore.selectAgent(name)}
       onDeselectAgent={() => wsStore.deselectAgent()}
       onCompact={() => wsStore.compact()}

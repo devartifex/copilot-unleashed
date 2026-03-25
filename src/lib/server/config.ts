@@ -28,6 +28,7 @@ function getConfig() {
     sessionPoolTtl: parseInt(env('SESSION_POOL_TTL_MS', String(5 * 60 * 1000))),
     maxSessionsPerUser: parseInt(env('MAX_SESSIONS_PER_USER', '5')),
     copilotConfigDir: process.env.COPILOT_CONFIG_DIR?.trim().replace(/^~/, homedir()) || undefined,
+    copilotCwd: process.env.COPILOT_CWD?.trim().replace(/^~/, homedir()) || undefined,
     chatStatePath: env('CHAT_STATE_PATH', env('NODE_ENV', 'development') !== 'production' ? '.chat-state' : '/data/chat-state'),
     pushStorePath: env('PUSH_STORE_PATH', env('NODE_ENV', 'development') !== 'production' ? '.push-subscriptions' : '/data/push-subscriptions'),
     vapid: {

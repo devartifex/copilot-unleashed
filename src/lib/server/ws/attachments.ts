@@ -6,7 +6,8 @@ import { UPLOAD_DIR_PREFIX } from './constants.js';
 export type SdkAttachment =
   | { type: 'file'; path: string; displayName?: string }
   | { type: 'directory'; path: string; displayName?: string }
-  | { type: 'selection'; filePath: string; displayName: string; selection?: { start: { line: number; character: number }; end: { line: number; character: number } }; text?: string };
+  | { type: 'selection'; filePath: string; displayName: string; selection?: { start: { line: number; character: number }; end: { line: number; character: number } }; text?: string }
+  | { type: 'blob'; data: string; mimeType: string };
 
 /** Validate that an attachment path is an absolute path inside the upload directory (prevents arbitrary file reads). */
 export function isValidAttachmentPath(filePath: string): boolean {
@@ -38,6 +39,22 @@ export function mapAttachmentsToSdk(raw: unknown): SdkAttachment[] | undefined {
       }
       if (typeof a.text === 'string') entry.text = a.text;
       mapped.push(entry);
+    } else if (attachType === 'blob') {
+      const data = a.data as string | undefined;
+      const mimeType = a.mimeType as string | undefined;
+      if (typeof data !== 'string' || typeof mimeType !== 'string') continue;
+      // Enforce 10MB base64 limit (~7.5MB decoded)
+      const MAX_BLOB_SIZE = 10 * 1024 * 1024;
+      if (data.length > MAX_BLOB_SIZE) {
+        logSecurity('warn', 'BLOB_SIZE_EXCEEDED', { size: data.length, limit: MAX_BLOB_SIZE });
+        continue;
+      }
+      // Validate mimeType format
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9!#$&\-^_.+]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-^_.+]*$/.test(mimeType)) {
+        logSecurity('warn', 'BLOB_INVALID_MIMETYPE', { mimeType });
+        continue;
+      }
+      mapped.push({ type: 'blob', data, mimeType });
     } else if (attachType === 'file' || attachType === 'directory') {
       const path = a.path as string | undefined;
       const name = (a.displayName ?? a.name) as string | undefined;

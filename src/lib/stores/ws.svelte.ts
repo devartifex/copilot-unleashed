@@ -397,9 +397,7 @@ export function createWsStore(): WsStore {
       ...(config.customInstructions?.trim() && { customInstructions: config.customInstructions.trim() }),
       ...(config.excludedTools?.length && { excludedTools: config.excludedTools }),
       ...(config.customTools?.length && { customTools: config.customTools }),
-      ...(config.customAgents?.length && { customAgents: config.customAgents }),
       ...(config.mcpServers?.length && { mcpServers: config.mcpServers }),
-      ...(config.disabledSkills?.length && { disabledSkills: config.disabledSkills }),
       ...(config.infiniteSessions && { infiniteSessions: config.infiniteSessions }),
     };
     send(msg);

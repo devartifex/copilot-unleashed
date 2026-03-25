@@ -2,7 +2,6 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { checkAuth } from '$lib/server/auth/guard';
 import { loadUserSettings, saveUserSettings } from '$lib/server/settings-store';
-import type { PersistedSettings } from '$lib/types/index.js';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	const auth = checkAuth(locals.session);
@@ -30,12 +29,23 @@ export const PUT: RequestHandler = async ({ locals, request }) => {
 	}
 
 	try {
-		const body = await request.json() as { settings?: PersistedSettings };
+		const body = await request.json() as { settings?: Record<string, unknown> };
 		if (!body.settings || typeof body.settings !== 'object') {
 			return json({ error: 'Missing settings object' }, { status: 400 });
 		}
 
-		await saveUserSettings(auth.user.login, body.settings);
+		const raw = body.settings;
+
+		// Backward compat: map legacy field name to new one
+		if ('customInstructions' in raw && !('additionalInstructions' in raw)) {
+			raw.additionalInstructions = raw.customInstructions ?? '';
+		}
+		delete raw.customInstructions;
+		// Strip removed fields from old clients
+		delete raw.customAgents;
+		delete raw.disabledSkills;
+
+		await saveUserSettings(auth.user.login, raw as unknown as Parameters<typeof saveUserSettings>[1]);
 		return json({ ok: true });
 	} catch (err: unknown) {
 		const message = err instanceof Error ? err.message : 'Unknown error';

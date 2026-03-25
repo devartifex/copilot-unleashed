@@ -5,7 +5,6 @@
     QuotaSnapshots,
     QuotaSnapshot,
     CustomToolDefinition,
-    CustomAgentDefinition,
     McpServerDefinition,
     SkillDefinition,
   } from '$lib/types/index.js';
@@ -18,20 +17,16 @@
     agents: (AgentInfo | string)[];
     currentAgent: string | null;
     quotaSnapshots: QuotaSnapshots | null;
-    customInstructions: string;
+    additionalInstructions: string;
     excludedTools: string[];
     customTools: CustomToolDefinition[];
-    customAgents: CustomAgentDefinition[];
     mcpServers: McpServerDefinition[];
     availableSkills: SkillDefinition[];
-    disabledSkills: string[];
     onClose: () => void;
     onSaveInstructions: (instructions: string) => void;
     onToggleTool: (toolName: string, enabled: boolean) => void;
     onSaveCustomTools: (tools: CustomToolDefinition[]) => void;
-    onSaveCustomAgents: (agents: CustomAgentDefinition[]) => void;
     onSaveMcpServers: (servers: McpServerDefinition[]) => void;
-    onToggleSkill: (skillName: string, enabled: boolean) => void;
     onSelectAgent: (name: string) => void;
     onDeselectAgent: () => void;
     onCompact: () => void;
@@ -49,20 +44,16 @@
     agents,
     currentAgent,
     quotaSnapshots,
-    customInstructions,
+    additionalInstructions,
     excludedTools,
     customTools,
-    customAgents,
     mcpServers,
     availableSkills,
-    disabledSkills,
     onClose,
     onSaveInstructions,
     onToggleTool,
     onSaveCustomTools,
-    onSaveCustomAgents,
     onSaveMcpServers,
-    onToggleSkill,
     onSelectAgent,
     onDeselectAgent,
     onCompact,
@@ -84,14 +75,13 @@
 
   type NotificationStatus = 'unsupported' | 'not-standalone-ios' | 'denied' | 'prompt' | 'subscribed' | 'granted-no-push' | 'loading';
 
-  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'custom-agents' | 'custom-tools' | 'agents' | 'skills' | 'quota' | 'notifications' | 'compact' | null;
+  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'custom-tools' | 'agents' | 'skills' | 'quota' | 'notifications' | 'compact' | null;
 
   let activeSection = $state<AccordionSection>(null);
   let instructionsDraft = $state('');
 
   // ── MCP server editor state ─────────────────────────────────────────
   const MAX_MCP_SERVERS = 10;
-  const MAX_CUSTOM_AGENTS = 10;
   let mcpShowAddForm = $state(false);
   let mcpExpandedIndex = $state<number | null>(null);
   let mcpDeleteConfirmIndex = $state<number | null>(null);
@@ -104,16 +94,7 @@
   let mcpDraftEnabled = $state(true);
   let mcpFormError = $state('');
 
-  let agentEditing = $state<number | null>(null);
-  let agentDraftName = $state('');
-  let agentDraftDisplayName = $state('');
-  let agentDraftDescription = $state('');
-  let agentDraftPrompt = $state('');
-  let agentDraftTools = $state('');
-  let agentFormError = $state('');
-
   const canAddMoreMcp = $derived(mcpServers.length < MAX_MCP_SERVERS);
-  const canAddMoreAgents = $derived(customAgents.length < MAX_CUSTOM_AGENTS);
 
   // ── Notification state ───────────────────────────────────────────────
   let notificationStatus = $state<NotificationStatus>('loading');
@@ -310,82 +291,9 @@
     onSaveMcpServers(updated);
   }
 
-  function agentValidateDraft(): string | null {
-    if (!agentDraftName.trim()) return 'Name is required';
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(agentDraftName.trim())) return 'Name must be alphanumeric/underscore/dash, max 64 chars';
-    if (!agentDraftPrompt.trim()) return 'Prompt is required';
-    return null;
-  }
-
-  function agentCancelEdit(): void {
-    agentEditing = null;
-    agentDraftName = '';
-    agentDraftDisplayName = '';
-    agentDraftDescription = '';
-    agentDraftPrompt = '';
-    agentDraftTools = '';
-    agentFormError = '';
-  }
-
-  function agentSave(): void {
-    const err = agentValidateDraft();
-    if (err) {
-      agentFormError = err;
-      return;
-    }
-
-    const duplicateIndex = customAgents.findIndex((agent, index) =>
-      agent.name === agentDraftName.trim() && index !== agentEditing
-    );
-    if (duplicateIndex >= 0) {
-      agentFormError = 'An agent with this name already exists';
-      return;
-    }
-
-    const agent: CustomAgentDefinition = {
-      name: agentDraftName.trim(),
-      displayName: agentDraftDisplayName.trim() || undefined,
-      description: agentDraftDescription.trim() || undefined,
-      tools: agentDraftTools.trim()
-        ? agentDraftTools.split(',').map((tool) => tool.trim()).filter(Boolean)
-        : undefined,
-      prompt: agentDraftPrompt.trim(),
-    };
-    const updatedAgents = [...customAgents];
-    if (agentEditing !== null) {
-      updatedAgents[agentEditing] = agent;
-    } else {
-      updatedAgents.push(agent);
-    }
-    onSaveCustomAgents(updatedAgents);
-    agentCancelEdit();
-  }
-
-  function agentStartEdit(index: number): void {
-    const agent = customAgents[index];
-    agentEditing = index;
-    agentDraftName = agent.name;
-    agentDraftDisplayName = agent.displayName ?? '';
-    agentDraftDescription = agent.description ?? '';
-    agentDraftPrompt = agent.prompt;
-    agentDraftTools = agent.tools?.join(', ') ?? '';
-    agentFormError = '';
-  }
-
-  function agentDelete(index: number): void {
-    onSaveCustomAgents(customAgents.filter((_, i) => i !== index));
-    if (agentEditing === index) {
-      agentCancelEdit();
-      return;
-    }
-    if (agentEditing !== null && agentEditing > index) {
-      agentEditing -= 1;
-    }
-  }
-
   // Sync draft when prop changes (including initial value)
   $effect(() => {
-    instructionsDraft = customInstructions;
+    instructionsDraft = additionalInstructions;
   });
 
   const groupedTools = $derived.by(() => {
@@ -484,20 +392,20 @@
       </div>
 
       <div class="settings-body">
-        <!-- Custom Instructions -->
+        <!-- Additional Instructions -->
         <div class="settings-accordion">
           <button
             class="settings-accordion-btn"
             class:open={activeSection === 'instructions'}
             onclick={() => toggleSection('instructions')}
           >
-            Custom Instructions
+            Additional Instructions
             <span class="accordion-chevron">▸</span>
           </button>
           {#if activeSection === 'instructions'}
             <div class="settings-accordion-body">
               <p class="settings-hint">
-                Add instructions that Copilot should follow in every response.
+                Quick supplementary instructions for this session. Custom instructions from <code>~/.copilot/</code> and <code>.github/</code> are loaded automatically by the CLI.
               </p>
               <textarea
                 class="settings-textarea"
@@ -677,77 +585,6 @@
           {/if}
         </div>
 
-        <!-- Custom Agents -->
-        <div class="settings-accordion">
-          <button
-            class="settings-accordion-btn"
-            class:open={activeSection === 'custom-agents'}
-            onclick={() => toggleSection('custom-agents')}
-          >
-            Custom Agents
-            <span class="accordion-chevron">▸</span>
-          </button>
-          {#if activeSection === 'custom-agents'}
-            <div class="settings-accordion-body">
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-2);">
-                <p class="settings-hint" style="margin-bottom: 0;">
-                  Define sub-agents with scoped tools and prompts for fleet mode delegation.
-                </p>
-                <span class="mcp-server-badge">{customAgents.length}/10</span>
-              </div>
-
-              {#each customAgents as agent, i (`${agent.name}-${i}`)}
-                <div class="mcp-server-item">
-                  <div class="mcp-server-header">
-                    <div style="flex: 1; min-width: 0;">
-                      <div class="mcp-server-name">{agent.displayName || agent.name}</div>
-                      <div class="tool-toggle-desc" style="padding-left: 0;">
-                        {agent.description || agent.name}
-                      </div>
-                    </div>
-                    <button class="mcp-edit-btn" onclick={() => agentStartEdit(i)} title="Edit">✎</button>
-                    <button class="mcp-edit-btn" style="color: var(--red);" onclick={() => agentDelete(i)} title="Delete">✕</button>
-                  </div>
-                </div>
-              {/each}
-
-              {#if agentEditing !== null || canAddMoreAgents}
-                <div class="mcp-form">
-                  {#if agentFormError}
-                    <div class="mcp-form-error">{agentFormError}</div>
-                  {/if}
-
-                  <div class="mcp-headers-label">Name <span style="color: var(--red);">*</span></div>
-                  <input class="mcp-input" type="text" bind:value={agentDraftName} placeholder="researcher" maxlength="64" />
-
-                  <div class="mcp-headers-label">Display Name</div>
-                  <input class="mcp-input" type="text" bind:value={agentDraftDisplayName} placeholder="Research Agent" />
-
-                  <div class="mcp-headers-label">Description</div>
-                  <input class="mcp-input" type="text" bind:value={agentDraftDescription} placeholder="Explores codebases using read-only tools" />
-
-                  <div class="mcp-headers-label">Prompt <span style="color: var(--red);">*</span></div>
-                  <textarea class="settings-textarea" bind:value={agentDraftPrompt} placeholder="You are a research assistant..." rows="3" style="min-height: 84px; max-height: 220px;"></textarea>
-
-                  <div class="mcp-headers-label">Tools (comma-separated, empty = all)</div>
-                  <input class="mcp-input" type="text" bind:value={agentDraftTools} placeholder="grep, glob, view" />
-
-                  <div class="mcp-form-actions">
-                    <button class="action-btn save" onclick={agentSave}>
-                      {agentEditing !== null ? 'Update' : 'Add'} Agent
-                    </button>
-                    {#if agentEditing !== null}
-                      <button class="action-btn" onclick={agentCancelEdit}>Cancel</button>
-                    {/if}
-                  </div>
-                </div>
-              {:else}
-                <div class="mcp-form-error" style="margin-top: var(--sp-2);">Maximum of {MAX_CUSTOM_AGENTS} agents reached</div>
-              {/if}
-            </div>
-          {/if}
-        </div>
-
         <!-- Agents -->
         <div class="settings-accordion">
           <button
@@ -817,22 +654,14 @@
           {#if activeSection === 'skills'}
             <div class="settings-accordion-body">
               <p class="settings-hint">
-                Skills are reusable prompt modules (SKILL.md) that inject specialized instructions into the session context.
+                Skills are reusable prompt modules (SKILL.md) discovered from the <code>skills/</code> directory. Use RPC commands to manage skills at runtime.
               </p>
               {#if availableSkills.length === 0}
                 <p class="settings-hint">No skills available.</p>
               {:else}
                 {#each availableSkills as skill (skill.name)}
-                  {@const isEnabled = !disabledSkills.includes(skill.name)}
                   <div class="skill-item">
-                    <label class="skill-toggle">
-                      <input
-                        type="checkbox"
-                        checked={isEnabled}
-                        onchange={() => onToggleSkill(skill.name, !isEnabled)}
-                      />
-                      <span class="skill-name">{skill.name}</span>
-                    </label>
+                    <span class="skill-name">{skill.name}</span>
                     {#if skill.description}
                       <p class="skill-desc">{skill.description}</p>
                     {/if}
@@ -1339,18 +1168,6 @@
   }
   .skill-item:last-child {
     border-bottom: none;
-  }
-  .skill-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    cursor: pointer;
-  }
-  .skill-toggle input[type="checkbox"] {
-    accent-color: var(--purple);
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
   }
   .skill-name {
     font-size: 0.85em;

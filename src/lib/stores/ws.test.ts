@@ -58,26 +58,6 @@ describe('createWsStore', () => {
     }));
   });
 
-  it('passes custom agents when creating a new session', () => {
-    const store = createWsStore();
-    store.connect();
-    const customAgents = [
-      { name: 'researcher', prompt: 'Research the codebase', description: 'Research agent' },
-    ];
-
-    store.newSession({
-      model: 'gpt-4.1',
-      customAgents,
-    });
-
-    expect(sockets).toHaveLength(1);
-    expect(sockets[0].send).toHaveBeenCalledWith(JSON.stringify({
-      type: 'new_session',
-      model: 'gpt-4.1',
-      customAgents,
-    }));
-  });
-
   describe('reconnection resilience', () => {
     it('debounces rapid connect calls within 500ms', () => {
       const store = createWsStore();

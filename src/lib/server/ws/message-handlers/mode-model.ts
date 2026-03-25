@@ -79,7 +79,9 @@ export async function handleSetModel(msg: any, ctx: MessageContext): Promise<voi
     return;
   }
   try {
-    await connectionEntry.session.setModel(newModel);
+    await connectionEntry.session.setModel(newModel,
+      connectionEntry.reasoningEffort ? { reasoningEffort: connectionEntry.reasoningEffort } : undefined
+    );
     // Note: model_changed is sent by the SDK event handler (session.model_change)
   } catch (err: any) {
     console.error('Model change error:', err.message);
@@ -95,5 +97,17 @@ export async function handleSetReasoning(msg: any, ctx: MessageContext): Promise
     poolSend(connectionEntry, { type: 'error', message: 'Invalid reasoning effort. Use: low, medium, high, or xhigh' });
     return;
   }
+
+  if (connectionEntry.session) {
+    try {
+      await connectionEntry.session.setModel(connectionEntry.model || 'gpt-4.1', { reasoningEffort: effort });
+    } catch (err: any) {
+      console.error('Reasoning effort error:', err.message);
+      poolSend(connectionEntry, { type: 'error', message: `Failed to set reasoning effort: ${err.message}` });
+      return;
+    }
+  }
+
+  connectionEntry.reasoningEffort = effort;
   poolSend(connectionEntry, { type: 'reasoning_changed', effort });
 }

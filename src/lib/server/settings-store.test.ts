@@ -75,7 +75,7 @@ interface PersistedSettings {
   model: string;
   mode: string;
   reasoningEffort: string;
-  customInstructions: string;
+  additionalInstructions: string;
   excludedTools: string[];
   customTools: unknown[];
   mcpServers?: unknown[];
@@ -85,7 +85,7 @@ const sampleSettings: PersistedSettings = {
   model: 'gpt-4.1',
   mode: 'interactive',
   reasoningEffort: 'medium',
-  customInstructions: 'Be helpful.',
+  additionalInstructions: 'Be helpful.',
   excludedTools: ['bash'],
   customTools: [{ name: 'lint' }],
   mcpServers: [{ name: 'github' }],
@@ -160,7 +160,7 @@ describe('saveUserSettings', () => {
   it('rejects oversized settings payloads before touching the filesystem', async () => {
     const oversized: PersistedSettings = {
       ...sampleSettings,
-      customInstructions: 'x'.repeat(60_000),
+      additionalInstructions: 'x'.repeat(60_000),
     };
 
     await expect(saveUserSettings('user', oversized)).rejects.toThrow('Settings data exceeds maximum size');

@@ -3,7 +3,6 @@ import type {
   ReasoningEffort,
   PersistedSettings,
   CustomToolDefinition,
-  CustomAgentDefinition,
   McpServerDefinition,
   SkillDefinition,
   InfiniteSessionsConfig,
@@ -21,12 +20,10 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   model: '',
   mode: 'interactive',
   reasoningEffort: 'medium',
-  customInstructions: '',
+  additionalInstructions: '',
   excludedTools: [],
   customTools: [],
-  customAgents: [],
   mcpServers: [],
-  disabledSkills: [],
   infiniteSessions: { ...DEFAULT_INFINITE_SESSIONS },
   notificationsEnabled: false,
 };
@@ -44,18 +41,6 @@ function isValidCustomTool(t: unknown): t is CustomToolDefinition {
     (obj.method === 'GET' || obj.method === 'POST') &&
     typeof obj.headers === 'object' && obj.headers !== null &&
     typeof obj.parameters === 'object' && obj.parameters !== null
-  );
-}
-
-function isValidCustomAgent(agent: unknown): agent is CustomAgentDefinition {
-  if (!agent || typeof agent !== 'object') return false;
-  const obj = agent as Record<string, unknown>;
-  return (
-    typeof obj.name === 'string' &&
-    (typeof obj.displayName === 'undefined' || typeof obj.displayName === 'string') &&
-    (typeof obj.description === 'undefined' || typeof obj.description === 'string') &&
-    (typeof obj.tools === 'undefined' || (Array.isArray(obj.tools) && obj.tools.every((tool) => typeof tool === 'string'))) &&
-    typeof obj.prompt === 'string'
   );
 }
 
@@ -77,15 +62,13 @@ function isValidMcpServer(s: unknown): s is McpServerDefinition {
 }
 
 export interface SettingsStore {
-  customInstructions: string;
+  additionalInstructions: string;
   excludedTools: string[];
   customTools: CustomToolDefinition[];
-  customAgents: CustomAgentDefinition[];
   reasoningEffort: ReasoningEffort;
   selectedModel: string;
   selectedMode: SessionMode;
   mcpServers: McpServerDefinition[];
-  disabledSkills: string[];
   availableSkills: SkillDefinition[];
   infiniteSessions: InfiniteSessionsConfig;
   notificationsEnabled: boolean;
@@ -96,15 +79,13 @@ export interface SettingsStore {
 }
 
 export function createSettingsStore(): SettingsStore {
-  let customInstructions = $state(DEFAULT_SETTINGS.customInstructions);
+  let additionalInstructions = $state(DEFAULT_SETTINGS.additionalInstructions);
   let excludedTools = $state<string[]>([...DEFAULT_SETTINGS.excludedTools]);
   let customTools = $state<CustomToolDefinition[]>([...DEFAULT_SETTINGS.customTools]);
-  let customAgents = $state<CustomAgentDefinition[]>([...(DEFAULT_SETTINGS.customAgents ?? [])]);
   let reasoningEffort = $state<ReasoningEffort>(DEFAULT_SETTINGS.reasoningEffort);
   let selectedModel = $state(DEFAULT_SETTINGS.model);
   let selectedMode = $state<SessionMode>(DEFAULT_SETTINGS.mode);
   let mcpServers = $state<McpServerDefinition[]>([...(DEFAULT_SETTINGS.mcpServers ?? [])]);
-  let disabledSkills = $state<string[]>([...(DEFAULT_SETTINGS.disabledSkills ?? [])]);
   let availableSkills = $state<SkillDefinition[]>([]);
   let infiniteSessions = $state<InfiniteSessionsConfig>({ ...DEFAULT_INFINITE_SESSIONS });
   let notificationsEnabled = $state(DEFAULT_SETTINGS.notificationsEnabled ?? false);
@@ -126,12 +107,10 @@ export function createSettingsStore(): SettingsStore {
       model: selectedModel,
       mode: selectedMode,
       reasoningEffort,
-      customInstructions,
+      additionalInstructions,
       excludedTools,
       customTools,
-      customAgents,
       mcpServers,
-      disabledSkills,
       infiniteSessions,
       notificationsEnabled,
     };
@@ -145,8 +124,10 @@ export function createSettingsStore(): SettingsStore {
     if (parsed.reasoningEffort && VALID_REASONING.has(parsed.reasoningEffort as ReasoningEffort)) {
       reasoningEffort = parsed.reasoningEffort as ReasoningEffort;
     }
-    if (typeof parsed.customInstructions === 'string') {
-      customInstructions = parsed.customInstructions;
+    // Accept both new and legacy field names for backward compatibility
+    const instructions = parsed.additionalInstructions ?? (parsed as Record<string, unknown>).customInstructions;
+    if (typeof instructions === 'string') {
+      additionalInstructions = instructions;
     }
     if (Array.isArray(parsed.excludedTools)) {
       excludedTools = parsed.excludedTools.filter((t): t is string => typeof t === 'string');
@@ -154,14 +135,8 @@ export function createSettingsStore(): SettingsStore {
     if (Array.isArray(parsed.customTools)) {
       customTools = parsed.customTools.filter(isValidCustomTool).slice(0, 10);
     }
-    if (Array.isArray(parsed.customAgents)) {
-      customAgents = parsed.customAgents.filter(isValidCustomAgent).slice(0, 10);
-    }
     if (Array.isArray(parsed.mcpServers)) {
       mcpServers = parsed.mcpServers.filter(isValidMcpServer).slice(0, 10);
-    }
-    if (Array.isArray(parsed.disabledSkills)) {
-      disabledSkills = parsed.disabledSkills.filter((s): s is string => typeof s === 'string');
     }
     if (parsed.infiniteSessions && typeof parsed.infiniteSessions === 'object') {
       const is = parsed.infiniteSessions;
@@ -237,17 +212,14 @@ export function createSettingsStore(): SettingsStore {
   }
 
   return {
-    get customInstructions() { return customInstructions; },
-    set customInstructions(v: string) { customInstructions = v; save(); },
+    get additionalInstructions() { return additionalInstructions; },
+    set additionalInstructions(v: string) { additionalInstructions = v; save(); },
 
     get excludedTools() { return excludedTools; },
     set excludedTools(v: string[]) { excludedTools = v; save(); },
 
     get customTools() { return customTools; },
     set customTools(v: CustomToolDefinition[]) { customTools = v.slice(0, 10); save(); },
-
-    get customAgents() { return customAgents; },
-    set customAgents(v: CustomAgentDefinition[]) { customAgents = v.slice(0, 10); save(); },
 
     get reasoningEffort() { return reasoningEffort; },
     set reasoningEffort(v: ReasoningEffort) { reasoningEffort = v; save(); },
@@ -260,9 +232,6 @@ export function createSettingsStore(): SettingsStore {
 
     get mcpServers() { return mcpServers; },
     set mcpServers(v: McpServerDefinition[]) { mcpServers = v.slice(0, 10); save(); },
-
-    get disabledSkills() { return disabledSkills; },
-    set disabledSkills(v: string[]) { disabledSkills = v; save(); },
 
     get availableSkills() { return availableSkills; },
     set availableSkills(v: SkillDefinition[]) { availableSkills = v; },

@@ -35,6 +35,7 @@ export interface CustomToolDefinition {
   method: 'GET' | 'POST';
   headers: Record<string, string>;
   parameters: Record<string, { type: string; description: string }>;
+  skipPermission?: boolean;
 }
 
 // ─── Tool / Agent types ─────────────────────────────────────────────────────
@@ -504,6 +505,12 @@ export interface FleetStatusMessage {
   agents: Array<{ agentId: string; agentType: string }>;
 }
 
+export interface SystemNotificationMessage {
+  type: 'system_notification';
+  content?: string;
+  kind?: Record<string, unknown>;
+}
+
 export interface HookPreToolMessage {
   type: 'hook_pre_tool';
   toolName: string;
@@ -561,6 +568,46 @@ export interface SessionUsageTotals {
 /** Server heartbeat response to client-side ping */
 export interface PongMessage {
   type: 'pong';
+}
+
+// ─── RPC discovery messages ─────────────────────────────────────────────────
+
+export interface SkillsListMessage {
+  type: 'skills_list';
+  skills: {
+    name: string;
+    description: string;
+    source: string;
+    userInvocable: boolean;
+    enabled: boolean;
+    path?: string;
+  }[];
+}
+
+export interface SkillToggledMessage {
+  type: 'skill_toggled';
+  name: string;
+  enabled: boolean;
+}
+
+export interface SkillsReloadedMessage {
+  type: 'skills_reloaded';
+}
+
+export interface McpServersListMessage {
+  type: 'mcp_servers_list';
+  servers: {
+    name: string;
+    status: 'connected' | 'failed' | 'pending' | 'disabled' | 'not_configured';
+    source?: string;
+    error?: string;
+  }[];
+}
+
+export interface McpServerToggledMessage {
+  type: 'mcp_server_toggled';
+  name: string;
+  enabled: boolean;
 }
 
 export type ServerMessage =
@@ -626,6 +673,7 @@ export type ServerMessage =
   | WorkspaceFileChangedMessage
   | FleetStartedMessage
   | FleetStatusMessage
+  | SystemNotificationMessage
   | HookPreToolMessage
   | HookPostToolMessage
   | HookUserPromptMessage
@@ -633,6 +681,11 @@ export type ServerMessage =
   | HookSessionEndMessage
   | HookErrorMessage
   | PongMessage
+  | SkillsListMessage
+  | SkillToggledMessage
+  | SkillsReloadedMessage
+  | McpServersListMessage
+  | McpServerToggledMessage
   | SessionsChangedMessage;
 
 // ─── Session filesystem watcher ──────────────────────────────────────────────
@@ -648,6 +701,12 @@ export interface FileAttachment {
   name: string;
   size: number;
   type: string;
+}
+
+export interface BlobAttachment {
+  type: 'blob';
+  data: string;
+  mimeType: string;
 }
 
 // ─── SDK attachment types (file, directory, selection) ───────────────────────
@@ -675,6 +734,13 @@ export interface InfiniteSessionsConfig {
   bufferThreshold: number;
 }
 
+export type { SystemPromptSection, SectionOverride, SectionOverrideAction } from '@github/copilot-sdk';
+
+export interface SystemPromptSectionInput {
+  action: 'replace' | 'remove' | 'append' | 'prepend';
+  content?: string;
+}
+
 export interface NewSessionMessage {
   type: 'new_session';
   model: string;
@@ -684,9 +750,8 @@ export interface NewSessionMessage {
   excludedTools?: string[];
   customTools?: CustomToolDefinition[];
   mcpServers?: McpServerDefinition[];
-  disabledSkills?: string[];
-  customAgents?: CustomAgentDefinition[];
   infiniteSessions?: InfiniteSessionsConfig;
+  systemPromptSections?: Record<string, SystemPromptSectionInput>;
 }
 
 export type MessageDeliveryMode = 'immediate' | 'enqueue';
@@ -931,9 +996,8 @@ export interface NewSessionConfig {
   excludedTools?: string[];
   customTools?: CustomToolDefinition[];
   mcpServers?: McpServerDefinition[];
-  disabledSkills?: string[];
-  customAgents?: CustomAgentDefinition[];
   infiniteSessions?: InfiniteSessionsConfig;
+  systemPromptSections?: Record<string, SystemPromptSectionInput>;
 }
 
 // ─── Settings (persisted to localStorage) ───────────────────────────────────
@@ -942,12 +1006,10 @@ export interface PersistedSettings {
   model: string;
   mode: SessionMode;
   reasoningEffort: ReasoningEffort;
-  customInstructions: string;
+  additionalInstructions: string;
   excludedTools: string[];
   customTools: CustomToolDefinition[];
   mcpServers?: McpServerDefinition[];
-  disabledSkills?: string[];
-  customAgents?: CustomAgentDefinition[];
   infiniteSessions?: InfiniteSessionsConfig;
   /** User preference for push notifications — persisted so it survives redeploys. */
   notificationsEnabled?: boolean;

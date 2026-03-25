@@ -9,6 +9,7 @@ import { handleListSessions, handleDeleteSession, handleGetSessionDetail, handle
 import { handleResumeSession } from './resume-session.js';
 import { handleGetPlan, handleUpdatePlan, handleDeletePlan } from './plans.js';
 import { handleStartFleet } from './fleet.js';
+import { handleListSkillsRpc, handleToggleSkillRpc, handleReloadSkills, handleListMcpRpc, handleToggleMcpRpc } from './rpc-discovery.js';
 import { chatStateStore } from '../../chat-state-singleton.js';
 
 export const messageHandlers: Record<string, (msg: any, ctx: MessageContext) => Promise<void>> = {
@@ -35,6 +36,11 @@ export const messageHandlers: Record<string, (msg: any, ctx: MessageContext) => 
   update_plan: handleUpdatePlan,
   delete_plan: handleDeletePlan,
   start_fleet: handleStartFleet,
+  list_skills_rpc: handleListSkillsRpc,
+  toggle_skill_rpc: handleToggleSkillRpc,
+  reload_skills: handleReloadSkills,
+  list_mcp_rpc: handleListMcpRpc,
+  toggle_mcp_rpc: handleToggleMcpRpc,
   clear_chat: async (_msg: any, ctx: MessageContext) => {
     const tabId = ctx.poolKey.split(':').slice(1).join(':');
     chatStateStore.delete(ctx.userLogin, tabId);

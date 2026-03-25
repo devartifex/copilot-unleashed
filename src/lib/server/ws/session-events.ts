@@ -7,6 +7,32 @@ import { chatStateStore } from '../chat-state-singleton.js';
 import { sendPushToUser } from '../push/sender.js';
 import { subscriptionStore } from '../push-singleton.js';
 
+export const HANDLED_EVENT_TYPES = new Set([
+  'assistant.message_delta', 'assistant.reasoning_delta', 'assistant.reasoning',
+  'assistant.intent', 'assistant.turn_start', 'assistant.turn_end', 'assistant.usage',
+  'tool.execution_start', 'tool.execution_complete', 'tool.execution_progress',
+  'tool.execution_partial_result',
+  'session.mode_changed', 'session.error', 'session.title_changed',
+  'session.warning', 'session.usage_info', 'session.info',
+  'session.plan_changed', 'session.compaction_start', 'session.compaction_complete',
+  'session.shutdown', 'session.model_change', 'session.idle', 'session.task_complete',
+  'session.truncation', 'session.context_changed', 'session.workspace_file_changed',
+  'subagent.started', 'subagent.completed', 'subagent.failed',
+  'subagent.selected', 'subagent.deselected',
+  'skill.invoked',
+  'elicitation.requested', 'elicitation.completed',
+  'exit_plan_mode.requested', 'exit_plan_mode.completed',
+  'system.notification',
+]);
+
+export function createCatchAllHandler(entry: PoolEntry, handledTypes: Set<string>): (event: any) => void {
+  return (event: any) => {
+    if (!handledTypes.has(event.type)) {
+      console.log('[EVENT] unhandled SDK event:', event.type, JSON.stringify(event.data ?? {}).slice(0, 200));
+    }
+  };
+}
+
 export function wireSessionEvents(
   session: any,
   entry: PoolEntry,
@@ -238,26 +264,10 @@ export function wireSessionEvents(
     poolSend(entry, { type: 'workspace_file_changed', path: event.data?.path, operation: event.data?.operation });
   });
 
-  // Catch-all: log unhandled event types for debugging / future audit
-  const handledTypes = new Set([
-    'assistant.message_delta', 'assistant.reasoning_delta', 'assistant.reasoning',
-    'assistant.intent', 'assistant.turn_start', 'assistant.turn_end', 'assistant.usage',
-    'tool.execution_start', 'tool.execution_complete', 'tool.execution_progress',
-    'tool.execution_partial_result',
-    'session.mode_changed', 'session.error', 'session.title_changed',
-    'session.warning', 'session.usage_info', 'session.info',
-    'session.plan_changed', 'session.compaction_start', 'session.compaction_complete',
-    'session.shutdown', 'session.model_change', 'session.idle', 'session.task_complete',
-    'session.truncation', 'session.context_changed', 'session.workspace_file_changed',
-    'subagent.started', 'subagent.completed', 'subagent.failed',
-    'subagent.selected', 'subagent.deselected',
-    'skill.invoked',
-    'elicitation.requested', 'elicitation.completed',
-    'exit_plan_mode.requested', 'exit_plan_mode.completed',
-  ]);
-  session.on((event: any) => {
-    if (!handledTypes.has(event.type)) {
-      console.log('[EVENT] unhandled SDK event:', event.type, JSON.stringify(event.data ?? {}).slice(0, 200));
-    }
+  session.on('system.notification', (event: any) => {
+    poolSend(entry, { type: 'system_notification', content: event.data?.content, kind: event.data?.kind });
   });
+
+  // Catch-all: log unhandled event types for debugging / future audit
+  session.on(createCatchAllHandler(entry, HANDLED_EVENT_TYPES));
 }

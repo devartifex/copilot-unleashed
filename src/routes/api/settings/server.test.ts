@@ -53,6 +53,16 @@ const settings = {
 	customTools: [],
 };
 
+// After backward compat mapping: customInstructions → additionalInstructions, stripped fields removed
+const expectedSavedSettings = {
+	model: 'gpt-4.1',
+	mode: 'chat',
+	reasoningEffort: 'medium',
+	additionalInstructions: 'Be concise',
+	excludedTools: ['bash'],
+	customTools: [],
+};
+
 describe('/api/settings', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -133,7 +143,7 @@ describe('/api/settings', () => {
 
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ ok: true });
-		expect(saveUserSettings).toHaveBeenCalledWith('octocat', settings);
+		expect(saveUserSettings).toHaveBeenCalledWith('octocat', expectedSavedSettings);
 	});
 
 	it('PUT returns 500 when saving settings fails', async () => {

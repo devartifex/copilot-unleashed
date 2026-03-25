@@ -6,7 +6,7 @@ import { config } from '../../config.js';
 import { poolSend } from '../session-pool.js';
 import { VALID_MODES } from '../constants.js';
 import { parseMcpServers } from '../mcp-servers.js';
-import { wireSessionEvents } from '../session-events.js';
+import { wireSessionEvents, createCatchAllHandler, HANDLED_EVENT_TYPES } from '../session-events.js';
 import { makeUserInputHandler, makePermissionHandler } from '../permissions.js';
 import type { MessageContext } from '../types.js';
 
@@ -66,6 +66,8 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
 
     let resumed = false;
 
+    const onEvent = createCatchAllHandler(connectionEntry, HANDLED_EVENT_TYPES);
+
     // Try native SDK resume first
     try {
       connectionEntry.session = await connectionEntry.client.resumeSession(sessionId, {
@@ -75,6 +77,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
         hooks: buildSessionHooks((message) => poolSend(connectionEntry, message)),
         configDir: resolvedConfigDir,
         mcpServers: mcpServersConfig as any,
+        onEvent,
         ...(detail?.plan && {
           systemMessage: {
             mode: 'append' as const,
@@ -101,6 +104,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
         permissionMode: 'approve_all',
         configDir: resolvedConfigDir,
         mcpServers: resumeMcpServers,
+        onEvent,
         onHookEvent: (message) => poolSend(connectionEntry, message),
       });
       console.log(`[RESUME] Fallback session created for ${sessionId} with context injection`);

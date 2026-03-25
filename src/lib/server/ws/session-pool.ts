@@ -41,6 +41,8 @@ export interface PoolEntry {
   pendingUserInputPrompt: Record<string, unknown> | null;
   /** Map of pending permission prompts keyed by requestId — re-sent on reconnect */
   pendingPermissionPrompts: Map<string, Record<string, unknown>>;
+  /** Current reasoning effort level for the session */
+  reasoningEffort: string | null;
   /** Timestamp of the last client ping — used to detect backgrounded/suspended apps */
   lastPingAt: number;
 }
@@ -64,6 +66,7 @@ export function createPoolEntry(client: CopilotClient, ws: WebSocket): PoolEntry
     seq: 0,
     pendingUserInputPrompt: null,
     pendingPermissionPrompts: new Map(),
+    reasoningEffort: null,
     lastPingAt: Date.now(),
   };
 }

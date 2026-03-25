@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSettingsStore } from '$lib/stores/settings.svelte.js';
 import type {
-  CustomAgentDefinition,
   CustomToolDefinition,
   McpServerDefinition,
   PersistedSettings,
@@ -26,16 +25,6 @@ function makeCustomTool(name: string): CustomToolDefinition {
     parameters: {
       prompt: { type: 'string', description: 'Prompt text' },
     },
-  };
-}
-
-function makeCustomAgent(name: string): CustomAgentDefinition {
-  return {
-    name,
-    displayName: `${name} display`,
-    description: `${name} description`,
-    tools: [`${name}.tool`],
-    prompt: `Prompt for ${name}`,
   };
 }
 
@@ -65,44 +54,39 @@ describe('createSettingsStore', () => {
     expect(store.selectedModel).toBe('');
     expect(store.selectedMode).toBe('interactive');
     expect(store.reasoningEffort).toBe('medium');
-    expect(store.customInstructions).toBe('');
+    expect(store.additionalInstructions).toBe('');
     expect(store.excludedTools).toEqual([]);
     expect(store.customTools).toEqual([]);
-    expect(store.customAgents).toEqual([]);
     expect(store.mcpServers).toEqual([]);
   });
 
   it('persists setter updates to localStorage and syncs them to the server', () => {
     const store = createSettingsStore();
     const tools = Array.from({ length: 12 }, (_, index) => makeCustomTool(`tool-${index}`));
-    const agents = Array.from({ length: 12 }, (_, index) => makeCustomAgent(`agent-${index}`));
     const servers = Array.from({ length: 12 }, (_, index) => makeMcpServer(`server-${index}`));
 
     store.selectedModel = 'gpt-5';
     store.selectedMode = 'autopilot';
     store.reasoningEffort = 'high';
-    store.customInstructions = 'Be concise';
+    store.additionalInstructions = 'Be concise';
     store.excludedTools = ['bash', 'grep'];
     store.customTools = tools;
-    store.customAgents = agents;
     store.mcpServers = servers;
 
     const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as PersistedSettings;
 
     expect(store.customTools).toHaveLength(10);
-    expect(store.customAgents).toHaveLength(10);
     expect(store.mcpServers).toHaveLength(10);
     expect(persisted).toMatchObject({
       model: 'gpt-5',
       mode: 'autopilot',
       reasoningEffort: 'high',
-      customInstructions: 'Be concise',
+      additionalInstructions: 'Be concise',
       excludedTools: ['bash', 'grep'],
     });
     expect(persisted.customTools).toHaveLength(10);
-    expect(persisted.customAgents).toHaveLength(10);
     expect(persisted.mcpServers).toHaveLength(10);
-    expect(fetchMock).toHaveBeenCalledTimes(8);
+    expect(fetchMock).toHaveBeenCalledTimes(7);
     expect(fetchMock).toHaveBeenLastCalledWith('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -110,29 +94,20 @@ describe('createSettingsStore', () => {
     });
   });
 
-  it('persists custom agents in settings', () => {
-    const settings = createSettingsStore();
-
-    settings.customAgents = [
-      {
-        name: 'researcher',
-        prompt: 'You are a research assistant',
-        description: 'Research agent',
-      },
-    ];
-    settings.save();
-
-    const settings2 = createSettingsStore();
-    settings2.load();
-
-    expect(settings2.customAgents).toHaveLength(1);
-    expect(settings2.customAgents[0].name).toBe('researcher');
-    expect(settings2.customAgents[0].prompt).toBe('You are a research assistant');
+  it('loads legacy customInstructions field for backward compatibility', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        customInstructions: 'legacy instructions',
+      }),
+    );
+    const store = createSettingsStore();
+    store.load();
+    expect(store.additionalInstructions).toBe('legacy instructions');
   });
 
   it('loads valid persisted settings, filters invalid entries, and keeps mode interactive', () => {
     const validTool = makeCustomTool('valid-tool');
-    const validAgent = makeCustomAgent('valid-agent');
     const validServer = makeMcpServer('valid-server');
 
     localStorage.setItem(
@@ -141,17 +116,12 @@ describe('createSettingsStore', () => {
         model: 'claude-sonnet',
         mode: 'autopilot',
         reasoningEffort: 'xhigh',
-        customInstructions: 'Use the docs',
+        additionalInstructions: 'Use the docs',
         excludedTools: ['bash', 42, null],
         customTools: [
           validTool,
           { ...validTool, name: 123 },
           ...Array.from({ length: 10 }, (_, index) => makeCustomTool(`extra-tool-${index}`)),
-        ],
-        customAgents: [
-          validAgent,
-          { ...validAgent, prompt: 123 },
-          ...Array.from({ length: 10 }, (_, index) => makeCustomAgent(`extra-agent-${index}`)),
         ],
         mcpServers: [
           validServer,
@@ -167,12 +137,10 @@ describe('createSettingsStore', () => {
     expect(store.selectedModel).toBe('claude-sonnet');
     expect(store.selectedMode).toBe('interactive');
     expect(store.reasoningEffort).toBe('xhigh');
-    expect(store.customInstructions).toBe('Use the docs');
+    expect(store.additionalInstructions).toBe('Use the docs');
     expect(store.excludedTools).toEqual(['bash']);
     expect(store.customTools).toHaveLength(10);
     expect(store.customTools[0]).toEqual(validTool);
-    expect(store.customAgents).toHaveLength(10);
-    expect(store.customAgents[0]).toEqual(validAgent);
     expect(store.mcpServers).toHaveLength(10);
     expect(store.mcpServers[0]).toEqual(validServer);
   });
@@ -195,10 +163,9 @@ describe('createSettingsStore', () => {
           model: 'gpt-4.1',
           mode: 'plan',
           reasoningEffort: 'low',
-          customInstructions: 'Server wins',
+          additionalInstructions: 'Server wins',
           excludedTools: ['bash'],
           customTools: [makeCustomTool('server-tool')],
-          customAgents: [makeCustomAgent('server-agent')],
           mcpServers: [makeMcpServer('server-mcp')],
         },
       }),
@@ -211,10 +178,9 @@ describe('createSettingsStore', () => {
     expect(store.selectedModel).toBe('gpt-4.1');
     expect(store.selectedMode).toBe('interactive');
     expect(store.reasoningEffort).toBe('low');
-    expect(store.customInstructions).toBe('Server wins');
+    expect(store.additionalInstructions).toBe('Server wins');
     expect(store.excludedTools).toEqual(['bash']);
     expect(store.customTools).toEqual([makeCustomTool('server-tool')]);
-    expect(store.customAgents).toEqual([makeCustomAgent('server-agent')]);
     expect(store.mcpServers).toEqual([makeMcpServer('server-mcp')]);
 
     const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as PersistedSettings;
@@ -239,12 +205,10 @@ describe('createSettingsStore', () => {
           model: 'gpt-4o-mini',
           mode: 'interactive',
           reasoningEffort: 'medium',
-          customInstructions: '',
+          additionalInstructions: '',
           excludedTools: [],
           customTools: [],
-          customAgents: [],
           mcpServers: [],
-          disabledSkills: [],
           infiniteSessions: { enabled: true, backgroundThreshold: 0.80, bufferThreshold: 0.95 },
           notificationsEnabled: false,
         },

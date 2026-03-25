@@ -7,7 +7,7 @@ interface PersistedSettings {
 	model: string;
 	mode: string;
 	reasoningEffort: string;
-	customInstructions: string;
+	additionalInstructions: string;
 	excludedTools: string[];
 	customTools: unknown[];
 	mcpServers?: unknown[];

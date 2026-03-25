@@ -1,5 +1,5 @@
 import { CopilotClient, defineTool } from '@github/copilot-sdk';
-import type { SessionConfig } from '@github/copilot-sdk';
+import type { SessionConfig, SystemPromptSection, SectionOverride } from '@github/copilot-sdk';
 
 export type HookEventCallback = (message: Record<string, unknown>) => void;
 import { isIP } from 'node:net';
@@ -13,6 +13,7 @@ export interface CustomToolDefinition {
   method: 'GET' | 'POST';
   headers: Record<string, string>;
   parameters: Record<string, { type: string; description: string }>;
+  skipPermission?: boolean;
 }
 
 type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
@@ -54,7 +55,10 @@ export interface CreateSessionOptions {
     tools?: string[];
     prompt: string;
   }>;
+  agent?: string;
+  onEvent?: (event: any) => void;
   onHookEvent?: HookEventCallback;
+  systemPromptSections?: Partial<Record<SystemPromptSection, SectionOverride>>;
 }
 
 function buildZodSchema(params: Record<string, { type: string; description: string }>): z.ZodObject<Record<string, z.ZodTypeAny>> {
@@ -177,6 +181,7 @@ function buildCustomTools(customTools: CustomToolDefinition[]) {
     return defineTool(tool.name, {
       description: tool.description,
       parameters: buildZodSchema(tool.parameters),
+      ...(tool.skipPermission ? { skipPermission: true } : {}),
       handler: async (args: unknown) => {
         const response = await fetch(tool.webhookUrl, {
           method: tool.method,
@@ -271,11 +276,14 @@ export async function createCopilotSession(
     sessionConfig.availableTools = options.availableTools;
   }
 
-  if (options.customInstructions) {
-    sessionConfig.systemMessage = {
-      mode: 'append',
-      content: options.customInstructions,
-    };
+  if (options.systemPromptSections && Object.keys(options.systemPromptSections).length > 0) {
+    const sections: Partial<Record<SystemPromptSection, SectionOverride>> = { ...options.systemPromptSections };
+    if (options.customInstructions && !sections.custom_instructions) {
+      sections.custom_instructions = { action: 'append', content: options.customInstructions };
+    }
+    sessionConfig.systemMessage = { mode: 'customize', sections };
+  } else if (options.customInstructions) {
+    sessionConfig.systemMessage = { mode: 'append', content: options.customInstructions };
   }
 
   if (options.onUserInputRequest) {
@@ -312,6 +320,14 @@ export async function createCopilotSession(
 
   if (options.customAgents && options.customAgents.length > 0) {
     sessionConfig.customAgents = options.customAgents;
+  }
+
+  if (options.agent && typeof options.agent === 'string') {
+    sessionConfig.agent = options.agent;
+  }
+
+  if (options.onEvent) {
+    sessionConfig.onEvent = options.onEvent;
   }
 
   if (options.onHookEvent) {

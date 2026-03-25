@@ -1,10 +1,11 @@
 import { createCopilotSession } from '../../copilot/session.js';
+import type { SystemPromptSection, SectionOverride } from '@github/copilot-sdk';
 import { getSkillDirectories } from '../../skills/scanner.js';
 import { config } from '../../config.js';
 import { poolSend } from '../session-pool.js';
 import { VALID_MODES } from '../constants.js';
 import { parseMcpServers } from '../mcp-servers.js';
-import { wireSessionEvents } from '../session-events.js';
+import { wireSessionEvents, createCatchAllHandler, HANDLED_EVENT_TYPES } from '../session-events.js';
 import { makeUserInputHandler, makePermissionHandler } from '../permissions.js';
 import { chatStateStore } from '../../chat-state-singleton.js';
 import type { MessageContext } from '../types.js';
@@ -81,7 +82,32 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
           })
       : undefined;
 
+    const validSections = new Set<string>([
+      'identity', 'tone', 'tool_efficiency', 'environment_context',
+      'code_change_rules', 'guidelines', 'safety', 'tool_instructions',
+      'custom_instructions', 'last_instructions',
+    ]);
+    const validActions = new Set<string>(['replace', 'remove', 'append', 'prepend']);
+
+    let systemPromptSections: Partial<Record<SystemPromptSection, SectionOverride>> | undefined;
+    if (msg.systemPromptSections && typeof msg.systemPromptSections === 'object') {
+      systemPromptSections = {};
+      for (const [name, override] of Object.entries(msg.systemPromptSections as Record<string, unknown>)) {
+        if (!validSections.has(name)) continue;
+        const o = override as Record<string, unknown>;
+        if (!o || typeof o !== 'object' || !validActions.has(o.action as string)) continue;
+        systemPromptSections[name as SystemPromptSection] = {
+          action: o.action as SectionOverride['action'],
+          ...(typeof o.content === 'string' ? { content: o.content.slice(0, 5000) } : {}),
+        };
+      }
+    }
+
     const skillDirectories = await getSkillDirectories();
+
+    const agent = typeof msg.agent === 'string' ? msg.agent.trim() : undefined;
+
+    const onEvent = createCatchAllHandler(connectionEntry, HANDLED_EVENT_TYPES);
 
     connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, {
       model: msg.model,
@@ -98,6 +124,9 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       skillDirectories,
       disabledSkills,
       customAgents,
+      agent,
+      onEvent,
+      systemPromptSections,
       onHookEvent: (message) => poolSend(connectionEntry, message),
     });
 

@@ -50,7 +50,6 @@ const settings = {
 	reasoningEffort: 'medium',
 	customInstructions: 'Be concise',
 	excludedTools: ['bash'],
-	customTools: [],
 };
 
 // After backward compat mapping: customInstructions → additionalInstructions, stripped fields removed
@@ -60,7 +59,6 @@ const expectedSavedSettings = {
 	reasoningEffort: 'medium',
 	additionalInstructions: 'Be concise',
 	excludedTools: ['bash'],
-	customTools: [],
 };
 
 describe('/api/settings', () => {

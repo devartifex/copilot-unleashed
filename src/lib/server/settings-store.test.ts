@@ -77,8 +77,6 @@ interface PersistedSettings {
   reasoningEffort: string;
   additionalInstructions: string;
   excludedTools: string[];
-  customTools: unknown[];
-  mcpServers?: unknown[];
 }
 
 const sampleSettings: PersistedSettings = {
@@ -87,8 +85,6 @@ const sampleSettings: PersistedSettings = {
   reasoningEffort: 'medium',
   additionalInstructions: 'Be helpful.',
   excludedTools: ['bash'],
-  customTools: [{ name: 'lint' }],
-  mcpServers: [{ name: 'github' }],
 };
 
 beforeEach(() => {

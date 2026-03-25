@@ -14,7 +14,7 @@
 
 **Every Copilot model. One login. Any device. Your server.**
 
-The only open-source web UI built on the official [`@github/copilot-sdk`](https://github.com/github/copilot-sdk). Self-host a ChatGPT-class experience powered by your GitHub Copilot subscription — with autopilot agents, live reasoning traces, native GitHub tools, and persistent sessions that sync between the CLI and the browser.
+The only open-source web UI built on the official [`@github/copilot-sdk`](https://github.com/github/copilot-sdk). Self-host a ChatGPT-class experience powered by your GitHub Copilot subscription — with autopilot agents, live reasoning traces, native GitHub tools, customizable agents, skills, prompts, and persistent sessions that sync between the CLI and the browser.
 
 <p align="center">
   <img src="docs/screenshots/usecase-autopilot-desktop.png" width="720" alt="Autopilot agent — reads a GitHub issue, implements the feature, runs tests, and opens a PR autonomously">
@@ -34,7 +34,7 @@ The only open-source web UI built on the official [`@github/copilot-sdk`](https:
 
 ## Why this exists
 
-The GitHub Copilot CLI is powerful, but it's stuck in your terminal. This project wraps the same official SDK in a web UI you can reach from any device — phone, tablet, laptop — with features the CLI doesn't have: persistent sessions, a visual plan editor, file and image attachments, custom webhook tools, and real-time streaming with a dark, touch-friendly interface.
+The GitHub Copilot CLI is powerful, but it's stuck in your terminal. This project wraps the same official SDK in a web UI you can reach from any device — phone, tablet, laptop — with features the CLI doesn't have: persistent sessions, a visual plan editor, file and image attachments, and real-time streaming with a dark, touch-friendly interface.
 
 Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, Gemini 3 Pro, and more through one account. This app lets you use them all from anywhere, on your own server, without handing your data to another SaaS.
 
@@ -46,8 +46,9 @@ Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, 
 - **Autopilot agents** — plan, code, run tests, and open PRs autonomously with live tool execution
 - **Extended thinking** — live reasoning traces from Claude Opus 4.6 and Claude Sonnet 4.6 with collapsible "Thinking…" blocks
 - **Native GitHub tools** — issues, PRs, code search, repos, Actions — built in via the GitHub MCP server
-- **Custom MCP servers** — plug in any MCP-compatible server with per-server headers, tool filtering, and timeout control
-- **Custom webhook tools** — connect Jira, Slack, databases, or internal APIs as callable tools
+- **MCP servers** — configure MCP-compatible servers in `~/.copilot/mcp-config.json`; enable/disable from settings
+- **Custom agents** — add `.agent.md` files to `~/.copilot/agents/` for specialized personas; activate from settings
+- **Skills & prompts** — reusable prompt modules and templates discovered from `~/.copilot/`; invoke with `/name` in chat
 - **Image vision** — attach images alongside code and documents; vision-capable models analyze them inline
 - **File & directory attachments** — drop in code files, images, CSVs, or whole directories with `@` mention autocomplete
 - **Issue & PR references** — type `#` to search and reference GitHub issues/PRs across all your repos
@@ -78,9 +79,9 @@ Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, 
 
 **Watch it think.** Enable extended thinking — see the live reasoning trace in a collapsible block before the answer. You see *how* it gets there, not just what it concludes.
 
-**Connect your own tools.** Define webhook tools or add MCP servers in the settings UI. Copilot calls your Jira, your database, your internal APIs — as part of its agentic workflow.
+**Connect external tools.** Configure MCP servers in `~/.copilot/mcp-config.json` — Copilot discovers their tools automatically. Create custom agents in `~/.copilot/agents/` for specialized workflows.
 
-> *"Is the auth bug ticket still open? If so, find the related PRs and summarize the discussion"* → calls your project tracker, then searches GitHub.
+> *"Is the auth bug ticket still open? If so, find the related PRs and summarize the discussion"* → calls your project tracker via MCP, then searches GitHub.
 
 **Self-host for personal use.** One `azd up`. Optionally share with a trusted team via `ALLOWED_GITHUB_USERS`. Everyone logs in with their own GitHub account — no shared API keys, no shared context.
 
@@ -384,7 +385,7 @@ Scopes: `copilot` (API access) + `read:user` (avatar) + `repo` (SDK tools need i
 - Rate limiting: 200 req / 15 min per IP (HTTP) + 30 msg / min per WebSocket connection
 - Secure cookies: httpOnly, secure (prod), sameSite: lax
 - DOMPurify on all rendered markdown
-- SSRF blocklist for custom webhook and MCP server URLs (IPv4 + IPv6 internal ranges, HTTPS required)
+- SSRF blocklist for MCP server URLs (IPv4 + IPv6 internal ranges, HTTPS required)
 - 10,000 char message limit, 10MB upload limit, extension allowlist
 - Per-tool permission prompts with 30s auto-deny countdown
 - Token revalidation on every WebSocket connect

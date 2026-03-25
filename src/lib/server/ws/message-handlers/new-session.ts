@@ -4,7 +4,6 @@ import { getSkillDirectories } from '../../skills/scanner.js';
 import { config } from '../../config.js';
 import { poolSend } from '../session-pool.js';
 import { VALID_MODES } from '../constants.js';
-import { parseMcpServers } from '../mcp-servers.js';
 import { wireSessionEvents, createCatchAllHandler, HANDLED_EVENT_TYPES } from '../session-events.js';
 import { makeUserInputHandler, makePermissionHandler } from '../permissions.js';
 import { chatStateStore } from '../../chat-state-singleton.js';
@@ -51,10 +50,6 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       : undefined;
 
     const permissionMode = msg.mode === 'autopilot' ? 'approve_all' as const : 'prompt' as const;
-
-    const customTools = Array.isArray(msg.customTools) ? msg.customTools.slice(0, 10) : undefined;
-
-    const mcpServers = parseMcpServers(msg.mcpServers);
 
     const disabledSkills = Array.isArray(msg.disabledSkills)
       ? msg.disabledSkills.filter((s: unknown) => typeof s === 'string')
@@ -114,12 +109,10 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       reasoningEffort: msg.reasoningEffort,
       customInstructions,
       excludedTools,
-      customTools,
       infiniteSessions,
       onUserInputRequest: makeUserInputHandler(connectionEntry, ctx.userLogin),
       permissionMode,
       onPermissionRequest: makePermissionHandler(connectionEntry, ctx.userLogin),
-      mcpServers,
       configDir: config.copilotConfigDir,
       skillDirectories,
       disabledSkills,

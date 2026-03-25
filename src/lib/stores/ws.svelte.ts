@@ -7,7 +7,6 @@ import type {
   ServerMessage,
   NewSessionConfig,
   MessageDeliveryMode,
-  McpServerDefinition,
 } from '$lib/types/index.js';
 import { notify } from '$lib/utils/notifications.js';
 import { getPushSubscription } from '$lib/utils/push-notifications.js';
@@ -52,7 +51,7 @@ export interface WsStore {
     mode?: MessageDeliveryMode,
   ): void;
   newSession(config: NewSessionConfig): void;
-  resumeSession(sessionId: string, mcpServers?: McpServerDefinition[]): void;
+  resumeSession(sessionId: string): void;
   setMode(mode: SessionMode): void;
   setModel(model: string): void;
   setReasoning(effort: ReasoningEffort): void;
@@ -396,21 +395,14 @@ export function createWsStore(): WsStore {
       ...(config.reasoningEffort && { reasoningEffort: config.reasoningEffort }),
       ...(config.customInstructions?.trim() && { customInstructions: config.customInstructions.trim() }),
       ...(config.excludedTools?.length && { excludedTools: config.excludedTools }),
-      ...(config.customTools?.length && { customTools: config.customTools }),
-      ...(config.mcpServers?.length && { mcpServers: config.mcpServers }),
       ...(config.infiniteSessions && { infiniteSessions: config.infiniteSessions }),
     };
     send(msg);
   }
 
-  function resumeSession(sessionId: string, mcpServers?: McpServerDefinition[]): void {
+  function resumeSession(sessionId: string): void {
     sessionReady = false;
-    const enabledServers = mcpServers?.filter(s => s.enabled);
-    send({
-      type: 'resume_session',
-      sessionId,
-      ...(enabledServers?.length && { mcpServers: enabledServers }),
-    });
+    send({ type: 'resume_session', sessionId });
   }
 
   function setMode(mode: SessionMode): void {

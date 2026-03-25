@@ -485,7 +485,6 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
       case 'agent_changed':
         currentAgent = msg.agent;
-        addInfoMessage(msg.agent ? `Agent selected: @${msg.agent}` : 'Agent deselected');
         break;
 
       case 'quota':

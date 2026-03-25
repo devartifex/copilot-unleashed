@@ -3,13 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const { defineToolMock } = vi.hoisted(() => ({
-  defineToolMock: vi.fn((name: string, options: Record<string, unknown>) => ({ name, ...options })),
-}));
-
 vi.mock('@github/copilot-sdk', () => ({
   CopilotClient: vi.fn(),
-  defineTool: defineToolMock,
 }));
 
 vi.mock('../config.js', () => ({
@@ -25,15 +20,6 @@ interface ClientMock {
   listModels: ReturnType<typeof vi.fn>;
 }
 
-interface DefinedTool {
-  name: string;
-  description: string;
-  parameters: {
-    parse: (input: unknown) => unknown;
-  };
-  handler: (args: unknown) => Promise<unknown>;
-}
-
 function createClientMock(): ClientMock {
   return {
     createSession: vi.fn(async (sessionConfig: unknown) => ({ sessionConfig })),
@@ -46,16 +32,9 @@ function getSessionConfig(client: ClientMock): Record<string, unknown> {
   return sessionConfig;
 }
 
-function getCreatedTool(client: ClientMock): DefinedTool {
-  const sessionConfig = getSessionConfig(client);
-  const tools = sessionConfig.tools as DefinedTool[];
-  return tools[0];
-}
-
 const fetchMock = vi.fn();
 
 beforeEach(() => {
-  defineToolMock.mockClear();
   fetchMock.mockReset();
   fetchMock.mockResolvedValue({
     ok: true,
@@ -136,13 +115,6 @@ describe('createCopilotSession', () => {
         bufferExhaustionThreshold: 0.4,
       },
       configDir: '/custom-config',
-      mcpServers: [{
-        name: 'public-api',
-        url: 'https://api.example.com:8443/stream/%E2%9C%93',
-        type: 'http',
-        headers: { 'X-Test': 'true' },
-        tools: [],
-      }],
     });
 
     expect(getSessionConfig(client)).toMatchObject({
@@ -162,244 +134,6 @@ describe('createCopilotSession', () => {
         bufferExhaustionThreshold: 0.4,
       },
     });
-
-    const mcpServers = getSessionConfig(client).mcpServers as Record<string, Record<string, unknown>>;
-    expect(mcpServers['public-api']).toEqual({
-      type: 'http',
-      url: 'https://api.example.com:8443/stream/%E2%9C%93',
-      headers: { 'X-Test': 'true' },
-      tools: ['*'],
-    });
-  });
-
-  it('builds POST custom tools with zod parameter parsing and JSON fetch bodies', async () => {
-    const client = createClientMock();
-
-    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-      customTools: [{
-        name: 'webhook-tool',
-        description: 'Calls a webhook',
-        webhookUrl: 'https://tools.example.com/hooks/%E2%9C%93',
-        method: 'POST',
-        headers: { Authorization: 'Bearer abc' },
-        parameters: {
-          query: { type: 'string', description: 'Search query' },
-          count: { type: 'number', description: 'Result count' },
-          enabled: { type: 'boolean', description: 'Feature toggle' },
-        },
-      }],
-    });
-
-    expect(defineToolMock).toHaveBeenCalledTimes(1);
-    const tool = getCreatedTool(client);
-
-    expect(tool.parameters.parse({ query: 'copilot', count: 2, enabled: true })).toEqual({
-      query: 'copilot',
-      count: 2,
-      enabled: true,
-    });
-
-    const result = await tool.handler({ query: 'copilot', count: 2, enabled: true });
-
-    expect(result).toEqual({ ok: true });
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://tools.example.com/hooks/%E2%9C%93',
-      expect.objectContaining({
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer abc',
-        },
-        body: JSON.stringify({ query: 'copilot', count: 2, enabled: true }),
-      }),
-    );
-  });
-
-  it('omits the request body for GET custom tools', async () => {
-    const client = createClientMock();
-
-    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-      customTools: [{
-        name: 'get-tool',
-        description: 'Fetches without a body',
-        webhookUrl: 'https://tools.example.com/read',
-        method: 'GET',
-        headers: {},
-        parameters: {},
-      }],
-    });
-
-    const tool = getCreatedTool(client);
-    await tool.handler({ ignored: true });
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://tools.example.com/read',
-      expect.objectContaining({
-        method: 'GET',
-        body: undefined,
-      }),
-    );
-  });
-
-  it('passes skipPermission through to defineTool when set', async () => {
-    const client = createClientMock();
-
-    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-      customTools: [{
-        name: 'safe-tool',
-        description: 'Low-risk lookup',
-        webhookUrl: 'https://tools.example.com/safe',
-        method: 'GET',
-        headers: {},
-        parameters: {},
-        skipPermission: true,
-      }],
-    });
-
-    expect(defineToolMock).toHaveBeenCalledTimes(1);
-    expect(defineToolMock).toHaveBeenCalledWith('safe-tool', expect.objectContaining({
-      skipPermission: true,
-    }));
-  });
-
-  it('omits skipPermission from defineTool when not set', async () => {
-    const client = createClientMock();
-
-    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-      customTools: [{
-        name: 'normal-tool',
-        description: 'Regular tool',
-        webhookUrl: 'https://tools.example.com/normal',
-        method: 'GET',
-        headers: {},
-        parameters: {},
-      }],
-    });
-
-    expect(defineToolMock).toHaveBeenCalledTimes(1);
-    const callArgs = defineToolMock.mock.calls[0][1] as Record<string, unknown>;
-    expect(callArgs).not.toHaveProperty('skipPermission');
-  });
-
-  it.each([
-    'https://127.0.0.1/hook',
-    'https://10.0.0.8/hook',
-    'https://172.16.5.10/hook',
-    'https://172.31.255.1/hook',
-    'https://192.168.1.5/hook',
-    'https://169.254.2.3/hook',
-    'https://0.0.0.0/hook',
-    'https://localhost/hook',
-    'https://sub.localhost/hook',
-    'https://[::1]/hook',
-    'https://[fc00::1]/hook',
-    'https://[fe80::1]/hook',
-  ])('rejects blocked tool URLs: %s', async (webhookUrl) => {
-    const client = createClientMock();
-
-    await expect(
-      createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-        customTools: [{
-          name: 'private-tool',
-          description: 'Should fail',
-          webhookUrl,
-          method: 'POST',
-          headers: {},
-          parameters: {},
-        }],
-      }),
-    ).rejects.toThrow('internal network URLs are not allowed');
-  });
-
-  it('rejects HTTP, invalid, and credential-bearing tool URLs', async () => {
-    const client = createClientMock();
-
-    await expect(
-      createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-        customTools: [{
-          name: 'http-tool',
-          description: 'Should fail',
-          webhookUrl: 'http://example.com/hook',
-          method: 'GET',
-          headers: {},
-          parameters: {},
-        }],
-      }),
-    ).rejects.toThrow('HTTPS required');
-
-    await expect(
-      createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-        customTools: [{
-          name: 'bad-tool',
-          description: 'Should fail',
-          webhookUrl: 'not-a-url',
-          method: 'GET',
-          headers: {},
-          parameters: {},
-        }],
-      }),
-    ).rejects.toThrow('invalid URL');
-
-    await expect(
-      createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-        customTools: [{
-          name: 'auth-tool',
-          description: 'Should fail',
-          webhookUrl: 'https://user:pass@example.com/hook',
-          method: 'GET',
-          headers: {},
-          parameters: {},
-        }],
-      }),
-    ).rejects.toThrow('auth credentials in URLs are not allowed');
-  });
-
-  it.each([
-    'https://127.0.0.1/stream',
-    'https://localhost/stream',
-    'https://[::1]/stream',
-  ])('rejects blocked MCP server URLs: %s', async (url) => {
-    const client = createClientMock();
-
-    await expect(
-      createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-        mcpServers: [{
-          name: 'private-mcp',
-          url,
-          type: 'sse',
-          headers: {},
-          tools: ['search'],
-        }],
-      }),
-    ).rejects.toThrow('internal network URLs are not allowed');
-  });
-
-  it('rejects non-HTTPS and invalid MCP server URLs', async () => {
-    const client = createClientMock();
-
-    await expect(
-      createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-        mcpServers: [{
-          name: 'http-mcp',
-          url: 'http://public.example.com/stream',
-          type: 'http',
-          headers: {},
-          tools: ['search'],
-        }],
-      }),
-    ).rejects.toThrow('HTTPS required');
-
-    await expect(
-      createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-        mcpServers: [{
-          name: 'bad-mcp',
-          url: '%%%bad-url',
-          type: 'http',
-          headers: {},
-          tools: ['search'],
-        }],
-      }),
-    ).rejects.toThrow('invalid URL');
   });
 
   it('passes skillDirectories and disabledSkills to the SDK session config', async () => {
@@ -443,50 +177,6 @@ describe('createCopilotSession', () => {
     expect(config.customAgents).toEqual(customAgents);
   });
 
-  it('supports SSE-type MCP servers alongside HTTP servers', async () => {
-    const client = createClientMock();
-
-    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-      mcpServers: [
-        {
-          name: 'http-server',
-          url: 'https://api.example.com/mcp',
-          type: 'http',
-          headers: { 'X-Api-Key': 'key1' },
-          tools: ['search'],
-        },
-        {
-          name: 'sse-server',
-          url: 'https://stream.example.com/events',
-          type: 'sse',
-          headers: { Authorization: 'Bearer tok' },
-          tools: [],
-        },
-      ],
-    });
-
-    const mcpServers = getSessionConfig(client).mcpServers as Record<string, Record<string, unknown>>;
-
-    // GitHub server always present
-    expect(mcpServers.github).toBeDefined();
-
-    // HTTP server preserved as-is
-    expect(mcpServers['http-server']).toEqual({
-      type: 'http',
-      url: 'https://api.example.com/mcp',
-      headers: { 'X-Api-Key': 'key1' },
-      tools: ['search'],
-    });
-
-    // SSE server with empty tools defaults to wildcard
-    expect(mcpServers['sse-server']).toEqual({
-      type: 'sse',
-      url: 'https://stream.example.com/events',
-      headers: { Authorization: 'Bearer tok' },
-      tools: ['*'],
-    });
-  });
-
   it('always includes GitHub MCP server with the provided token', async () => {
     const client = createClientMock();
 
@@ -515,7 +205,7 @@ describe('createCopilotSession', () => {
 
     try {
       const mcpServers: Awaited<ReturnType<typeof buildSessionMcpServers>> =
-        await buildSessionMcpServers('gh-token', undefined, dir);
+        await buildSessionMcpServers('gh-token', dir);
       expect(mcpServers['awesome-copilot']).toEqual({
         type: 'stdio',
         command: 'docker',
@@ -528,53 +218,10 @@ describe('createCopilotSession', () => {
     }
   });
 
-  it('passes timeout to MCP server config when specified', async () => {
+  it('only includes GitHub MCP server when no config file exists', async () => {
     const client = createClientMock();
 
-    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-      mcpServers: [
-        {
-          name: 'with-timeout',
-          url: 'https://api.example.com/mcp',
-          type: 'http',
-          headers: {},
-          tools: ['search'],
-          timeout: 60000,
-        },
-        {
-          name: 'without-timeout',
-          url: 'https://api2.example.com/mcp',
-          type: 'http',
-          headers: {},
-          tools: [],
-        },
-      ],
-    });
-
-    const mcpServers = getSessionConfig(client).mcpServers as Record<string, Record<string, unknown>>;
-
-    expect(mcpServers['with-timeout']).toEqual({
-      type: 'http',
-      url: 'https://api.example.com/mcp',
-      headers: {},
-      tools: ['search'],
-      timeout: 60000,
-    });
-
-    expect(mcpServers['without-timeout']).toEqual({
-      type: 'http',
-      url: 'https://api2.example.com/mcp',
-      headers: {},
-      tools: ['*'],
-    });
-  });
-
-  it('omits user MCP servers when none are provided', async () => {
-    const client = createClientMock();
-
-    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
-      mcpServers: [],
-    });
+    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token');
 
     const mcpServers = getSessionConfig(client).mcpServers as Record<string, Record<string, unknown>>;
     expect(Object.keys(mcpServers)).toEqual(['github']);

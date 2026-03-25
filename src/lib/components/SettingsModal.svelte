@@ -4,8 +4,6 @@
     AgentInfo,
     QuotaSnapshots,
     QuotaSnapshot,
-    CustomToolDefinition,
-    McpServerDefinition,
     SkillDefinition,
     InstructionInfo,
     PromptInfo,
@@ -15,7 +13,6 @@
     CustomizationSource,
   } from '$lib/types/index.js';
   import { pickPrimaryQuota } from '$lib/types/index.js';
-  import CustomToolsEditor from './CustomToolsEditor.svelte';
   import SourceBadge from './SourceBadge.svelte';
 
   interface Props {
@@ -26,8 +23,6 @@
     quotaSnapshots: QuotaSnapshots | null;
     additionalInstructions: string;
     excludedTools: string[];
-    customTools: CustomToolDefinition[];
-    mcpServers: McpServerDefinition[];
     discoveredMcpServers: SourcedMcpServerInfo[];
     availableSkills: Array<{ name: string; description?: string; source?: string; enabled?: boolean; license?: string }>;
     instructions: InstructionInfo[];
@@ -35,8 +30,6 @@
     onClose: () => void;
     onSaveInstructions: (instructions: string) => void;
     onToggleTool: (toolName: string, enabled: boolean) => void;
-    onSaveCustomTools: (tools: CustomToolDefinition[]) => void;
-    onSaveMcpServers: (servers: McpServerDefinition[]) => void;
     onSelectAgent: (name: string) => void;
     onDeselectAgent: () => void;
     onCompact: () => void;
@@ -49,7 +42,6 @@
     onFetchPrompts: () => void;
     onToggleSkill: (name: string, enabled: boolean) => void;
     onToggleMcpServer: (name: string, enabled: boolean) => void;
-    onUsePrompt: (name: string, content: string) => void;
     notificationsEnabled: boolean;
     onToggleNotifications: (enabled: boolean) => void;
   }
@@ -62,8 +54,6 @@
     quotaSnapshots,
     additionalInstructions,
     excludedTools,
-    customTools,
-    mcpServers,
     discoveredMcpServers,
     availableSkills,
     instructions,
@@ -71,8 +61,6 @@
     onClose,
     onSaveInstructions,
     onToggleTool,
-    onSaveCustomTools,
-    onSaveMcpServers,
     onSelectAgent,
     onDeselectAgent,
     onCompact,
@@ -85,7 +73,6 @@
     onFetchPrompts,
     onToggleSkill,
     onToggleMcpServer,
-    onUsePrompt,
     notificationsEnabled,
     onToggleNotifications,
   }: Props = $props();
@@ -100,26 +87,10 @@
 
   type NotificationStatus = 'unsupported' | 'not-standalone-ios' | 'denied' | 'prompt' | 'subscribed' | 'granted-no-push' | 'loading';
 
-  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'custom-tools' | 'agents' | 'skills' | 'quota' | 'notifications' | 'compact' | 'prompts' | null;
+  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'quota' | 'notifications' | 'compact' | 'prompts' | null;
 
   let activeSection = $state<AccordionSection>(null);
   let instructionsDraft = $state('');
-
-  // ── MCP server editor state ─────────────────────────────────────────
-  const MAX_MCP_SERVERS = 10;
-  let mcpShowAddForm = $state(false);
-  let mcpExpandedIndex = $state<number | null>(null);
-  let mcpDeleteConfirmIndex = $state<number | null>(null);
-  let mcpDraftName = $state('');
-  let mcpDraftUrl = $state('');
-  let mcpDraftType = $state<'http' | 'sse'>('http');
-  let mcpDraftHeaders = $state<Array<{ key: string; value: string }>>([]);
-  let mcpDraftTools = $state('');
-  let mcpDraftTimeout = $state('');
-  let mcpDraftEnabled = $state(true);
-  let mcpFormError = $state('');
-
-  const canAddMoreMcp = $derived(mcpServers.length < MAX_MCP_SERVERS);
 
   // ── Notification state ───────────────────────────────────────────────
   let notificationStatus = $state<NotificationStatus>('loading');
@@ -217,104 +188,6 @@
       refreshNotificationStatus();
     }
   });
-
-  function mcpResetDraft(): void {
-    mcpDraftName = '';
-    mcpDraftUrl = '';
-    mcpDraftType = 'http';
-    mcpDraftHeaders = [];
-    mcpDraftTools = '';
-    mcpDraftTimeout = '';
-    mcpDraftEnabled = true;
-    mcpFormError = '';
-  }
-
-  function mcpLoadIntoDraft(server: McpServerDefinition): void {
-    mcpDraftName = server.name;
-    mcpDraftUrl = server.url;
-    mcpDraftType = server.type;
-    mcpDraftHeaders = Object.entries(server.headers).map(([key, value]) => ({ key, value }));
-    mcpDraftTools = server.tools.length > 0 ? server.tools.join(', ') : '';
-    mcpDraftTimeout = server.timeout ? String(server.timeout) : '';
-    mcpDraftEnabled = server.enabled;
-    mcpFormError = '';
-  }
-
-  function mcpValidateUrl(url: string): boolean {
-    try {
-      const parsed = new URL(url);
-      return parsed.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  }
-
-  function mcpValidateDraft(): string | null {
-    if (!mcpDraftName.trim()) return 'Name is required';
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(mcpDraftName.trim())) return 'Name must be alphanumeric/underscore/dash, max 64 chars';
-    if (!mcpDraftUrl.trim()) return 'URL is required';
-    if (!mcpValidateUrl(mcpDraftUrl)) return 'URL must be https://';
-    return null;
-  }
-
-  function mcpBuildFromDraft(): McpServerDefinition {
-    const headers: Record<string, string> = {};
-    for (const h of mcpDraftHeaders) {
-      if (h.key.trim()) headers[h.key.trim()] = h.value;
-    }
-    const tools = mcpDraftTools.trim()
-      ? mcpDraftTools.split(',').map(t => t.trim()).filter(Boolean)
-      : [];
-    const timeoutVal = mcpDraftTimeout.trim() ? Number(mcpDraftTimeout.trim()) : undefined;
-    return {
-      name: mcpDraftName.trim(),
-      url: mcpDraftUrl.trim(),
-      type: mcpDraftType,
-      headers,
-      tools,
-      enabled: mcpDraftEnabled,
-      ...(timeoutVal && timeoutVal > 0 ? { timeout: timeoutVal } : {}),
-    };
-  }
-
-  function mcpHandleAdd(): void {
-    const err = mcpValidateDraft();
-    if (err) { mcpFormError = err; return; }
-    const server = mcpBuildFromDraft();
-    if (mcpServers.some(s => s.name === server.name)) {
-      mcpFormError = 'A server with this name already exists';
-      return;
-    }
-    onSaveMcpServers([...mcpServers, server]);
-    mcpResetDraft();
-    mcpShowAddForm = false;
-  }
-
-  function mcpHandleUpdate(index: number): void {
-    const err = mcpValidateDraft();
-    if (err) { mcpFormError = err; return; }
-    const server = mcpBuildFromDraft();
-    const existing = mcpServers.findIndex((s, i) => s.name === server.name && i !== index);
-    if (existing >= 0) { mcpFormError = 'A server with this name already exists'; return; }
-    const updated = [...mcpServers];
-    updated[index] = server;
-    onSaveMcpServers(updated);
-    mcpExpandedIndex = null;
-    mcpResetDraft();
-  }
-
-  function mcpHandleDelete(index: number): void {
-    const updated = mcpServers.filter((_, i) => i !== index);
-    onSaveMcpServers(updated);
-    mcpDeleteConfirmIndex = null;
-    mcpExpandedIndex = null;
-  }
-
-  function mcpToggleEnabled(index: number): void {
-    const updated = [...mcpServers];
-    updated[index] = { ...updated[index], enabled: !updated[index].enabled };
-    onSaveMcpServers(updated);
-  }
 
   // Sync draft when prop changes (including initial value)
   $effect(() => {
@@ -443,7 +316,7 @@
           {#if activeSection === 'instructions'}
             <div class="settings-accordion-body">
               {#if instructions.length > 0}
-                <p class="settings-hint">Instruction files are auto-loaded by the Copilot CLI from <code>~/.copilot/</code> and <code>.github/</code>.</p>
+                <p class="settings-hint">Instruction files from <code>~/.copilot/</code> are automatically applied at session creation. No action needed.</p>
                 {#each [...groupBySource(instructions).entries()] as [source, items] (source)}
                   <div class="source-group">
                     <div class="source-group-header"><SourceBadge {source} /> <span class="source-group-count">{items.length}</span></div>
@@ -528,6 +401,9 @@
           </button>
           {#if activeSection === 'mcp'}
             <div class="settings-accordion-body">
+              <p class="settings-hint">
+                MCP servers are configured in <code>~/.copilot/mcp-config.json</code>. Their tools become available to the model automatically.
+              </p>
               <!-- Built-in GitHub server (non-removable) -->
               <div class="mcp-server-item">
                 <div class="mcp-server-header">
@@ -580,109 +456,6 @@
               {:else}
                 <p class="settings-hint">No CLI-configured MCP servers found.</p>
               {/if}
-
-              <hr class="mcp-divider" />
-
-              <!-- User-defined servers -->
-              {#each mcpServers as server, i (server.name)}
-                <div class="mcp-server-item">
-                  <div class="mcp-server-header">
-                    <label class="tool-toggle-label" style="flex:1">
-                      <input
-                        type="checkbox"
-                        class="tool-toggle-check"
-                        checked={server.enabled}
-                        onchange={() => mcpToggleEnabled(i)}
-                      />
-                      <span class="mcp-server-name">{server.name}</span>
-                    </label>
-                    <SourceBadge source="user" />
-                    <span class="mcp-server-badge">{server.type}</span>
-                    <button class="mcp-edit-btn" onclick={() => {
-                      if (mcpExpandedIndex === i) {
-                        mcpExpandedIndex = null;
-                      } else {
-                        mcpLoadIntoDraft(server);
-                        mcpExpandedIndex = i;
-                        mcpShowAddForm = false;
-                      }
-                    }}>✎</button>
-                  </div>
-                  <div class="tool-toggle-desc">{server.url}</div>
-
-                  {#if mcpExpandedIndex === i}
-                    <div class="mcp-form">
-                      {#if mcpFormError}
-                        <div class="mcp-form-error">{mcpFormError}</div>
-                      {/if}
-                      <input class="mcp-input" bind:value={mcpDraftName} placeholder="Name" />
-                      <input class="mcp-input" bind:value={mcpDraftUrl} placeholder="https://..." />
-                      <select class="mcp-input" bind:value={mcpDraftType}>
-                        <option value="http">HTTP (Streamable)</option>
-                        <option value="sse">SSE</option>
-                      </select>
-                      <input class="mcp-input" bind:value={mcpDraftTools} placeholder="Tools filter (comma-separated, empty = all)" />
-                      <label class="mcp-headers-label" for="mcp-timeout-edit">Timeout (ms)</label>
-                      <input id="mcp-timeout-edit" class="mcp-input" type="number" bind:value={mcpDraftTimeout} placeholder="30000" min="1000" max="300000" />
-
-                      <div class="mcp-headers-label">Headers</div>
-                      {#each mcpDraftHeaders as header, hi (hi)}
-                        <div class="mcp-header-row">
-                          <input class="mcp-input mcp-input-half" bind:value={header.key} placeholder="Key" />
-                          <input class="mcp-input mcp-input-half" bind:value={header.value} placeholder="Value" />
-                          <button class="mcp-remove-btn" onclick={() => { mcpDraftHeaders = mcpDraftHeaders.filter((_, idx) => idx !== hi); }}>✕</button>
-                        </div>
-                      {/each}
-                      <button class="mcp-link-btn" onclick={() => { mcpDraftHeaders = [...mcpDraftHeaders, { key: '', value: '' }]; }}>+ Add header</button>
-
-                      <div class="mcp-form-actions">
-                        <button class="action-btn save" onclick={() => mcpHandleUpdate(i)}>Save</button>
-                        {#if mcpDeleteConfirmIndex === i}
-                          <button class="action-btn delete" onclick={() => mcpHandleDelete(i)}>Confirm delete</button>
-                        {:else}
-                          <button class="action-btn delete" onclick={() => { mcpDeleteConfirmIndex = i; }}>Delete</button>
-                        {/if}
-                        <button class="action-btn" onclick={() => { mcpExpandedIndex = null; mcpResetDraft(); }}>Cancel</button>
-                      </div>
-                    </div>
-                  {/if}
-                </div>
-              {/each}
-
-              <!-- Add new server form -->
-              {#if mcpShowAddForm}
-                <div class="mcp-form">
-                  {#if mcpFormError}
-                    <div class="mcp-form-error">{mcpFormError}</div>
-                  {/if}
-                  <input class="mcp-input" bind:value={mcpDraftName} placeholder="Name (e.g. my-server)" />
-                  <input class="mcp-input" bind:value={mcpDraftUrl} placeholder="https://..." />
-                  <select class="mcp-input" bind:value={mcpDraftType}>
-                    <option value="http">HTTP (Streamable)</option>
-                    <option value="sse">SSE</option>
-                  </select>
-                  <input class="mcp-input" bind:value={mcpDraftTools} placeholder="Tools filter (comma-separated, empty = all)" />
-                  <label class="mcp-headers-label" for="mcp-timeout-add">Timeout (ms)</label>
-                  <input id="mcp-timeout-add" class="mcp-input" type="number" bind:value={mcpDraftTimeout} placeholder="30000" min="1000" max="300000" />
-
-                  <div class="mcp-headers-label">Headers</div>
-                  {#each mcpDraftHeaders as header, hi (hi)}
-                    <div class="mcp-header-row">
-                      <input class="mcp-input mcp-input-half" bind:value={header.key} placeholder="Key" />
-                      <input class="mcp-input mcp-input-half" bind:value={header.value} placeholder="Value" />
-                      <button class="mcp-remove-btn" onclick={() => { mcpDraftHeaders = mcpDraftHeaders.filter((_, idx) => idx !== hi); }}>✕</button>
-                    </div>
-                  {/each}
-                  <button class="mcp-link-btn" onclick={() => { mcpDraftHeaders = [...mcpDraftHeaders, { key: '', value: '' }]; }}>+ Add header</button>
-
-                  <div class="mcp-form-actions">
-                    <button class="action-btn save" onclick={mcpHandleAdd}>Add Server</button>
-                    <button class="action-btn" onclick={() => { mcpShowAddForm = false; mcpResetDraft(); }}>Cancel</button>
-                  </div>
-                </div>
-              {:else if canAddMoreMcp}
-                <button class="mcp-link-btn" style="margin-top: var(--sp-2)" onclick={() => { mcpResetDraft(); mcpShowAddForm = true; mcpExpandedIndex = null; }}>+ Add MCP server</button>
-              {/if}
             </div>
           {/if}
         </div>
@@ -699,8 +472,11 @@
           </button>
           {#if activeSection === 'agents'}
             <div class="settings-accordion-body">
+              <p class="settings-hint">
+                Click an agent to activate it for the current session. The model will use the agent's system prompt for all subsequent messages. Click again to deactivate.
+              </p>
               {#if agents.length === 0}
-                <p class="settings-hint">No agents available.</p>
+                <p class="settings-hint">No agents found. Add <code>.agent.md</code> files to <code>~/.copilot/agents/</code>.</p>
               {:else}
                 {#each [...groupBySource(agents).entries()] as [source, items] (source)}
                   <div class="source-group">
@@ -727,26 +503,6 @@
           {/if}
         </div>
 
-        <!-- Custom Tools -->
-        <div class="settings-accordion">
-          <button
-            class="settings-accordion-btn"
-            class:open={activeSection === 'custom-tools'}
-            onclick={() => toggleSection('custom-tools')}
-          >
-            Custom Tools
-            <span class="accordion-chevron">▸</span>
-          </button>
-          {#if activeSection === 'custom-tools'}
-            <div class="settings-accordion-body">
-              <p class="settings-hint">
-                Define webhook-based tools that Copilot can invoke during conversations.
-              </p>
-              <CustomToolsEditor tools={customTools} onSave={onSaveCustomTools} />
-            </div>
-          {/if}
-        </div>
-
         <!-- Skills -->
         <div class="settings-accordion">
           <button
@@ -760,7 +516,7 @@
           {#if activeSection === 'skills'}
             <div class="settings-accordion-body">
               <p class="settings-hint">
-                Skills are reusable prompt modules discovered by the Copilot CLI.
+                Skills are prompt modules discovered by the Copilot CLI. Toggle to enable or disable. The model invokes them automatically when relevant.
               </p>
               {#if availableSkills.length === 0}
                 <p class="settings-hint">No skills available. Start a session first.</p>
@@ -802,7 +558,7 @@
           {#if activeSection === 'prompts'}
             <div class="settings-accordion-body">
               <p class="settings-hint">
-                Reusable prompt templates from <code>.github/prompts/</code> and <code>~/.copilot/prompts/</code>. Click "Use" to fill the chat input, or type <code>/name</code> in chat.
+                Prompt templates from <code>~/.copilot/prompts/</code>. Type <code>/name</code> in the chat input to use one.
               </p>
               {#if prompts.length === 0}
                 <p class="settings-hint">No prompt files found.</p>
@@ -812,10 +568,7 @@
                     <div class="source-group-header"><SourceBadge {source} /> <span class="source-group-count">{items.length}</span></div>
                     {#each items as prompt (prompt.name)}
                       <div class="prompt-item">
-                        <div class="prompt-header">
-                          <span class="customization-name">{prompt.name}</span>
-                          <button class="action-btn use-btn" onclick={() => onUsePrompt(prompt.name, prompt.content)}>Use</button>
-                        </div>
+                        <span class="customization-name">{prompt.name}</span>
                         {#if prompt.description}
                           <p class="customization-desc">{prompt.description}</p>
                         {/if}

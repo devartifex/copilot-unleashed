@@ -44,6 +44,8 @@ export const PUT: RequestHandler = async ({ locals, request }) => {
 		// Strip removed fields from old clients
 		delete raw.customAgents;
 		delete raw.disabledSkills;
+		delete raw.customTools;
+		delete raw.mcpServers;
 
 		await saveUserSettings(auth.user.login, raw as unknown as Parameters<typeof saveUserSettings>[1]);
 		return json({ ok: true });

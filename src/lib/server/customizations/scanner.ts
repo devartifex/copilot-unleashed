@@ -93,7 +93,7 @@ export async function scanCustomizations(
   if (cached && Date.now() - cachedAt < CACHE_TTL_MS) return cached;
 
   const home = copilotHome ?? join(homedir(), '.copilot');
-  const root = cwd ?? process.cwd();
+  const root = cwd ?? homedir();
   const instructions: InstructionFile[] = [];
   const agents: AgentFile[] = [];
   const prompts: PromptFile[] = [];
@@ -208,11 +208,12 @@ export async function scanCustomizations(
     if (content === null) continue;
 
     const fm = parseFrontmatter(content);
+    const title = file.replace('.prompt.md', '');
     prompts.push({
-      name: fm.description || file.replace('.prompt.md', ''),
+      name: title,
       source: 'repo',
       path: filePath,
-      description: fm.description || file.replace('.prompt.md', ''),
+      description: fm.description || title,
       content,
     });
   }
@@ -227,11 +228,12 @@ export async function scanCustomizations(
     if (content === null) continue;
 
     const fm = parseFrontmatter(content);
+    const title = file.replace('.prompt.md', '');
     prompts.push({
-      name: fm.description || file.replace('.prompt.md', ''),
+      name: title,
       source: 'user',
       path: filePath,
-      description: fm.description || file.replace('.prompt.md', ''),
+      description: fm.description || title,
       content,
     });
   }

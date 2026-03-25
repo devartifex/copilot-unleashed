@@ -8,7 +8,7 @@
   const { source }: Props = $props();
 
   const labels: Record<CustomizationSource, string> = {
-    builtin: 'Built-in',
+    builtin: 'CLI',
     user: 'User',
     repo: 'Repo',
   };

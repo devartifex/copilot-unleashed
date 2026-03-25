@@ -5,7 +5,6 @@ import { getSessionDetail, buildSessionContext, isValidSessionId } from '../../c
 import { config } from '../../config.js';
 import { poolSend } from '../session-pool.js';
 import { VALID_MODES } from '../constants.js';
-import { parseMcpServers } from '../mcp-servers.js';
 import { wireSessionEvents, createCatchAllHandler, HANDLED_EVENT_TYPES } from '../session-events.js';
 import { makeUserInputHandler, makePermissionHandler } from '../permissions.js';
 import type { MessageContext } from '../types.js';
@@ -41,11 +40,8 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
     // Read filesystem plan for injection into resumed session context
     const detail = await getSessionDetail(sessionId);
 
-    // Parse MCP servers from the message so resumed sessions retain MCP access
-    const resumeMcpServers = parseMcpServers(msg.mcpServers);
-
-    // Build the full MCP config (GitHub server + user servers)
-    const mcpServersConfig = await buildSessionMcpServers(githubToken, resumeMcpServers, resolvedConfigDir);
+    // Build the full MCP config (GitHub server + config-file servers)
+    const mcpServersConfig = await buildSessionMcpServers(githubToken, resolvedConfigDir);
 
     let resumed = false;
 
@@ -86,7 +82,6 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
         onUserInputRequest: makeUserInputHandler(connectionEntry, ctx.userLogin),
         permissionMode: 'approve_all',
         configDir: resolvedConfigDir,
-        mcpServers: resumeMcpServers,
         onEvent,
         onHookEvent: (message) => poolSend(connectionEntry, message),
       });

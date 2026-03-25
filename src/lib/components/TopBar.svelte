@@ -7,7 +7,6 @@
     connectionState: ConnectionState;
     sessionTitle: string | null;
     quotaSnapshots: QuotaSnapshots | null;
-    activeSkillCount: number;
     onToggleSidebar: () => void;
     onOpenModelSheet: () => void;
   }
@@ -17,7 +16,6 @@
     connectionState,
     sessionTitle,
     quotaSnapshots,
-    activeSkillCount,
     onToggleSidebar,
     onOpenModelSheet,
   }: Props = $props();
@@ -65,12 +63,6 @@
       <path d="M2.5 4 L5 6.5 L7.5 4"/>
     </svg>
   </button>
-
-  {#if activeSkillCount > 0}
-    <span class="skill-badge" title="{activeSkillCount} skill{activeSkillCount > 1 ? 's' : ''} active">
-      ⚡ {activeSkillCount}
-    </span>
-  {/if}
 </div>
 
 <style>
@@ -238,24 +230,6 @@
   .dot-disconnected {
     background: var(--red);
     box-shadow: 0 0 4px var(--red);
-  }
-
-  /* ── Skill badge ──────────────────────────────────────────────── */
-  .skill-badge {
-    font-family: var(--font-mono);
-    font-size: 0.7em;
-    color: var(--yellow);
-    background: rgba(250, 204, 21, 0.1);
-    border: 1px solid rgba(250, 204, 21, 0.25);
-    border-radius: var(--radius-sm);
-    padding: 2px 6px;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
   }
 
   /* ── Responsive ────────────────────────────────────────────────── */

@@ -47,8 +47,6 @@
     return info?.capabilities?.supports?.vision === true;
   });
 
-  const activeSkillCount = $derived(settings.availableSkills.length);
-
   function normalizeCustomizationSource(raw: string | undefined): CustomizationSource {
     const src = (raw ?? '').toLowerCase();
     return (src === 'personal' || src === 'user')
@@ -130,7 +128,7 @@
           if (msg.sdkSessionId) {
             // Session will be restored — keep sessionLoading true until cold_resume/session_resumed
             console.log('[PAGE] connected with sdkSessionId, resuming', msg.sdkSessionId);
-            wsStore.resumeSession(msg.sdkSessionId, settings.mcpServers.length > 0 ? settings.mcpServers : undefined);
+            wsStore.resumeSession(msg.sdkSessionId);
           } else {
             // No previous session — show new chat immediately
             sessionLoading = false;
@@ -228,8 +226,6 @@
       ...(isReasoning && { reasoningEffort: settings.reasoningEffort }),
       ...(settings.additionalInstructions.trim() && { customInstructions: settings.additionalInstructions.trim() }),
       ...(settings.excludedTools.length > 0 && { excludedTools: settings.excludedTools }),
-      ...(settings.customTools.length > 0 && { customTools: settings.customTools }),
-      ...(settings.mcpServers.length > 0 && { mcpServers: settings.mcpServers.filter(s => s.enabled) }),
       infiniteSessions: settings.infiniteSessions,
     });
   }
@@ -326,7 +322,7 @@
 
   function handleResumeSession(sessionId: string): void {
     chatStore.clearMessages();
-    wsStore.resumeSession(sessionId, settings.mcpServers);
+    wsStore.resumeSession(sessionId);
     sessionsOpen = false;
   }
 
@@ -360,7 +356,6 @@
       connectionState={wsStore.connectionState}
       sessionTitle={chatStore.sessionTitle}
       quotaSnapshots={chatStore.quotaSnapshots}
-      {activeSkillCount}
       onToggleSidebar={() => sidebarOpen = true}
       onOpenModelSheet={() => modelSheetOpen = true}
     />
@@ -466,8 +461,6 @@
       quotaSnapshots={chatStore.quotaSnapshots}
       additionalInstructions={settings.additionalInstructions}
       excludedTools={settings.excludedTools}
-      customTools={settings.customTools}
-      mcpServers={settings.mcpServers}
       discoveredMcpServers={settings.discoveredMcpServers}
       availableSkills={settings.availableSkills}
       instructions={settings.instructions}
@@ -481,8 +474,6 @@
           settings.excludedTools = [...settings.excludedTools, name];
         }
       }}
-      onSaveCustomTools={(tools) => { settings.customTools = tools; }}
-      onSaveMcpServers={(servers) => { settings.mcpServers = servers; }}
       onSelectAgent={(name) => wsStore.selectAgent(name)}
       onDeselectAgent={() => wsStore.deselectAgent()}
       onCompact={() => wsStore.compact()}
@@ -517,7 +508,6 @@
       onFetchPrompts={() => wsStore.send({ type: 'list_prompts' })}
       onToggleSkill={(name, enabled) => wsStore.send({ type: 'toggle_skill_rpc', name, enabled })}
       onToggleMcpServer={(name, enabled) => wsStore.send({ type: 'toggle_mcp_rpc', name, enabled })}
-      onUsePrompt={(_name, content) => { settingsOpen = false; handleSend(content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trim()); }}
       notificationsEnabled={settings.notificationsEnabled}
       onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
     />

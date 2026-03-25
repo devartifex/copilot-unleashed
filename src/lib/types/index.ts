@@ -26,29 +26,7 @@ export interface ModelInfo {
   supportedReasoningEfforts?: string[];
 }
 
-// ─── Custom tool definitions ────────────────────────────────────────────────
-
-export interface CustomToolDefinition {
-  name: string;
-  description: string;
-  webhookUrl: string;
-  method: 'GET' | 'POST';
-  headers: Record<string, string>;
-  parameters: Record<string, { type: string; description: string }>;
-  skipPermission?: boolean;
-}
-
 // ─── Tool / Agent types ─────────────────────────────────────────────────────
-
-export interface McpServerDefinition {
-  name: string;
-  url: string;
-  type: 'http' | 'sse';
-  headers: Record<string, string>;
-  tools: string[];
-  enabled: boolean;
-  timeout?: number;
-}
 
 export interface ToolInfo {
   name: string;
@@ -751,8 +729,6 @@ export interface NewSessionMessage {
   reasoningEffort?: ReasoningEffort;
   customInstructions?: string;
   excludedTools?: string[];
-  customTools?: CustomToolDefinition[];
-  mcpServers?: McpServerDefinition[];
   infiniteSessions?: InfiniteSessionsConfig;
   systemPromptSections?: Record<string, SystemPromptSectionInput>;
 }
@@ -836,7 +812,6 @@ export interface ListSessionsMessage {
 export interface ResumeSessionMessage {
   type: 'resume_session';
   sessionId: string;
-  mcpServers?: McpServerDefinition[];
 }
 
 export interface DeleteSessionMessage {
@@ -1031,8 +1006,6 @@ export interface NewSessionConfig {
   reasoningEffort?: ReasoningEffort;
   customInstructions?: string;
   excludedTools?: string[];
-  customTools?: CustomToolDefinition[];
-  mcpServers?: McpServerDefinition[];
   infiniteSessions?: InfiniteSessionsConfig;
   systemPromptSections?: Record<string, SystemPromptSectionInput>;
 }
@@ -1045,8 +1018,6 @@ export interface PersistedSettings {
   reasoningEffort: ReasoningEffort;
   additionalInstructions: string;
   excludedTools: string[];
-  customTools: CustomToolDefinition[];
-  mcpServers?: McpServerDefinition[];
   infiniteSessions?: InfiniteSessionsConfig;
   /** User preference for push notifications — persisted so it survives redeploys. */
   notificationsEnabled?: boolean;

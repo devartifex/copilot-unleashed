@@ -9,8 +9,6 @@ interface PersistedSettings {
 	reasoningEffort: string;
 	additionalInstructions: string;
 	excludedTools: string[];
-	customTools: unknown[];
-	mcpServers?: unknown[];
 }
 
 const MAX_FILE_SIZE = 50 * 1024; // 50KB per user

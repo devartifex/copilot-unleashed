@@ -1,23 +1,12 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
-import { CopilotClient, defineTool } from '@github/copilot-sdk';
+import { CopilotClient } from '@github/copilot-sdk';
 import type { SessionConfig, SystemPromptSection, SectionOverride, MCPServerConfig } from '@github/copilot-sdk';
 
 export type HookEventCallback = (message: Record<string, unknown>) => void;
 import { isIP } from 'node:net';
 import { config } from '../config.js';
-import { z } from 'zod';
-
-export interface CustomToolDefinition {
-  name: string;
-  description: string;
-  webhookUrl: string;
-  method: 'GET' | 'POST';
-  headers: Record<string, string>;
-  parameters: Record<string, { type: string; description: string }>;
-  skipPermission?: boolean;
-}
 
 type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 
@@ -27,27 +16,16 @@ export interface InfiniteSessionsConfig {
   bufferExhaustionThreshold?: number;
 }
 
-export interface McpServerInput {
-  name: string;
-  url: string;
-  type: 'http' | 'sse';
-  headers: Record<string, string>;
-  tools: string[];
-  timeout?: number;
-}
-
 export interface CreateSessionOptions {
   model?: string;
   reasoningEffort?: ReasoningEffort;
   customInstructions?: string;
   excludedTools?: string[];
   availableTools?: string[];
-  customTools?: CustomToolDefinition[];
   infiniteSessions?: InfiniteSessionsConfig;
   onUserInputRequest?: SessionConfig['onUserInputRequest'];
   permissionMode?: 'approve_all' | 'prompt';
   onPermissionRequest?: SessionConfig['onPermissionRequest'];
-  mcpServers?: McpServerInput[];
   configDir?: string;
   skillDirectories?: string[];
   disabledSkills?: string[];
@@ -62,20 +40,6 @@ export interface CreateSessionOptions {
   onEvent?: (event: any) => void;
   onHookEvent?: HookEventCallback;
   systemPromptSections?: Partial<Record<SystemPromptSection, SectionOverride>>;
-}
-
-function buildZodSchema(params: Record<string, { type: string; description: string }>): z.ZodObject<Record<string, z.ZodTypeAny>> {
-  const shape: Record<string, z.ZodTypeAny> = {};
-  for (const [name, param] of Object.entries(params)) {
-    let field: z.ZodTypeAny;
-    switch (param.type) {
-      case 'number': field = z.number(); break;
-      case 'boolean': field = z.boolean(); break;
-      default: field = z.string(); break;
-    }
-    shape[name] = field.describe(param.description);
-  }
-  return z.object(shape);
 }
 
 function isPrivateIpv4(hostname: string): boolean {
@@ -153,28 +117,8 @@ function validateOutboundUrl(kind: 'Tool' | 'MCP server', name: string, rawUrl: 
   }
 }
 
-function validateToolUrl(toolName: string, webhookUrl: string): void {
-  validateOutboundUrl('Tool', toolName, webhookUrl);
-}
-
 function validateMcpServerUrl(name: string, serverUrl: string): void {
   validateOutboundUrl('MCP server', name, serverUrl);
-}
-
-function buildUserMcpServers(servers?: McpServerInput[]): Record<string, unknown> {
-  if (!servers || servers.length === 0) return {};
-  const result: Record<string, unknown> = {};
-  for (const server of servers) {
-    validateMcpServerUrl(server.name, server.url);
-    result[server.name] = {
-      type: server.type,
-      url: server.url,
-      headers: server.headers,
-      tools: server.tools.length > 0 ? server.tools : ['*'],
-      ...(server.timeout && server.timeout > 0 ? { timeout: server.timeout } : {}),
-    };
-  }
-  return result;
 }
 
 function normalizeStringRecord(value: unknown): Record<string, string> | undefined {
@@ -231,7 +175,6 @@ async function loadConfiguredMcpServers(configDir?: string): Promise<Record<stri
 
 export async function buildSessionMcpServers(
   githubToken: string,
-  servers?: McpServerInput[],
   configDir?: string,
 ) : Promise<Record<string, MCPServerConfig>> {
   const configuredMcpServers = await loadConfiguredMcpServers(configDir);
@@ -246,31 +189,7 @@ export async function buildSessionMcpServers(
       },
       tools: ['*'],
     },
-    ...buildUserMcpServers(servers),
   };
-}
-
-function buildCustomTools(customTools: CustomToolDefinition[]) {
-  return customTools.map((tool) => {
-    validateToolUrl(tool.name, tool.webhookUrl);
-
-    return defineTool(tool.name, {
-      description: tool.description,
-      parameters: buildZodSchema(tool.parameters),
-      ...(tool.skipPermission ? { skipPermission: true } : {}),
-      handler: async (args: unknown) => {
-        const response = await fetch(tool.webhookUrl, {
-          method: tool.method,
-          headers: { 'Content-Type': 'application/json', ...tool.headers },
-          body: tool.method === 'POST' ? JSON.stringify(args) : undefined,
-          signal: AbortSignal.timeout(30_000),
-          redirect: 'manual',
-        });
-        if (!response.ok) throw new Error(`Tool failed: ${response.status}`);
-        return await response.json();
-      },
-    });
-  });
 }
 
 export function buildSessionHooks(onHookEvent: HookEventCallback): SessionConfig['hooks'] {
@@ -327,7 +246,7 @@ export async function createCopilotSession(
     streaming: true,
     onPermissionRequest: permissionHandler,
     ...(config.copilotConfigDir && { configDir: config.copilotConfigDir }),
-    mcpServers: await buildSessionMcpServers(githubToken, options.mcpServers, options.configDir),
+    mcpServers: await buildSessionMcpServers(githubToken, options.configDir),
   };
 
   if (options.reasoningEffort) {
@@ -366,10 +285,6 @@ export async function createCopilotSession(
         bufferExhaustionThreshold: options.infiniteSessions.bufferExhaustionThreshold,
       }),
     };
-  }
-
-  if (options.customTools && options.customTools.length > 0) {
-    sessionConfig.tools = buildCustomTools(options.customTools);
   }
 
   if (options.configDir) {

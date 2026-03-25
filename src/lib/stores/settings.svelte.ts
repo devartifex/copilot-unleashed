@@ -2,8 +2,6 @@ import type {
   SessionMode,
   ReasoningEffort,
   PersistedSettings,
-  CustomToolDefinition,
-  McpServerDefinition,
   SourcedSkillInfo,
   SourcedMcpServerInfo,
   InfiniteSessionsConfig,
@@ -25,8 +23,6 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   reasoningEffort: 'medium',
   additionalInstructions: '',
   excludedTools: [],
-  customTools: [],
-  mcpServers: [],
   infiniteSessions: { ...DEFAULT_INFINITE_SESSIONS },
   notificationsEnabled: false,
 };
@@ -34,44 +30,12 @@ const DEFAULT_SETTINGS: PersistedSettings = {
 const VALID_MODES = new Set<SessionMode>(['interactive', 'plan', 'autopilot']);
 const VALID_REASONING = new Set<ReasoningEffort>(['low', 'medium', 'high', 'xhigh']);
 
-function isValidCustomTool(t: unknown): t is CustomToolDefinition {
-  if (!t || typeof t !== 'object') return false;
-  const obj = t as Record<string, unknown>;
-  return (
-    typeof obj.name === 'string' &&
-    typeof obj.description === 'string' &&
-    typeof obj.webhookUrl === 'string' &&
-    (obj.method === 'GET' || obj.method === 'POST') &&
-    typeof obj.headers === 'object' && obj.headers !== null &&
-    typeof obj.parameters === 'object' && obj.parameters !== null
-  );
-}
-
-function isValidMcpServer(s: unknown): s is McpServerDefinition {
-  if (!s || typeof s !== 'object') return false;
-  const obj = s as Record<string, unknown>;
-  if (
-    typeof obj.name !== 'string' ||
-    typeof obj.url !== 'string' ||
-    (obj.type !== 'http' && obj.type !== 'sse') ||
-    typeof obj.headers !== 'object' || obj.headers === null ||
-    !Array.isArray(obj.tools) ||
-    typeof obj.enabled !== 'boolean'
-  ) return false;
-  if ('timeout' in obj && obj.timeout !== undefined) {
-    if (typeof obj.timeout !== 'number' || obj.timeout <= 0) return false;
-  }
-  return true;
-}
-
 export interface SettingsStore {
   additionalInstructions: string;
   excludedTools: string[];
-  customTools: CustomToolDefinition[];
   reasoningEffort: ReasoningEffort;
   selectedModel: string;
   selectedMode: SessionMode;
-  mcpServers: McpServerDefinition[];
   discoveredMcpServers: SourcedMcpServerInfo[];
   availableSkills: SourcedSkillInfo[];
   instructions: InstructionInfo[];
@@ -88,11 +52,9 @@ export interface SettingsStore {
 export function createSettingsStore(): SettingsStore {
   let additionalInstructions = $state(DEFAULT_SETTINGS.additionalInstructions);
   let excludedTools = $state<string[]>([...DEFAULT_SETTINGS.excludedTools]);
-  let customTools = $state<CustomToolDefinition[]>([...DEFAULT_SETTINGS.customTools]);
   let reasoningEffort = $state<ReasoningEffort>(DEFAULT_SETTINGS.reasoningEffort);
   let selectedModel = $state(DEFAULT_SETTINGS.model);
   let selectedMode = $state<SessionMode>(DEFAULT_SETTINGS.mode);
-  let mcpServers = $state<McpServerDefinition[]>([...(DEFAULT_SETTINGS.mcpServers ?? [])]);
   let availableSkills = $state<SourcedSkillInfo[]>([]);
   let discoveredMcpServers = $state<SourcedMcpServerInfo[]>([]);
   let instructions = $state<InstructionInfo[]>([]);
@@ -119,8 +81,6 @@ export function createSettingsStore(): SettingsStore {
       reasoningEffort,
       additionalInstructions,
       excludedTools,
-      customTools,
-      mcpServers,
       infiniteSessions,
       notificationsEnabled,
     };
@@ -141,12 +101,6 @@ export function createSettingsStore(): SettingsStore {
     }
     if (Array.isArray(parsed.excludedTools)) {
       excludedTools = parsed.excludedTools.filter((t): t is string => typeof t === 'string');
-    }
-    if (Array.isArray(parsed.customTools)) {
-      customTools = parsed.customTools.filter(isValidCustomTool).slice(0, 10);
-    }
-    if (Array.isArray(parsed.mcpServers)) {
-      mcpServers = parsed.mcpServers.filter(isValidMcpServer).slice(0, 10);
     }
     if (parsed.infiniteSessions && typeof parsed.infiniteSessions === 'object') {
       const is = parsed.infiniteSessions;
@@ -251,9 +205,6 @@ export function createSettingsStore(): SettingsStore {
     get excludedTools() { return excludedTools; },
     set excludedTools(v: string[]) { excludedTools = v; save(); },
 
-    get customTools() { return customTools; },
-    set customTools(v: CustomToolDefinition[]) { customTools = v.slice(0, 10); save(); },
-
     get reasoningEffort() { return reasoningEffort; },
     set reasoningEffort(v: ReasoningEffort) { reasoningEffort = v; save(); },
 
@@ -262,9 +213,6 @@ export function createSettingsStore(): SettingsStore {
 
     get selectedMode() { return selectedMode; },
     set selectedMode(v: SessionMode) { selectedMode = v; save(); },
-
-    get mcpServers() { return mcpServers; },
-    set mcpServers(v: McpServerDefinition[]) { mcpServers = v.slice(0, 10); save(); },
 
     get availableSkills() { return availableSkills; },
     set availableSkills(v: SourcedSkillInfo[]) { availableSkills = v; },

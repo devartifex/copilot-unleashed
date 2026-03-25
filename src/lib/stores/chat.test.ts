@@ -266,7 +266,6 @@ describe('createChatStore', () => {
     expect(store.messages).toEqual([
       expect.objectContaining({ role: 'info', content: 'Mode changed to Plan' }),
       expect.objectContaining({ role: 'info', content: 'Model changed to gpt-5' }),
-      expect.objectContaining({ role: 'info', content: 'Agent selected: @reviewer' }),
       expect.objectContaining({ role: 'info', content: 'Session reconnected' }),
       expect.objectContaining({ role: 'info', content: 'Session resumed: session-2' }),
       expect.objectContaining({ role: 'info', content: 'Session deleted' }),

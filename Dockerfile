@@ -11,7 +11,16 @@ RUN npm run build \
  && if [ -f bundled-session-store.db ]; then cp bundled-session-store.db /tmp/copilot-config/session-store.db; fi
 
 FROM node:24-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl gnupg git \
+ && install -m 0755 -d /etc/apt/keyrings \
+ && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
+ && chmod a+r /etc/apt/keyrings/docker.asc \
+ && . /etc/os-release \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends docker-ce-cli \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 COPY --from=builder /app/node_modules node_modules/
@@ -19,6 +28,13 @@ COPY --from=builder /app/build build/
 COPY --from=builder /app/dist dist/
 COPY --from=builder /app/server.js ./
 COPY package.json ./
+
+# Customization files for the scanner (instructions, prompts, agents, skills)
+COPY --from=builder /app/.github/copilot-instructions.md .github/copilot-instructions.md
+COPY --from=builder /app/.github/instructions/ .github/instructions/
+COPY --from=builder /app/.github/prompts/ .github/prompts/
+COPY --from=builder /app/.github/agents/ .github/agents/
+COPY --from=builder /app/skills/ skills/
 
 ENV NODE_ENV=production
 ENV PORT=3000

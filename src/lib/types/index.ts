@@ -1108,6 +1108,9 @@ export interface SourcedMcpServerInfo {
   name: string;
   source: CustomizationSource;
   status: string;
+  type?: string;
+  url?: string;
+  command?: string;
   error?: string;
 }
 

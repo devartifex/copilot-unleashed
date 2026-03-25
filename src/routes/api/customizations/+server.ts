@@ -37,5 +37,13 @@ export const GET: RequestHandler = async ({ locals }) => {
       description,
       content,
     })),
+    mcpServers: customizations.mcpServers.map(({ name, source, type, url, command }) => ({
+      name,
+      source,
+      type,
+      status: 'not_configured' as const,
+      ...(url && { url }),
+      ...(command && { command }),
+    })),
   });
 };

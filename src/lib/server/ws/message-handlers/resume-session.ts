@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { approveAll } from '@github/copilot-sdk';
-import { createCopilotSession, buildSessionHooks } from '../../copilot/session.js';
+import { createCopilotSession, buildSessionHooks, buildSessionMcpServers } from '../../copilot/session.js';
 import { getSessionDetail, buildSessionContext, isValidSessionId } from '../../copilot/session-metadata.js';
 import { config } from '../../config.js';
 import { poolSend } from '../session-pool.js';
@@ -45,24 +45,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
     const resumeMcpServers = parseMcpServers(msg.mcpServers);
 
     // Build the full MCP config (GitHub server + user servers)
-    const mcpServersConfig: Record<string, unknown> = {
-      github: {
-        type: 'http',
-        url: 'https://api.githubcopilot.com/mcp/x/all',
-        headers: { Authorization: `Bearer ${githubToken}` },
-        tools: ['*'],
-      },
-    };
-    if (resumeMcpServers) {
-      for (const s of resumeMcpServers) {
-        mcpServersConfig[s.name] = {
-          type: s.type,
-          url: s.url,
-          headers: s.headers,
-          tools: s.tools.length > 0 ? s.tools : ['*'],
-        };
-      }
-    }
+    const mcpServersConfig = await buildSessionMcpServers(githubToken, resumeMcpServers, resolvedConfigDir);
 
     let resumed = false;
 

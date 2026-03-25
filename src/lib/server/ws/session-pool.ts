@@ -45,6 +45,10 @@ export interface PoolEntry {
   reasoningEffort: string | null;
   /** Timestamp of the last client ping — used to detect backgrounded/suspended apps */
   lastPingAt: number;
+  /** Latest workspace cwd reported by the SDK session */
+  workspaceCwd: string | null;
+  /** Latest git root reported by the SDK session */
+  workspaceGitRoot: string | null;
 }
 
 export const sessionPool = new Map<string, PoolEntry>();
@@ -68,6 +72,8 @@ export function createPoolEntry(client: CopilotClient, ws: WebSocket): PoolEntry
     pendingPermissionPrompts: new Map(),
     reasoningEffort: null,
     lastPingAt: Date.now(),
+    workspaceCwd: null,
+    workspaceGitRoot: null,
   };
 }
 

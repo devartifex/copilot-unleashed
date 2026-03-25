@@ -38,17 +38,18 @@ describe('registerServiceWorker', () => {
 	});
 
 	it('returns registration and logs scope when registration succeeds', async () => {
-		const mockRegistration = { scope: '/' } as ServiceWorkerRegistration;
+		const mockRegistration = { scope: '/', update: vi.fn().mockResolvedValue(undefined) } as unknown as ServiceWorkerRegistration;
 		const registerMock = vi.fn().mockResolvedValue(mockRegistration);
 		Object.defineProperty(navigator, 'serviceWorker', {
 			configurable: true,
-			value: { register: registerMock },
+			value: { register: registerMock, addEventListener: vi.fn() },
 		});
 
 		const result = await registerServiceWorker();
 
 		expect(result).toBe(mockRegistration);
-		expect(registerMock).toHaveBeenCalledWith('/sw.js', { scope: '/' });
+		expect(registerMock).toHaveBeenCalledWith('/sw.js?v=2026-03-25-2', { scope: '/' });
+		expect(mockRegistration.update).toHaveBeenCalled();
 		expect(console.log).toHaveBeenCalledWith('[SW] Registered with scope:', '/');
 	});
 
@@ -56,7 +57,7 @@ describe('registerServiceWorker', () => {
 		const registerMock = vi.fn().mockRejectedValue(new Error('Registration failed'));
 		Object.defineProperty(navigator, 'serviceWorker', {
 			configurable: true,
-			value: { register: registerMock },
+			value: { register: registerMock, addEventListener: vi.fn() },
 		});
 
 		const result = await registerServiceWorker();

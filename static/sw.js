@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'copilot-unleashed-v1';
+const CACHE_NAME = 'copilot-unleashed-v2';
 const PRECACHE_URLS = [
   '/',
   '/favicon.png',

@@ -26,10 +26,19 @@ export interface PromptFile {
   content: string;
 }
 
+export interface McpConfigEntry {
+  name: string;
+  source: string;
+  type: string;
+  url?: string;
+  command?: string;
+}
+
 export interface DiscoveredCustomizations {
   instructions: InstructionFile[];
   agents: AgentFile[];
   prompts: PromptFile[];
+  mcpServers: McpConfigEntry[];
 }
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
@@ -73,13 +82,15 @@ async function readdirSafe(path: string): Promise<string[]> {
 }
 
 let cached: DiscoveredCustomizations | null = null;
+let cachedAt = 0;
+const CACHE_TTL_MS = 30_000;
 
-/** Scan filesystem locations for Copilot customization files (instructions + agents). */
+/** Scan filesystem locations for Copilot customization files (instructions + agents + prompts). */
 export async function scanCustomizations(
   copilotHome?: string,
   cwd?: string,
 ): Promise<DiscoveredCustomizations> {
-  if (cached) return cached;
+  if (cached && Date.now() - cachedAt < CACHE_TTL_MS) return cached;
 
   const home = copilotHome ?? join(homedir(), '.copilot');
   const root = cwd ?? process.cwd();
@@ -225,11 +236,38 @@ export async function scanCustomizations(
     });
   }
 
-  cached = { instructions, agents, prompts };
+  // 9. MCP servers from mcp-config.json (user-level and repo-level)
+  const mcpServers: McpConfigEntry[] = [];
+  for (const [dir, source] of [[home, 'user'], [join(root, '.github'), 'repo']] as const) {
+    const mcpConfigPath = join(dir, 'mcp-config.json');
+    const mcpRaw = await readFileSafe(mcpConfigPath);
+    if (mcpRaw) {
+      try {
+        const parsed = JSON.parse(mcpRaw);
+        const servers = parsed.mcpServers || parsed.servers || {};
+        for (const [name, cfg] of Object.entries(servers)) {
+          const c = cfg as Record<string, unknown>;
+          const entry: McpConfigEntry = {
+            name,
+            source,
+            type: (c.type as string) || (c.command ? 'stdio' : 'http'),
+          };
+          if (typeof c.url === 'string') entry.url = c.url;
+          if (typeof c.command === 'string') entry.command = c.command;
+          mcpServers.push(entry);
+        }
+      } catch { /* malformed JSON */ }
+    }
+  }
+
+  cached = { instructions, agents, prompts, mcpServers };
+  cachedAt = Date.now();
+  console.log(`[scanner] Discovered ${instructions.length} instructions, ${agents.length} agents, ${prompts.length} prompts, ${mcpServers.length} mcp servers (home=${home}, root=${root})`);
   return cached;
 }
 
 /** Clear the cached customizations (for testing or hot-reload). */
 export function clearCache(): void {
   cached = null;
+  cachedAt = 0;
 }

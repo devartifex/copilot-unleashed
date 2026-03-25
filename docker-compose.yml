@@ -8,6 +8,7 @@ services:
     environment:
       - NODE_ENV=development
       - BASE_URL=http://localhost:3000
+      - DOCKER_HOST=unix:///var/run/docker.sock
       - SESSION_STORE_PATH=/data/sessions
       - SETTINGS_STORE_PATH=/data/settings
       - CHAT_STATE_PATH=/data/chat-state
@@ -21,6 +22,9 @@ services:
     volumes:
       - copilot-data:/data
       - ~/.copilot:/home/node/.copilot  # sync host CLI sessions into container
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "991"
     restart: unless-stopped
 
 volumes:

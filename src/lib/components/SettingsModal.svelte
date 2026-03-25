@@ -28,6 +28,7 @@
     excludedTools: string[];
     customTools: CustomToolDefinition[];
     mcpServers: McpServerDefinition[];
+    discoveredMcpServers: SourcedMcpServerInfo[];
     availableSkills: Array<{ name: string; description?: string; source?: string; enabled?: boolean; license?: string }>;
     instructions: InstructionInfo[];
     prompts: PromptInfo[];
@@ -43,6 +44,7 @@
     onFetchAgents: () => void;
     onFetchQuota: () => void;
     onFetchSkills: () => void;
+    onFetchMcpServers: () => void;
     onFetchInstructions: () => void;
     onFetchPrompts: () => void;
     onToggleSkill: (name: string, enabled: boolean) => void;
@@ -62,6 +64,7 @@
     excludedTools,
     customTools,
     mcpServers,
+    discoveredMcpServers,
     availableSkills,
     instructions,
     prompts,
@@ -77,6 +80,7 @@
     onFetchAgents,
     onFetchQuota,
     onFetchSkills,
+    onFetchMcpServers,
     onFetchInstructions,
     onFetchPrompts,
     onToggleSkill,
@@ -338,6 +342,10 @@
     quotaPercentUsed > 90 ? 'red' : quotaPercentUsed > 70 ? 'yellow' : 'green',
   );
 
+  function getMcpTools(serverName: string): ToolInfo[] {
+    return groupedTools.get(serverName) ?? [];
+  }
+
   function toggleSection(section: AccordionSection) {
     if (activeSection === section) {
       activeSection = null;
@@ -349,6 +357,10 @@
     if (section === 'agents') onFetchAgents();
     if (section === 'quota') onFetchQuota();
     if (section === 'skills') onFetchSkills();
+    if (section === 'mcp') {
+      onFetchMcpServers();
+      onFetchTools();
+    }
     if (section === 'instructions') onFetchInstructions();
     if (section === 'prompts') onFetchPrompts();
   }
@@ -524,6 +536,52 @@
                 </div>
                 <div class="tool-toggle-desc">api.githubcopilot.com — always active with full access</div>
               </div>
+
+              <!-- SDK-discovered servers (from mcp-config.json / CLI) -->
+              {#if discoveredMcpServers.length > 0}
+                {#each discoveredMcpServers as server (server.name)}
+                  {@const sessionTools = getMcpTools(server.name)}
+                  <div class="mcp-server-item">
+                    <div class="mcp-server-header">
+                      <span class="mcp-server-name">{server.name}</span>
+                      <SourceBadge source={server.source} />
+                      <span class="mcp-server-badge">{server.type || 'mcp'}</span>
+                      {#if server.status && server.status !== 'not_configured'}
+                        <span class="mcp-server-badge {server.status === 'connected' ? 'status-ok' : server.status === 'failed' ? 'status-err' : ''}">{server.status}</span>
+                      {/if}
+                    </div>
+                    <div class="tool-toggle-desc">{server.url || server.command || 'CLI-configured'}</div>
+                    {#if server.error}
+                      <div class="tool-toggle-desc" style="color: var(--danger)">{server.error}</div>
+                    {/if}
+                    {#if sessionTools.length > 0}
+                      <div class="mcp-tools-block">
+                        <div class="mcp-tools-title">Tools exposed to this session</div>
+                        <div class="mcp-tools-list">
+                          {#each sessionTools as tool (tool.name)}
+                            <div class="mcp-tool-chip" title={tool.description || tool.name}>{tool.name}</div>
+                          {/each}
+                        </div>
+                        <p class="settings-hint mcp-test-hint">
+                          To test this MCP, ask for one of these capabilities explicitly so the model has a clear reason to call it.
+                        </p>
+                      </div>
+                    {:else if server.status === 'failed'}
+                      <p class="settings-hint mcp-test-hint">
+                        This server is configured but failed to start, so it cannot expose tools to the current session yet.
+                      </p>
+                    {:else}
+                      <p class="settings-hint mcp-test-hint">
+                        No tools from this server are visible in the current session yet. Start a fresh chat session after enabling it, then reopen Settings to confirm its tools appear here.
+                      </p>
+                    {/if}
+                  </div>
+                {/each}
+              {:else}
+                <p class="settings-hint">No CLI-configured MCP servers found.</p>
+              {/if}
+
+              <hr class="mcp-divider" />
 
               <!-- User-defined servers -->
               {#each mcpServers as server, i (server.name)}
@@ -1056,6 +1114,40 @@
     padding: 1px 6px;
     border-radius: 8px;
     border: 1px solid var(--border);
+  }
+  .mcp-server-badge.status-ok { color: var(--success, #3fb950); border-color: var(--success, #3fb950); }
+  .mcp-server-badge.status-err { color: var(--danger); border-color: var(--danger); }
+  .mcp-tools-block {
+    margin-top: var(--sp-2);
+    padding-left: 24px;
+  }
+  .mcp-tools-title {
+    font-size: 0.72em;
+    color: var(--fg);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .mcp-tools-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .mcp-tool-chip {
+    font-size: 0.68em;
+    color: var(--fg);
+    background: var(--bg-overlay);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px 8px;
+  }
+  .mcp-test-hint {
+    padding-left: 0;
+    margin-top: 6px;
+  }
+  .mcp-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: var(--sp-2) 0;
   }
   .mcp-edit-btn {
     background: none;

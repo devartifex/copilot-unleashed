@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const { defineToolMock } = vi.hoisted(() => ({
   defineToolMock: vi.fn((name: string, options: Record<string, unknown>) => ({ name, ...options })),
@@ -15,7 +18,7 @@ vi.mock('../config.js', () => ({
   },
 }));
 
-import { createCopilotSession, getAvailableModels, buildSessionHooks } from './session.js';
+import { createCopilotSession, getAvailableModels, buildSessionHooks, buildSessionMcpServers } from './session.js';
 
 interface ClientMock {
   createSession: ReturnType<typeof vi.fn>;
@@ -496,6 +499,33 @@ describe('createCopilotSession', () => {
       headers: { Authorization: 'Bearer my-gh-token-123' },
       tools: ['*'],
     });
+  });
+
+  it('merges stdio MCP servers from mcp-config.json into the session config', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'copilot-mcp-test-'));
+    await writeFile(join(dir, 'mcp-config.json'), JSON.stringify({
+      mcpServers: {
+        'awesome-copilot': {
+          type: 'stdio',
+          command: 'docker',
+          args: ['run', '-i', '--rm', 'ghcr.io/microsoft/mcp-dotnet-samples/awesome-copilot:latest'],
+        },
+      },
+    }));
+
+    try {
+      const mcpServers: Awaited<ReturnType<typeof buildSessionMcpServers>> =
+        await buildSessionMcpServers('gh-token', undefined, dir);
+      expect(mcpServers['awesome-copilot']).toEqual({
+        type: 'stdio',
+        command: 'docker',
+        args: ['run', '-i', '--rm', 'ghcr.io/microsoft/mcp-dotnet-samples/awesome-copilot:latest'],
+        tools: ['*'],
+      });
+      expect(mcpServers.github).toBeDefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('passes timeout to MCP server config when specified', async () => {

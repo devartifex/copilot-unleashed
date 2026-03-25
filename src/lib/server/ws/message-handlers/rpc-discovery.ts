@@ -72,20 +72,37 @@ export async function handleReloadSkills(_msg: any, ctx: MessageContext): Promis
 
 export async function handleListMcpRpc(_msg: any, ctx: MessageContext): Promise<void> {
 	const { connectionEntry } = ctx;
+	const workspaceRoot = connectionEntry.workspaceGitRoot || connectionEntry.workspaceCwd || config.copilotCwd;
 
-	if (!connectionEntry.session) {
-		poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
-		return;
+	// If session exists, use SDK RPC for live status
+	if (connectionEntry.session) {
+		try {
+			const result = await connectionEntry.session.rpc.mcp.list();
+			const servers = (result?.servers || []).map((s: any) => ({
+				...s,
+				source: s.source === 'user' ? 'user' : s.source === 'workspace' ? 'repo' : 'builtin',
+			}));
+			poolSend(connectionEntry, { type: 'mcp_servers_list', servers });
+			return;
+		} catch (err: any) {
+			console.error('List MCP servers RPC error, falling back to scanner:', err.message);
+		}
 	}
+
+	// Fallback: read mcp-config.json from filesystem
 	try {
-		const result = await connectionEntry.session.rpc.mcp.list();
-		const servers = (result?.servers || []).map((s: any) => ({
-			...s,
-			source: s.source === 'user' ? 'user' : s.source === 'workspace' ? 'repo' : 'builtin',
+		const customizations = await scanCustomizations(config.copilotConfigDir, workspaceRoot || undefined);
+		const servers = customizations.mcpServers.map(s => ({
+			name: s.name,
+			source: s.source,
+			status: 'not_configured' as const,
+			type: s.type,
+			...(s.url && { url: s.url }),
+			...(s.command && { command: s.command }),
 		}));
 		poolSend(connectionEntry, { type: 'mcp_servers_list', servers });
 	} catch (err: any) {
-		console.error('List MCP servers RPC error:', err.message);
+		console.error('List MCP servers scanner error:', err.message);
 		poolSend(connectionEntry, { type: 'error', message: `Failed to list MCP servers: ${err.message}` });
 	}
 }
@@ -122,8 +139,9 @@ export async function handleToggleMcpRpc(msg: any, ctx: MessageContext): Promise
 
 export async function handleListInstructions(_msg: any, ctx: MessageContext): Promise<void> {
 	const { connectionEntry } = ctx;
+	const workspaceRoot = connectionEntry.workspaceGitRoot || connectionEntry.workspaceCwd || config.copilotCwd;
 	try {
-		const customizations = await scanCustomizations(config.copilotConfigDir, config.copilotCwd);
+		const customizations = await scanCustomizations(config.copilotConfigDir, workspaceRoot || undefined);
 		const instructions = customizations.instructions.map(({ name, source, path, applyTo }) => ({
 			name,
 			source,
@@ -139,8 +157,9 @@ export async function handleListInstructions(_msg: any, ctx: MessageContext): Pr
 
 export async function handleListPrompts(_msg: any, ctx: MessageContext): Promise<void> {
 	const { connectionEntry } = ctx;
+	const workspaceRoot = connectionEntry.workspaceGitRoot || connectionEntry.workspaceCwd || config.copilotCwd;
 	try {
-		const customizations = await scanCustomizations(config.copilotConfigDir, config.copilotCwd);
+		const customizations = await scanCustomizations(config.copilotConfigDir, workspaceRoot || undefined);
 		const prompts = customizations.prompts.map(({ name, source, path, description, content }) => ({
 			name,
 			source,
@@ -157,13 +176,14 @@ export async function handleListPrompts(_msg: any, ctx: MessageContext): Promise
 
 export async function handleUsePrompt(msg: any, ctx: MessageContext): Promise<void> {
 	const { connectionEntry } = ctx;
+	const workspaceRoot = connectionEntry.workspaceGitRoot || connectionEntry.workspaceCwd || config.copilotCwd;
 	const name = typeof msg.name === 'string' ? msg.name.trim() : '';
 	if (!name) {
 		poolSend(connectionEntry, { type: 'error', message: 'Prompt name is required' });
 		return;
 	}
 	try {
-		const customizations = await scanCustomizations(config.copilotConfigDir, config.copilotCwd);
+		const customizations = await scanCustomizations(config.copilotConfigDir, workspaceRoot || undefined);
 		const prompt = customizations.prompts.find(p => p.name === name);
 		if (!prompt) {
 			poolSend(connectionEntry, { type: 'error', message: `Prompt not found: ${name}` });

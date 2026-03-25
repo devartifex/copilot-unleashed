@@ -252,6 +252,8 @@ export function wireSessionEvents(
     poolSend(entry, { type: 'tool_partial_result', toolCallId: event.data?.toolCallId, partialOutput: event.data?.partialOutput });
   });
   session.on('session.context_changed', (event: any) => {
+    entry.workspaceCwd = event.data?.cwd ?? entry.workspaceCwd;
+    entry.workspaceGitRoot = event.data?.gitRoot ?? entry.workspaceGitRoot;
     poolSend(entry, {
       type: 'context_changed',
       cwd: event.data?.cwd,

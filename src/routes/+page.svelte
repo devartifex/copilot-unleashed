@@ -14,7 +14,7 @@
   import { createWsStore } from '$lib/stores/ws.svelte.js';
   import { createChatStore } from '$lib/stores/chat.svelte.js';
   import { createSettingsStore } from '$lib/stores/settings.svelte.js';
-  import type { Attachment, SessionMode, ReasoningEffort } from '$lib/types/index.js';
+  import type { Attachment, SessionMode, ReasoningEffort, CustomizationSource } from '$lib/types/index.js';
 
   let { data } = $props();
 
@@ -49,6 +49,50 @@
 
   const activeSkillCount = $derived(settings.availableSkills.length);
 
+  function normalizeCustomizationSource(raw: string | undefined): CustomizationSource {
+    const src = (raw ?? '').toLowerCase();
+    return (src === 'personal' || src === 'user')
+      ? 'user'
+      : (src === 'project' || src === 'workspace' || src === 'repo')
+        ? 'repo'
+        : 'builtin';
+  }
+
+  function mergeMcpServers(
+    current: Array<{
+      name: string;
+      source: CustomizationSource;
+      status: string;
+      type?: string;
+      url?: string;
+      command?: string;
+      error?: string;
+    }>,
+    incoming: Array<{
+      name: string;
+      source?: string;
+      status: string;
+      type?: string;
+      url?: string;
+      command?: string;
+      error?: string;
+    }>,
+  ) {
+    const merged = new Map(current.map((server) => [server.name.toLowerCase(), server]));
+
+    for (const server of incoming) {
+      const key = server.name.toLowerCase();
+      const existing = merged.get(key);
+      merged.set(key, {
+        ...existing,
+        ...server,
+        source: normalizeCustomizationSource(server.source ?? existing?.source),
+      });
+    }
+
+    return [...merged.values()];
+  }
+
   const modeStyle = $derived.by(() => {
     switch (chatStore.mode) {
       case 'plan':
@@ -72,6 +116,7 @@
       settings.load();
       settings.syncFromServer();
       settings.fetchSkills();
+      settings.fetchCustomizations();
       wsStore.connect();
 
       // Wire WS messages → chat store
@@ -139,6 +184,9 @@
         }
         if (msg.type === 'prompts_list') {
           settings.prompts = msg.prompts;
+        }
+        if (msg.type === 'mcp_servers_list') {
+          settings.discoveredMcpServers = mergeMcpServers(settings.discoveredMcpServers, msg.servers);
         }
 
         // Clear sessions loading state
@@ -420,6 +468,7 @@
       excludedTools={settings.excludedTools}
       customTools={settings.customTools}
       mcpServers={settings.mcpServers}
+      discoveredMcpServers={settings.discoveredMcpServers}
       availableSkills={settings.availableSkills}
       instructions={settings.instructions}
       prompts={settings.prompts}
@@ -441,6 +490,29 @@
       onFetchAgents={() => wsStore.listAgents()}
       onFetchQuota={() => wsStore.getQuota()}
       onFetchSkills={() => wsStore.send({ type: 'list_skills_rpc' })}
+      onFetchMcpServers={() => {
+        wsStore.send({ type: 'list_mcp_rpc' });
+        fetch('/api/customizations')
+          .then(async (res) => {
+            if (!res.ok) return null;
+            return await res.json() as {
+              mcpServers?: Array<{
+                name: string;
+                source?: string;
+                status: string;
+                type?: string;
+                url?: string;
+                command?: string;
+                error?: string;
+              }>;
+            };
+          })
+          .then((body) => {
+            if (!body?.mcpServers) return;
+            settings.discoveredMcpServers = mergeMcpServers(settings.discoveredMcpServers, body.mcpServers);
+          })
+          .catch(() => { /* ignore fetch errors */ });
+      }}
       onFetchInstructions={() => wsStore.send({ type: 'list_instructions' })}
       onFetchPrompts={() => wsStore.send({ type: 'list_prompts' })}
       onToggleSkill={(name, enabled) => wsStore.send({ type: 'toggle_skill_rpc', name, enabled })}

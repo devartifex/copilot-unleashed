@@ -5,6 +5,7 @@ import type {
   CustomToolDefinition,
   McpServerDefinition,
   SourcedSkillInfo,
+  SourcedMcpServerInfo,
   InfiniteSessionsConfig,
   InstructionInfo,
   PromptInfo,
@@ -71,6 +72,7 @@ export interface SettingsStore {
   selectedModel: string;
   selectedMode: SessionMode;
   mcpServers: McpServerDefinition[];
+  discoveredMcpServers: SourcedMcpServerInfo[];
   availableSkills: SourcedSkillInfo[];
   instructions: InstructionInfo[];
   prompts: PromptInfo[];
@@ -80,6 +82,7 @@ export interface SettingsStore {
   save(): void;
   syncFromServer(): Promise<void>;
   fetchSkills(): Promise<void>;
+  fetchCustomizations(): Promise<void>;
 }
 
 export function createSettingsStore(): SettingsStore {
@@ -91,6 +94,7 @@ export function createSettingsStore(): SettingsStore {
   let selectedMode = $state<SessionMode>(DEFAULT_SETTINGS.mode);
   let mcpServers = $state<McpServerDefinition[]>([...(DEFAULT_SETTINGS.mcpServers ?? [])]);
   let availableSkills = $state<SourcedSkillInfo[]>([]);
+  let discoveredMcpServers = $state<SourcedMcpServerInfo[]>([]);
   let instructions = $state<InstructionInfo[]>([]);
   let prompts = $state<PromptInfo[]>([]);
   let infiniteSessions = $state<InfiniteSessionsConfig>({ ...DEFAULT_INFINITE_SESSIONS });
@@ -217,6 +221,29 @@ export function createSettingsStore(): SettingsStore {
     }
   }
 
+  async function fetchCustomizations(): Promise<void> {
+    try {
+      const res = await fetch('/api/customizations');
+      if (!res.ok) return;
+      const body = await res.json() as {
+        instructions?: InstructionInfo[];
+        prompts?: PromptInfo[];
+        mcpServers?: SourcedMcpServerInfo[];
+      };
+      if (Array.isArray(body.instructions)) {
+        instructions = body.instructions;
+      }
+      if (Array.isArray(body.prompts)) {
+        prompts = body.prompts;
+      }
+      if (Array.isArray(body.mcpServers)) {
+        discoveredMcpServers = body.mcpServers;
+      }
+    } catch {
+      // Ignore fetch errors
+    }
+  }
+
   return {
     get additionalInstructions() { return additionalInstructions; },
     set additionalInstructions(v: string) { additionalInstructions = v; save(); },
@@ -241,6 +268,9 @@ export function createSettingsStore(): SettingsStore {
 
     get availableSkills() { return availableSkills; },
     set availableSkills(v: SourcedSkillInfo[]) { availableSkills = v; },
+
+    get discoveredMcpServers() { return discoveredMcpServers; },
+    set discoveredMcpServers(v: SourcedMcpServerInfo[]) { discoveredMcpServers = v; },
 
     get instructions() { return instructions; },
     set instructions(v: InstructionInfo[]) { instructions = v; },
@@ -269,5 +299,6 @@ export function createSettingsStore(): SettingsStore {
     save,
     syncFromServer,
     fetchSkills,
+    fetchCustomizations,
   };
 }

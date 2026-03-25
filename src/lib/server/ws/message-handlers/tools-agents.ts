@@ -18,6 +18,7 @@ export async function handleListTools(msg: any, ctx: MessageContext): Promise<vo
 
 export async function handleListAgents(msg: any, ctx: MessageContext): Promise<void> {
   const { connectionEntry } = ctx;
+  const workspaceRoot = connectionEntry.workspaceGitRoot || connectionEntry.workspaceCwd || config.copilotCwd;
 
   if (!connectionEntry.session) {
     poolSend(connectionEntry, { type: 'error', message: 'No active session. Send new_session first.' });
@@ -33,7 +34,7 @@ export async function handleListAgents(msg: any, ctx: MessageContext): Promise<v
     // Merge with scanner data for source metadata
     let scannedAgents: { name: string; source: string }[] = [];
     try {
-      const customizations = await scanCustomizations(config.copilotConfigDir, config.copilotCwd);
+      const customizations = await scanCustomizations(config.copilotConfigDir, workspaceRoot || undefined);
       scannedAgents = customizations.agents.map(a => ({ name: a.name, source: a.source }));
     } catch { /* scanner failure is non-fatal */ }
 

@@ -1,5 +1,8 @@
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { CopilotClient, defineTool } from '@github/copilot-sdk';
-import type { SessionConfig, SystemPromptSection, SectionOverride } from '@github/copilot-sdk';
+import type { SessionConfig, SystemPromptSection, SectionOverride, MCPServerConfig } from '@github/copilot-sdk';
 
 export type HookEventCallback = (message: Record<string, unknown>) => void;
 import { isIP } from 'node:net';
@@ -174,6 +177,79 @@ function buildUserMcpServers(servers?: McpServerInput[]): Record<string, unknown
   return result;
 }
 
+function normalizeStringRecord(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => typeof v === 'string')
+    .map(([k, v]) => [k, v as string]);
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+async function loadConfiguredMcpServers(configDir?: string): Promise<Record<string, MCPServerConfig>> {
+  const resolvedConfigDir = configDir || config.copilotConfigDir || join(homedir(), '.copilot');
+  const configPath = join(resolvedConfigDir, 'mcp-config.json');
+
+  try {
+    const raw = await readFile(configPath, 'utf8');
+    const parsed = JSON.parse(raw) as { mcpServers?: Record<string, Record<string, unknown>>; servers?: Record<string, Record<string, unknown>> };
+    const configured = parsed.mcpServers || parsed.servers || {};
+    const result: Record<string, MCPServerConfig> = {};
+
+    for (const [name, server] of Object.entries(configured)) {
+      const type = typeof server.type === 'string' ? server.type : undefined;
+
+      if ((type === 'http' || type === 'sse') && typeof server.url === 'string') {
+        validateMcpServerUrl(name, server.url);
+        result[name] = {
+          type,
+          url: server.url,
+          ...(normalizeStringRecord(server.headers) ? { headers: normalizeStringRecord(server.headers) } : {}),
+          tools: Array.isArray(server.tools) && server.tools.length > 0 ? server.tools : ['*'],
+          ...(typeof server.timeout === 'number' && server.timeout > 0 ? { timeout: server.timeout } : {}),
+        };
+        continue;
+      }
+
+      if ((type === 'stdio' || type === 'local' || typeof server.command === 'string') && typeof server.command === 'string') {
+        result[name] = {
+          type: type === 'local' ? 'local' : 'stdio',
+          command: server.command,
+          args: Array.isArray(server.args) ? server.args.filter((arg): arg is string => typeof arg === 'string') : [],
+          ...(normalizeStringRecord(server.env) ? { env: normalizeStringRecord(server.env) } : {}),
+          ...(typeof server.cwd === 'string' ? { cwd: server.cwd } : {}),
+          tools: Array.isArray(server.tools) && server.tools.length > 0 ? server.tools : ['*'],
+          ...(typeof server.timeout === 'number' && server.timeout > 0 ? { timeout: server.timeout } : {}),
+        };
+      }
+    }
+
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+export async function buildSessionMcpServers(
+  githubToken: string,
+  servers?: McpServerInput[],
+  configDir?: string,
+) : Promise<Record<string, MCPServerConfig>> {
+  const configuredMcpServers = await loadConfiguredMcpServers(configDir);
+
+  return {
+    ...configuredMcpServers,
+    github: {
+      type: 'http',
+      url: 'https://api.githubcopilot.com/mcp/x/all',
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+      },
+      tools: ['*'],
+    },
+    ...buildUserMcpServers(servers),
+  };
+}
+
 function buildCustomTools(customTools: CustomToolDefinition[]) {
   return customTools.map((tool) => {
     validateToolUrl(tool.name, tool.webhookUrl);
@@ -251,17 +327,7 @@ export async function createCopilotSession(
     streaming: true,
     onPermissionRequest: permissionHandler,
     ...(config.copilotConfigDir && { configDir: config.copilotConfigDir }),
-    mcpServers: {
-      github: {
-        type: 'http',
-        url: 'https://api.githubcopilot.com/mcp/x/all',
-        headers: {
-          Authorization: `Bearer ${githubToken}`,
-        },
-        tools: ['*'],
-      },
-      ...buildUserMcpServers(options.mcpServers),
-    },
+    mcpServers: await buildSessionMcpServers(githubToken, options.mcpServers, options.configDir),
   };
 
   if (options.reasoningEffort) {

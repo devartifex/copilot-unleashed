@@ -56,6 +56,7 @@ describe('session-watcher', () => {
     await sleep(200);
 
     mod.stopSessionWatcher();
+    changed.mockClear();
 
     await writeFile(join(tempDir, 'after-stop.json'), '{}');
     await sleep(300);

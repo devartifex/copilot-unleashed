@@ -86,10 +86,15 @@ SESSION_SECRET=<random-32-byte-hex>            # Generate: openssl rand -hex 32
 
 **2. Run**
 
+> **Previously cloned?** Pull the latest changes first:
+> ```bash
+> git fetch origin && git reset --hard origin/master
+> ```
+
 _Docker (recommended):_
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 _Local development (Node.js 24+):_

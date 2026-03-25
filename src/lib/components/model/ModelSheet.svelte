@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ModelInfo, ReasoningEffort } from '$lib/types/index.js';
+  import { X, Check } from 'lucide-svelte';
 
   interface Props {
     open: boolean;
@@ -64,13 +65,14 @@
 <svelte:window onkeydown={handleEscapeKey} />
 
 {#if open}
-  <!-- a11y: overlay is role="presentation" — click-to-dismiss is a mouse convenience; keyboard users press Escape -->
   <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
   <div class="sheet-overlay" role="presentation" onclick={handleBackdropClick}>
     <div class="sheet-panel" role="presentation">
       <div class="sheet-header">
         <span class="sheet-title">Models</span>
-        <button class="sheet-close" onclick={onClose}>✕</button>
+        <button class="sheet-close" onclick={onClose} aria-label="Close">
+          <X size={18} />
+        </button>
       </div>
 
       <div class="sheet-body">
@@ -119,9 +121,9 @@
                     <span class="model-item-mult">{formatMultiplier(info)}</span>
                   {/if}
                   {#if currentModel === info.id}
-                    <svg class="model-item-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M3 8.5 L6.5 12 L13 4"/>
-                    </svg>
+                    <span class="model-item-check">
+                      <Check size={16} />
+                    </span>
                   {/if}
                 </span>
               </button>
@@ -134,6 +136,7 @@
 {/if}
 
 <style>
+  /* ── Mobile: fullscreen sheet ───────────────────────────────────── */
   .sheet-overlay {
     position: fixed;
     inset: 0;
@@ -170,7 +173,6 @@
   }
 
   .sheet-title {
-    font-family: var(--font-mono);
     font-size: 0.9em;
     font-weight: 600;
     color: var(--fg);
@@ -180,7 +182,6 @@
     background: none;
     border: none;
     color: var(--fg-muted);
-    font-size: 1.1em;
     cursor: pointer;
     padding: 4px 8px;
     border-radius: var(--radius-sm);
@@ -200,14 +201,8 @@
     overflow-y: auto;
     padding: 0 var(--sp-4) var(--sp-3);
     padding-bottom: calc(var(--sp-3) + var(--safe-bottom));
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
     min-height: 0;
   }
-  .sheet-body::-webkit-scrollbar { width: 4px; }
-  .sheet-body::-webkit-scrollbar-track { background: transparent; }
-  .sheet-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  .sheet-body::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
 
   /* ── Model list ────────────────────────────────────────────────── */
   .model-list {
@@ -243,7 +238,6 @@
     background: none;
     border: none;
     color: var(--fg);
-    font-family: var(--font-mono);
     font-size: 0.85em;
     padding: var(--sp-2) var(--sp-3);
     border-radius: var(--radius-sm);
@@ -299,6 +293,8 @@
   .model-item-check {
     color: var(--purple);
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
   }
 
   /* ── Reasoning section ─────────────────────────────────────────── */
@@ -317,7 +313,6 @@
   }
 
   .reasoning-label {
-    font-family: var(--font-mono);
     font-size: 0.75em;
     color: var(--fg-dim);
     text-transform: uppercase;
@@ -339,7 +334,6 @@
     border: none;
     color: var(--fg-dim);
     padding: var(--sp-1) var(--sp-2);
-    font-family: var(--font-mono);
     font-size: 0.82em;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -365,5 +359,49 @@
 
   .reasoning-opt-label {
     font-weight: 500;
+  }
+
+  /* ── Desktop: dropdown popover ─────────────────────────────────── */
+  @media (min-width: 1024px) {
+    .sheet-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 95;
+      background: transparent;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .sheet-panel {
+      position: relative;
+      margin-top: 56px;
+      margin-left: auto;
+      margin-right: auto;
+      width: 320px;
+      max-width: 320px;
+      max-height: 480px;
+      flex: none;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      animation: dropIn 0.15s ease;
+    }
+
+    @keyframes dropIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .sheet-header {
+      padding-top: var(--sp-3);
+    }
+
+    .sheet-body {
+      padding-bottom: var(--sp-3);
+      max-height: calc(480px - 52px);
+    }
   }
 </style>

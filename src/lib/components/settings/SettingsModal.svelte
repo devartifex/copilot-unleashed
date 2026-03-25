@@ -7,6 +7,7 @@
     SourcedAgentInfo,
     SourcedMcpServerInfo,
   } from '$lib/types/index.js';
+  import { X, ChevronRight } from 'lucide-svelte';
   import InstructionsPanel from './InstructionsPanel.svelte';
   import ToolsPanel from './ToolsPanel.svelte';
   import McpServersPanel from './McpServersPanel.svelte';
@@ -122,7 +123,7 @@
     <div class="settings-panel" role="presentation">
       <div class="settings-header">
         <span class="settings-title">Settings</span>
-        <button class="settings-close" onclick={onClose}>✕</button>
+        <button class="settings-close" onclick={onClose} aria-label="Close settings"><X size={20} /></button>
       </div>
 
       <div class="settings-body">
@@ -134,7 +135,7 @@
             onclick={() => toggleSection('instructions')}
           >
             Additional Instructions
-            <span class="accordion-chevron">▸</span>
+            <span class="accordion-chevron"><ChevronRight size={16} /></span>
           </button>
           {#if activeSection === 'instructions'}
             <div class="settings-accordion-body">
@@ -151,7 +152,7 @@
             onclick={() => toggleSection('tools')}
           >
             Tools
-            <span class="accordion-chevron">▸</span>
+            <span class="accordion-chevron"><ChevronRight size={16} /></span>
           </button>
           {#if activeSection === 'tools'}
             <div class="settings-accordion-body">
@@ -168,7 +169,7 @@
             onclick={() => toggleSection('mcp')}
           >
             MCP Servers
-            <span class="accordion-chevron">▸</span>
+            <span class="accordion-chevron"><ChevronRight size={16} /></span>
           </button>
           {#if activeSection === 'mcp'}
             <div class="settings-accordion-body">
@@ -185,7 +186,7 @@
             onclick={() => toggleSection('agents')}
           >
             Agents
-            <span class="accordion-chevron">▸</span>
+            <span class="accordion-chevron"><ChevronRight size={16} /></span>
           </button>
           {#if activeSection === 'agents'}
             <div class="settings-accordion-body">
@@ -202,7 +203,7 @@
             onclick={() => toggleSection('skills')}
           >
             Skills
-            <span class="accordion-chevron">▸</span>
+            <span class="accordion-chevron"><ChevronRight size={16} /></span>
           </button>
           {#if activeSection === 'skills'}
             <div class="settings-accordion-body">
@@ -219,7 +220,7 @@
             onclick={() => toggleSection('prompts')}
           >
             Prompts
-            <span class="accordion-chevron">▸</span>
+            <span class="accordion-chevron"><ChevronRight size={16} /></span>
           </button>
           {#if activeSection === 'prompts'}
             <div class="settings-accordion-body">
@@ -236,7 +237,7 @@
             onclick={() => toggleSection('quota')}
           >
             Quota
-            <span class="accordion-chevron">▸</span>
+            <span class="accordion-chevron"><ChevronRight size={16} /></span>
           </button>
           {#if activeSection === 'quota'}
             <div class="settings-accordion-body">
@@ -253,7 +254,7 @@
             onclick={() => toggleSection('notifications')}
           >
             Notifications
-            <span class="accordion-chevron">▸</span>
+            <span class="accordion-chevron"><ChevronRight size={16} /></span>
           </button>
           {#if activeSection === 'notifications'}
             <div class="settings-accordion-body">
@@ -270,7 +271,7 @@
             onclick={() => toggleSection('compact')}
           >
             Compaction
-            <span class="accordion-chevron">▸</span>
+            <span class="accordion-chevron"><ChevronRight size={16} /></span>
           </button>
           {#if activeSection === 'compact'}
             <div class="settings-accordion-body">
@@ -287,10 +288,12 @@
   .settings-overlay {
     position: fixed;
     inset: 0;
-    background: var(--bg);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
     z-index: 100;
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     animation: fadeIn 0.15s ease;
   }
   @keyframes fadeIn {
@@ -298,11 +301,13 @@
     to { opacity: 1; }
   }
   .settings-panel {
-    background: var(--bg);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
     width: 100%;
-    max-width: 600px;
-    margin: 0 auto;
-    flex: 1;
+    max-width: 640px;
+    max-height: 80vh;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -312,12 +317,10 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--sp-3) var(--sp-4);
-    padding-top: calc(var(--sp-3) + var(--safe-top));
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
   .settings-title {
-    font-family: var(--font-mono);
     font-size: 0.9em;
     color: var(--fg);
     font-weight: 600;
@@ -326,13 +329,14 @@
     background: none;
     border: none;
     color: var(--fg-dim);
-    font-size: 1.1em;
     cursor: pointer;
     padding: var(--sp-1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .settings-body {
     padding: var(--sp-4);
-    padding-bottom: calc(var(--sp-4) + var(--safe-bottom));
     overflow-y: auto;
     flex: 1;
     display: flex;
@@ -356,7 +360,6 @@
     border: none;
     color: var(--fg);
     padding: var(--sp-3);
-    font-family: var(--font-mono);
     font-size: 0.85em;
     cursor: pointer;
   }
@@ -365,7 +368,8 @@
   }
   .accordion-chevron {
     color: var(--fg-dim);
-    font-size: 0.8em;
+    display: flex;
+    align-items: center;
     transition: transform 0.2s ease;
   }
   .settings-accordion-btn.open .accordion-chevron {
@@ -374,7 +378,32 @@
   .settings-accordion-body {
     padding: var(--sp-3);
     border-top: 1px solid var(--border);
-    max-height: 250px;
+    max-height: 60vh;
     overflow-y: auto;
+  }
+
+  /* Mobile: fullscreen behavior */
+  @media (max-width: 1023px) {
+    .settings-overlay {
+      align-items: stretch;
+      justify-content: stretch;
+    }
+    .settings-panel {
+      max-width: none;
+      max-height: none;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      flex: 1;
+    }
+    .settings-header {
+      padding-top: calc(var(--sp-3) + var(--safe-top));
+    }
+    .settings-body {
+      padding-bottom: calc(var(--sp-4) + var(--safe-bottom));
+    }
+    .settings-accordion-body {
+      max-height: 250px;
+    }
   }
 </style>

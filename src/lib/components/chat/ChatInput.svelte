@@ -292,6 +292,7 @@
     {/if}
 
     <textarea
+      class="scrollbar-hidden"
       bind:this={textareaEl}
       bind:value={inputValue}
       placeholder={inputPlaceholder}
@@ -488,7 +489,6 @@
     color: var(--purple);
     font-weight: 500;
     font-size: 0.85em;
-    font-family: var(--font-mono);
     line-height: 1.4;
   }
 
@@ -504,7 +504,6 @@
     border: 1px solid rgba(110, 64, 201, 0.30);
     border-radius: var(--radius-sm);
     color: var(--purple);
-    font-family: var(--font-mono);
     font-size: 0.78em;
     padding: 4px 10px;
     cursor: pointer;
@@ -535,12 +534,6 @@
     -webkit-appearance: none;
     appearance: none;
     min-height: 52px;
-    /* Hide scrollbar but keep scrolling */
-    scrollbar-width: none;
-  }
-
-  textarea::-webkit-scrollbar {
-    display: none;
   }
 
   textarea::placeholder {
@@ -588,7 +581,6 @@
   .steering-indicator {
     padding: 0 var(--sp-4);
     color: var(--fg-dim);
-    font-family: var(--font-mono);
     font-size: 0.75em;
     line-height: 1.4;
   }
@@ -640,7 +632,6 @@
     background: transparent;
     border: none;
     color: var(--fg-dim);
-    font-family: var(--font-mono);
     font-size: 0.8em;
     padding: 4px 10px;
     border-radius: 4px;
@@ -723,7 +714,6 @@
     background: none;
     border: none;
     color: var(--fg);
-    font-family: var(--font-mono);
     font-size: 0.85em;
     padding: var(--sp-2) var(--sp-3);
     cursor: pointer;

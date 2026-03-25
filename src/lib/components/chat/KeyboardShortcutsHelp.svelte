@@ -70,7 +70,6 @@
     animation: helpIn 0.15s ease;
     max-height: 70vh;
     overflow-y: auto;
-    scrollbar-width: thin;
   }
 
   @keyframes helpIn {

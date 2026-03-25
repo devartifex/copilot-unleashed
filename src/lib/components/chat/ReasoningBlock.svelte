@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { ChevronDown } from 'lucide-svelte';
+
   interface Props {
     content: string;
     isStreaming: boolean;
@@ -17,7 +19,7 @@
 
 <div class="reasoning-block" class:collapsed>
   <button class="reasoning-header" onclick={toggle} type="button">
-    <span class="reasoning-chevron">▼</span>
+    <span class="reasoning-chevron"><ChevronDown size={14} /></span>
     <span class="reasoning-icon" class:thinking={isStreaming}>💭</span>
     <span>{headerLabel}</span>
   </button>
@@ -42,19 +44,17 @@
     min-height: 32px;
     background: none;
     border: none;
-    font-family: inherit;
     font-size: inherit;
   }
 
   .reasoning-chevron {
     color: var(--fg-dim);
-    font-size: 0.75em;
     transition: transform 0.2s ease;
-    display: inline-block;
+    display: inline-flex;
   }
 
-  .collapsed .reasoning-chevron {
-    transform: rotate(-90deg);
+  .reasoning-block:not(.collapsed) .reasoning-chevron {
+    transform: rotate(180deg);
   }
 
   .reasoning-icon {

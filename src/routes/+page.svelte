@@ -26,6 +26,7 @@
 
   // ── UI state ───────────────────────────────────────────────────────────
   let sidebarOpen = $state(false);
+  let sidebarCollapsed = $state(false);
   let settingsOpen = $state(false);
   let sessionsOpen = $state(false);
   let modelSheetOpen = $state(false);
@@ -307,15 +308,33 @@
 </svelte:head>
 
 {#if data.authenticated}
-  <div class="screen" style={modeStyle}>
-    <TopBar
-      currentModel={effectiveModel}
-      connectionState={wsStore.connectionState}
-      sessionTitle={chatStore.sessionTitle}
+  <div class="app-layout" class:sidebar-collapsed={sidebarCollapsed}>
+    <Sidebar
+      open={sidebarOpen}
+      collapsed={sidebarCollapsed}
+      currentAgent={chatStore.currentAgent}
       quotaSnapshots={chatStore.quotaSnapshots}
-      onToggleSidebar={() => sidebarOpen = true}
-      onOpenModelSheet={() => modelSheetOpen = true}
+      sessionTotals={chatStore.sessionTotals}
+      sessions={chatStore.sessions}
+      onClose={() => sidebarOpen = false}
+      onNewChat={handleNewChat}
+      onOpenSessions={handleOpenSessions}
+      onOpenSettings={handleOpenSettings}
+      onLogout={handleLogout}
+      onToggleCollapse={() => sidebarCollapsed = !sidebarCollapsed}
+      onResumeSession={handleResumeSession}
     />
+
+    <div class="screen" style={modeStyle}>
+      <TopBar
+        currentModel={effectiveModel}
+        connectionState={wsStore.connectionState}
+        sessionTitle={chatStore.sessionTitle}
+        quotaSnapshots={chatStore.quotaSnapshots}
+        modelSheetOpen={modelSheetOpen}
+        onToggleSidebar={() => sidebarOpen = true}
+        onOpenModelSheet={() => modelSheetOpen = true}
+      />
 
     <div class="terminal">
       {#if sessionLoading}
@@ -387,18 +406,10 @@
         onCompact={() => wsStore.compact()}
       />
     </div>
+    <!-- End .terminal -->
 
-    <Sidebar
-      open={sidebarOpen}
-      currentAgent={chatStore.currentAgent}
-      quotaSnapshots={chatStore.quotaSnapshots}
-      sessionTotals={chatStore.sessionTotals}
-      onClose={() => sidebarOpen = false}
-      onNewChat={handleNewChat}
-      onOpenSessions={handleOpenSessions}
-      onOpenSettings={handleOpenSettings}
-      onLogout={handleLogout}
-    />
+    </div>
+    <!-- End .screen -->
 
     <ModelSheet
       open={modelSheetOpen}
@@ -485,12 +496,37 @@
 {/if}
 
 <style>
+  /* ── App layout grid (desktop) ─────────────────────────────────── */
+  .app-layout {
+    height: 100dvh;
+    height: var(--vh, 100dvh);
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (min-width: 1024px) {
+    .app-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      flex-direction: unset;
+    }
+    .app-layout.sidebar-collapsed {
+      grid-template-columns: 56px 1fr;
+    }
+  }
+
   .screen {
     height: 100dvh;
     height: var(--vh, 100dvh);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  @media (min-width: 1024px) {
+    .screen {
+      height: 100%;
+    }
   }
 
   .terminal {
@@ -519,7 +555,14 @@
 
   @media (min-width: 1024px) {
     .terminal {
-      max-width: 880px;
+      max-width: 768px;
+    }
+  }
+
+  @media (min-width: 1440px) {
+    .terminal {
+      max-width: 820px;
+      padding: var(--sp-4) var(--sp-6);
     }
   }
 

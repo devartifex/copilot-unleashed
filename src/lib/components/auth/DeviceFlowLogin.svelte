@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Check, XCircle } from 'lucide-svelte';
   import { createAuthStore } from '$lib/stores/auth.svelte';
   import { invalidateAll } from '$app/navigation';
 
@@ -102,16 +103,16 @@
           <span class="spinner-char">{auth.spinnerChar}</span>
           <span>{auth.errorMessage || 'Waiting for authorization…'}</span>
         {:else if auth.authStatus === 'authorized'}
-          <span class="spinner-char done">✓</span>
+          <span class="spinner-char done"><Check size={16} /></span>
           <span>Authorized as @{auth.user?.login}</span>
         {:else if auth.authStatus === 'expired'}
-          <span class="spinner-char failed">✗</span>
+          <span class="spinner-char failed"><XCircle size={16} /></span>
           <span>Code expired — refresh the page to try again.</span>
         {:else if auth.authStatus === 'denied'}
-          <span class="spinner-char failed">✗</span>
+          <span class="spinner-char failed"><XCircle size={16} /></span>
           <span>Access denied — authorization was cancelled on GitHub.</span>
         {:else if auth.authStatus === 'error'}
-          <span class="spinner-char failed">✗</span>
+          <span class="spinner-char failed"><XCircle size={16} /></span>
           <span>{auth.errorMessage || 'Failed to start device flow.'}</span>
         {:else}
           <span class="spinner-char">{auth.spinnerChar}</span>
@@ -180,7 +181,6 @@
   }
 
   .hero-title {
-    font-family: var(--font-mono);
     font-size: 1.6em;
     font-weight: 700;
     color: var(--fg);
@@ -242,7 +242,6 @@
   }
 
   .login-heading {
-    font-family: var(--font-mono);
     font-size: 0.95em;
     font-weight: 600;
     color: var(--fg);
@@ -309,7 +308,6 @@
     color: var(--fg-muted);
     cursor: pointer;
     padding: var(--sp-2) var(--sp-3);
-    font-family: var(--font-mono);
     font-size: 0.8em;
     transition: all 0.2s ease;
     min-height: 36px;
@@ -336,7 +334,6 @@
     color: var(--fg);
     text-decoration: none;
     border-radius: var(--radius-md);
-    font-family: var(--font-mono);
     font-size: 0.85em;
     font-weight: 600;
     transition: all 0.2s ease;

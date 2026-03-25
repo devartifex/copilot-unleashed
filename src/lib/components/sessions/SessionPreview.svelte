@@ -125,16 +125,10 @@
     flex: 1;
     overflow-y: auto;
     padding: var(--sp-3) var(--sp-4);
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
     min-height: 0;
   }
-  .preview-body::-webkit-scrollbar { width: 4px; }
-  .preview-body::-webkit-scrollbar-track { background: transparent; }
-  .preview-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
   .preview-summary {
-    font-family: var(--font-mono);
     font-size: 0.9em;
     color: var(--fg);
     line-height: 1.5;
@@ -154,7 +148,6 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    font-family: var(--font-mono);
     font-size: 0.8em;
     gap: var(--sp-2);
   }
@@ -165,6 +158,7 @@
   }
 
   .meta-value {
+    font-family: var(--font-mono);
     color: var(--fg-muted);
     text-align: right;
     overflow: hidden;
@@ -183,7 +177,6 @@
   }
 
   .section-header {
-    font-family: var(--font-mono);
     font-size: 0.78em;
     font-weight: 600;
     color: var(--fg-muted);
@@ -202,11 +195,11 @@
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
-    font-family: var(--font-mono);
     font-size: 0.82em;
   }
 
   .checkpoint-number {
+    font-family: var(--font-mono);
     color: var(--fg-dim);
     flex-shrink: 0;
     min-width: 1.5em;
@@ -221,7 +214,6 @@
   }
 
   .plan-preview {
-    font-family: var(--font-mono);
     font-size: 0.78em;
     color: var(--fg-muted);
     white-space: pre-wrap;

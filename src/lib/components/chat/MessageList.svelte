@@ -2,10 +2,10 @@
   import type { Snippet } from 'svelte';
   import type { ChatStore } from '$lib/stores/chat.svelte.js';
   import { renderMarkdown, highlightCodeBlocks, addCopyButtons } from '$lib/utils/markdown.js';
+  import { Sparkles } from 'lucide-svelte';
+  import Spinner from '$lib/components/shared/Spinner.svelte';
   import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
   import ReasoningBlock from '$lib/components/chat/ReasoningBlock.svelte';
-
-  const BRAILLE_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
   interface Props {
     chatStore: ChatStore;
@@ -19,7 +19,6 @@
 
   let messagesEl: HTMLDivElement | undefined = $state();
   let streamContentEl: HTMLDivElement | undefined = $state();
-  let spinnerIndex = $state(0);
 
   const streamHtml = $derived(
     chatStore.currentStreamContent
@@ -66,15 +65,6 @@
     highlightCodeBlocks(streamContentEl);
     addCopyButtons(streamContentEl);
   });
-
-  // Braille spinner for waiting state
-  $effect(() => {
-    if (!showWaiting) return;
-    const interval = setInterval(() => {
-      spinnerIndex = (spinnerIndex + 1) % BRAILLE_FRAMES.length;
-    }, 80);
-    return () => clearInterval(interval);
-  });
 </script>
 
 <div class="messages" bind:this={messagesEl}>
@@ -93,14 +83,14 @@
 
     {#if showWaiting}
       <div class="waiting-indicator">
-        <span class="waiting-spinner">{BRAILLE_FRAMES[spinnerIndex]}</span>
+        <Spinner size={14} color="var(--yellow)" />
         <span class="waiting-label">Thinking</span>
       </div>
     {/if}
 
     {#if chatStore.currentStreamContent}
       <div class="message assistant streaming">
-        <span class="assistant-marker">◆ Copilot</span>
+        <span class="assistant-marker"><Sparkles size={14} /> Copilot</span>
         <div class="content" bind:this={streamContentEl}>
           {@html streamHtml}
           <span class="typing-indicator"></span>
@@ -123,15 +113,6 @@
     overscroll-behavior: contain;
     scroll-padding-bottom: 80px;
   }
-
-  .messages {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
-  }
-  .messages::-webkit-scrollbar { width: 4px; }
-  .messages::-webkit-scrollbar-track { background: transparent; }
-  .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  .messages::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
 
   /* ── streaming assistant message ───────────────────────────────────────── */
   .message.assistant {
@@ -251,13 +232,6 @@
     align-items: center;
     gap: var(--sp-2);
     animation: msg-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .waiting-spinner {
-    color: var(--yellow);
-    font-size: 0.85em;
-    width: 1em;
-    text-align: center;
   }
 
   .waiting-label {

@@ -209,11 +209,7 @@ describe('createChatStore', () => {
     dispatch(store, { type: 'delta', content: '   ' }, { type: 'turn_end' });
 
     expect(store.messages.filter((message) => message.role === 'assistant')).toHaveLength(0);
-    expect(notifyMock).toHaveBeenLastCalledWith('Response ready', {
-      body: undefined,
-      tag: 'response-ready',
-      force: true,
-    });
+    // No notification for whitespace-only content (no actual response)
   });
 
   it('tracks model, tool, agent, and session metadata updates', () => {
@@ -309,15 +305,15 @@ describe('createChatStore', () => {
       { type: 'reasoning_changed', effort: 'high' },
     );
 
-    // Usage is accumulated, not emitted per-call (emitted on turn_end)
+    // Usage is accumulated, not emitted per-call (emitted on turn_end with content or session_idle)
     expect(store.messages.filter(m => m.role === 'usage')).toHaveLength(0);
     expect(store.quotaSnapshots).toEqual(updatedQuota);
     expect(store.contextInfo).toEqual({ tokenLimit: 64000, currentTokens: 4000, messagesLength: 12 });
     expect(store.plan).toEqual({ exists: true, content: '1. Investigate\n2. Ship\n3. Verify', path: '/tmp/plan.md' });
     expect(store.reasoningEffort).toBe('high');
 
-    // Emit turn_end to flush accumulated usage
-    dispatch(store, { type: 'turn_end' });
+    // session_idle flushes remaining accumulated usage
+    dispatch(store, { type: 'session_idle' });
 
     const usageMessages = store.messages.filter(m => m.role === 'usage');
     expect(usageMessages).toHaveLength(1);
@@ -536,8 +532,8 @@ describe('createChatStore', () => {
       totalCost: 5, totalDurationMs: 1200, apiCalls: 2, premiumRequests: 0,
     });
 
-    // turn_end emits one consolidated usage message
-    dispatch(store, { type: 'turn_end' });
+    // turn_end with content emits one consolidated usage message
+    dispatch(store, { type: 'delta', content: 'Final answer' }, { type: 'turn_end' });
     const usageMessages = store.messages.filter(m => m.role === 'usage');
     expect(usageMessages).toHaveLength(1);
     expect(usageMessages[0]).toMatchObject({
@@ -562,6 +558,9 @@ describe('createChatStore', () => {
       outputTokens: 200,
       cost: 1,
     }, {
+      type: 'delta',
+      content: 'Response',
+    }, {
       type: 'turn_end',
     });
 
@@ -575,6 +574,7 @@ describe('createChatStore', () => {
     expect(store.sessionTotals.premiumRequests).toBe(5);
     expect(store.sessionTotals.totalDurationMs).toBe(3200);
     expect(store.messages).toEqual([
+      expect.objectContaining({ role: 'assistant', content: 'Response' }),
       expect.objectContaining({ role: 'usage' }),
       expect.objectContaining({ role: 'info', content: 'Session ended · 5 premium requests · 3.2s total API time' }),
     ]);

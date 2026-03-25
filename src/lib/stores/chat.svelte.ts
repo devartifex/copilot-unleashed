@@ -257,7 +257,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         isWaiting = true;
         activeToolCalls = new Map();
         hadToolExecution = false;
-        pendingUsage = null;
+        // Don't reset pendingUsage — accumulate across all turns in the agentic loop
         break;
 
       case 'reasoning_delta':
@@ -283,6 +283,8 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       case 'tool_start':
         isWaiting = false;
         hadToolExecution = true;
+        // Skip internal SDK tools — the intent event already provides a friendly description
+        if (msg.toolName === 'report_intent') break;
         addMessage('tool', msg.toolName, {
           toolCallId: msg.toolCallId,
           toolName: msg.toolName,
@@ -320,37 +322,38 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         currentStreamContent += msg.content;
         break;
 
-      case 'turn_end':
-        // Skip client-side notification for replayed messages: the server already sent a
-        // push notification while the client was unreachable (iOS backgrounded / WS closed).
-        if (!msg.replayed) {
-          notify('Response ready', {
-            body: currentStreamContent.trim().slice(0, 100) || undefined,
-            tag: 'response-ready',
-            // Force-notify after tool execution: the user may have briefly returned to
-            // approve a tool call and then switched away again — tab might be visible at
-            // the exact moment the response arrives, but they still want to know.
-            force: hadToolExecution,
-          });
+      case 'turn_end': {
+        const hadContent = currentStreamContent.trim().length > 0;
+        finalizeStream();
+        // Only notify and emit usage when the turn produced actual assistant content —
+        // intermediate turns (tool decisions) accumulate usage silently.
+        if (hadContent) {
+          if (!msg.replayed) {
+            notify('Response ready', {
+              body: messages.at(-1)?.content?.slice(0, 100) || undefined,
+              tag: 'response-ready',
+              force: hadToolExecution,
+            });
+          }
+          // Emit one consolidated usage summary for the entire response
+          if (pendingUsage && pendingUsage.apiCalls > 0) {
+            addMessage('usage', '', {
+              inputTokens: pendingUsage.inputTokens,
+              outputTokens: pendingUsage.outputTokens,
+              reasoningTokens: pendingUsage.reasoningTokens || undefined,
+              cacheReadTokens: pendingUsage.cacheReadTokens || undefined,
+              cacheWriteTokens: pendingUsage.cacheWriteTokens || undefined,
+              duration: pendingUsage.totalDurationMs || undefined,
+              cost: pendingUsage.totalCost || undefined,
+              quotaSnapshots: pendingUsage.lastQuotaSnapshots ?? undefined,
+              copilotUsage: pendingUsage.lastCopilotUsage ?? undefined,
+            });
+          }
+          pendingUsage = null;
         }
         hadToolExecution = false;
-        finalizeStream();
-        // Emit one consolidated usage summary for the entire turn
-        if (pendingUsage && pendingUsage.apiCalls > 0) {
-          addMessage('usage', '', {
-            inputTokens: pendingUsage.inputTokens,
-            outputTokens: pendingUsage.outputTokens,
-            reasoningTokens: pendingUsage.reasoningTokens || undefined,
-            cacheReadTokens: pendingUsage.cacheReadTokens || undefined,
-            cacheWriteTokens: pendingUsage.cacheWriteTokens || undefined,
-            duration: pendingUsage.totalDurationMs || undefined,
-            cost: pendingUsage.totalCost || undefined,
-            quotaSnapshots: pendingUsage.lastQuotaSnapshots ?? undefined,
-            copilotUsage: pendingUsage.lastCopilotUsage ?? undefined,
-          });
-        }
-        pendingUsage = null;
         break;
+      }
 
       case 'models': {
         const newModels = new Map<string, ModelInfo>();
@@ -729,6 +732,21 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       case 'session_idle':
         isStreaming = false;
         isWaiting = false;
+        // Flush any remaining accumulated usage that wasn't emitted on turn_end
+        if (pendingUsage && pendingUsage.apiCalls > 0) {
+          addMessage('usage', '', {
+            inputTokens: pendingUsage.inputTokens,
+            outputTokens: pendingUsage.outputTokens,
+            reasoningTokens: pendingUsage.reasoningTokens || undefined,
+            cacheReadTokens: pendingUsage.cacheReadTokens || undefined,
+            cacheWriteTokens: pendingUsage.cacheWriteTokens || undefined,
+            duration: pendingUsage.totalDurationMs || undefined,
+            cost: pendingUsage.totalCost || undefined,
+            quotaSnapshots: pendingUsage.lastQuotaSnapshots ?? undefined,
+            copilotUsage: pendingUsage.lastCopilotUsage ?? undefined,
+          });
+          pendingUsage = null;
+        }
         break;
 
       case 'task_complete':

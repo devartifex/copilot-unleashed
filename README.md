@@ -14,7 +14,7 @@
 
 **Every Copilot model. One login. Any device. Your server.**
 
-The only open-source web UI built on the official [`@github/copilot-sdk`](https://github.com/github/copilot-sdk). Self-host a ChatGPT-class experience powered by your GitHub Copilot subscription — with autopilot agents, live reasoning traces, native GitHub tools, customizable agents, skills, prompts, and persistent sessions that sync between the CLI and the browser.
+The only open-source web UI built on the official [`@github/copilot-sdk`](https://github.com/github/copilot-sdk). Self-host a ChatGPT-class experience powered by your GitHub Copilot subscription — with autopilot agents, live reasoning traces, native GitHub tools, and the current Copilot SDK customization model for agents, skills, prompts, instructions, and MCP servers.
 
 <p align="center">
   <img src="docs/screenshots/usecase-autopilot-desktop.png" width="720" alt="Autopilot agent — reads a GitHub issue, implements the feature, runs tests, and opens a PR autonomously">
@@ -36,6 +36,8 @@ The only open-source web UI built on the official [`@github/copilot-sdk`](https:
 
 The GitHub Copilot CLI is powerful, but it's stuck in your terminal. This project wraps the same official SDK in a web UI you can reach from any device — phone, tablet, laptop — with features the CLI doesn't have: persistent sessions, a visual plan editor, file and image attachments, and real-time streaming with a dark, touch-friendly interface.
 
+It now follows the newer Copilot SDK customization flow instead of layering a separate app-specific system on top. That means settings reflect what the SDK can actually use in a session: agents, skills, and MCP servers can be toggled live; prompts are slash shortcuts from chat; instructions are discovered and shown clearly instead of pretending to be runtime toggles.
+
 Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, Gemini 3 Pro, and more through one account. This app lets you use them all from anywhere, on your own server, without handing your data to another SaaS.
 
 ---
@@ -46,9 +48,11 @@ Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, 
 - **Autopilot agents** — plan, code, run tests, and open PRs autonomously with live tool execution
 - **Extended thinking** — live reasoning traces from Claude Opus 4.6 and Claude Sonnet 4.6 with collapsible "Thinking…" blocks
 - **Native GitHub tools** — issues, PRs, code search, repos, Actions — built in via the GitHub MCP server
-- **MCP servers** — configure MCP-compatible servers in `~/.copilot/mcp-config.json`; enable/disable from settings
-- **Custom agents** — add `.agent.md` files to `~/.copilot/agents/` for specialized personas; activate from settings
-- **Skills & prompts** — reusable prompt modules and templates discovered from `~/.copilot/`; invoke with `/name` in chat
+- **MCP servers** — configure MCP-compatible servers in `~/.copilot/mcp-config.json` or `.github/mcp-config.json`; enable/disable from settings
+- **Custom agents** — add `.agent.md` files to `~/.copilot/agents/` or `.github/agents/`; select them from settings for the current session
+- **Skills** — enable or disable SDK-discovered skills from settings; the model can invoke them during a chat
+- **Prompts** — add `.prompt.md` files to `~/.copilot/prompts/` or `.github/prompts/`; invoke them with `/name` autocomplete in chat
+- **Instructions** — view discovered user and repo instruction files in settings so you can see exactly what context the SDK is using
 - **Image vision** — attach images alongside code and documents; vision-capable models analyze them inline
 - **File & directory attachments** — drop in code files, images, CSVs, or whole directories with `@` mention autocomplete
 - **Issue & PR references** — type `#` to search and reference GitHub issues/PRs across all your repos
@@ -84,6 +88,26 @@ Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, 
 > *"Is the auth bug ticket still open? If so, find the related PRs and summarize the discussion"* → calls your project tracker via MCP, then searches GitHub.
 
 **Self-host for personal use.** One `azd up`. Optionally share with a trusted team via `ALLOWED_GITHUB_USERS`. Everyone logs in with their own GitHub account — no shared API keys, no shared context.
+
+---
+
+## Customizations that are available
+
+The app now mirrors the Copilot SDK and CLI customization model instead of inventing a separate one.
+
+- **Instructions** — discovered from `~/.copilot/copilot-instructions.md`, `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, and agent guidance files like `AGENTS.md`. They are shown in settings for visibility; they are not chat commands.
+- **Agents** — discovered from `~/.copilot/agents/*.agent.md` and `.github/agents/*.agent.md`. Select one in settings to make it the active agent for the current session.
+- **Skills** — discovered by the Copilot CLI / SDK. Enable or disable them in settings; they are then available for the model to use during the conversation.
+- **Prompts** — discovered from `~/.copilot/prompts/*.prompt.md` and `.github/prompts/*.prompt.md`. Use them from chat with `/prompt-name`; the UI autocompletes the prompt content without auto-sending it.
+- **MCP servers** — discovered from `~/.copilot/mcp-config.json` and `.github/mcp-config.json`. Enable or disable each server in settings; their tools then appear in the active session.
+
+Source badges in settings tell you where a customization came from:
+
+- **CLI** — discovered by the Copilot CLI / SDK at runtime
+- **User** — loaded from your `~/.copilot` directory
+- **Repo** — loaded from the current repository
+
+This refactor also fixes a long-standing mismatch where the app scanner could read customizations from the app repository instead of the same home/repo locations the Copilot SDK actually uses.
 
 ---
 

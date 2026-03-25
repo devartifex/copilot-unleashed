@@ -2,6 +2,7 @@ import type {
   Attachment,
   ChatMessage,
   ChatMessageRole,
+  CopilotUsageItem,
   ToolCallState,
   ServerMessage,
   SessionMode,
@@ -111,6 +112,16 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   // Used to force-notify on turn_end even when the tab is visible, because the user
   // had to briefly return to approve the tool and may have switched away again.
   let hadToolExecution = false;
+
+  // Accumulates per-LLM-call usage within a turn; emitted as one summary on turn_end
+  let pendingUsage: {
+    inputTokens: number; outputTokens: number; reasoningTokens: number;
+    cacheReadTokens: number; cacheWriteTokens: number;
+    totalCost: number; totalDurationMs: number; apiCalls: number;
+    premiumDelta: number;
+    lastQuotaSnapshots: QuotaSnapshots | null;
+    lastCopilotUsage: CopilotUsageItem[] | null;
+  } | null = null;
 
   // ── Data lists ──────────────────────────────────────────────────────────
   let models = $state(new Map<string, ModelInfo>());
@@ -246,6 +257,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         isWaiting = true;
         activeToolCalls = new Map();
         hadToolExecution = false;
+        pendingUsage = null;
         break;
 
       case 'reasoning_delta':
@@ -309,7 +321,6 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'turn_end':
-      case 'done':
         // Skip client-side notification for replayed messages: the server already sent a
         // push notification while the client was unreachable (iOS backgrounded / WS closed).
         if (!msg.replayed) {
@@ -324,6 +335,21 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         }
         hadToolExecution = false;
         finalizeStream();
+        // Emit one consolidated usage summary for the entire turn
+        if (pendingUsage && pendingUsage.apiCalls > 0) {
+          addMessage('usage', '', {
+            inputTokens: pendingUsage.inputTokens,
+            outputTokens: pendingUsage.outputTokens,
+            reasoningTokens: pendingUsage.reasoningTokens || undefined,
+            cacheReadTokens: pendingUsage.cacheReadTokens || undefined,
+            cacheWriteTokens: pendingUsage.cacheWriteTokens || undefined,
+            duration: pendingUsage.totalDurationMs || undefined,
+            cost: pendingUsage.totalCost || undefined,
+            quotaSnapshots: pendingUsage.lastQuotaSnapshots ?? undefined,
+            copilotUsage: pendingUsage.lastCopilotUsage ?? undefined,
+          });
+        }
+        pendingUsage = null;
         break;
 
       case 'models': {
@@ -346,7 +372,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
           autopilot: 'Auto',
         };
         mode = msg.mode;
-        addInfoMessage(`Mode changed to ${modeLabels[msg.mode] ?? msg.mode}`);
+        // State updated silently — mode pill in TopBar provides visual feedback
         break;
       }
 
@@ -354,7 +380,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         if (msg.model) {
           currentModel = msg.model;
         }
-        addInfoMessage(`Model changed to ${msg.model}`);
+        // State updated silently — model pill in TopBar provides visual feedback
         break;
 
       case 'title_changed':
@@ -367,18 +393,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'usage':
-        addMessage('usage', '', {
-          inputTokens: msg.inputTokens,
-          outputTokens: msg.outputTokens,
-          reasoningTokens: msg.reasoningTokens,
-          cacheReadTokens: msg.cacheReadTokens,
-          cacheWriteTokens: msg.cacheWriteTokens,
-          duration: msg.duration,
-          cost: msg.cost,
-          quotaSnapshots: msg.quotaSnapshots,
-          copilotUsage: msg.copilotUsage,
-        });
-        // Derive premium requests from quota snapshot delta
+        // Accumulate per-LLM-call usage; one summary emitted on turn_end
         {
           let premiumDelta = 0;
           if (msg.quotaSnapshots) {
@@ -386,15 +401,12 @@ export function createChatStore(wsStore: WsStore): ChatStore {
             const currentUsed = primary?.snapshot.usedRequests;
             if (currentUsed != null) {
               if (baselineUsedRequests == null) {
-                // First snapshot — capture baseline (before this turn's usage)
-                // Estimate baseline as currentUsed minus cost (cost ≈ premium requests consumed this call)
                 baselineUsedRequests = currentUsed - (msg.cost ?? 0);
               }
               premiumDelta = currentUsed - baselineUsedRequests;
             }
             quotaSnapshots = msg.quotaSnapshots;
           }
-          // Also try copilotUsage as fallback
           const copilotPremium = msg.copilotUsage?.reduce(
             (acc: number, item: { premiumRequests?: number }) => acc + (item.premiumRequests ?? 0), 0,
           ) ?? 0;
@@ -410,6 +422,26 @@ export function createChatStore(wsStore: WsStore): ChatStore {
             apiCalls: sessionTotals.apiCalls + 1,
             premiumRequests: resolvedPremium,
           };
+          // Accumulate into pending turn usage
+          if (!pendingUsage) {
+            pendingUsage = {
+              inputTokens: 0, outputTokens: 0, reasoningTokens: 0,
+              cacheReadTokens: 0, cacheWriteTokens: 0,
+              totalCost: 0, totalDurationMs: 0, apiCalls: 0, premiumDelta: 0,
+              lastQuotaSnapshots: null, lastCopilotUsage: null,
+            };
+          }
+          pendingUsage.inputTokens += msg.inputTokens ?? 0;
+          pendingUsage.outputTokens += msg.outputTokens ?? 0;
+          pendingUsage.reasoningTokens += msg.reasoningTokens ?? 0;
+          pendingUsage.cacheReadTokens += msg.cacheReadTokens ?? 0;
+          pendingUsage.cacheWriteTokens += msg.cacheWriteTokens ?? 0;
+          pendingUsage.totalCost += msg.cost ?? 0;
+          pendingUsage.totalDurationMs += msg.duration ?? 0;
+          pendingUsage.apiCalls += 1;
+          pendingUsage.premiumDelta = resolvedPremium;
+          if (msg.quotaSnapshots) pendingUsage.lastQuotaSnapshots = msg.quotaSnapshots;
+          if (msg.copilotUsage) pendingUsage.lastCopilotUsage = msg.copilotUsage;
         }
         break;
 
@@ -529,7 +561,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'plan_changed':
-        addInfoMessage('Plan updated');
+        // Automatic SDK event — no chat message needed
         break;
 
       case 'plan_updated':
@@ -552,27 +584,19 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         addInfoMessage('Compacting conversation…');
         break;
 
-      case 'compaction_complete': {
-        let compactionMsg = 'Compaction complete';
+      case 'compaction_complete':
+        // Verbose follow-up to compaction_start — context bar shows window usage
         if (msg.preCompactionTokens != null && msg.postCompactionTokens != null) {
-          compactionMsg += `: ${msg.preCompactionTokens.toLocaleString()} → ${msg.postCompactionTokens.toLocaleString()} tokens`;
+          // Update the existing "Compacting…" info with a brief result
+          addInfoMessage(
+            `Compacted: ${msg.preCompactionTokens.toLocaleString()} → ${msg.postCompactionTokens.toLocaleString()} tokens`,
+          );
         }
-        if (msg.tokensRemoved) {
-          compactionMsg += (msg.preCompactionTokens != null ? ', ' : ': ') + `removed ${msg.tokensRemoved.toLocaleString()} tokens`;
-        }
-        if (msg.messagesRemoved) {
-          compactionMsg += `, ${msg.messagesRemoved} messages`;
-        }
-        addInfoMessage(compactionMsg);
         break;
-      }
 
       case 'compaction_result':
-        addInfoMessage(
-          'Compaction result' +
-          (msg.tokensRemoved ? `: removed ${msg.tokensRemoved} tokens` : '') +
-          (msg.messagesRemoved ? `, ${msg.messagesRemoved} messages` : ''),
-        );
+        // Suppressed — compaction_complete already covers this
+        break;
         break;
 
       case 'skill_invoked':
@@ -671,11 +695,8 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'exit_plan_mode_requested':
-        addInfoMessage('Exiting plan mode…');
-        break;
-
       case 'exit_plan_mode_completed':
-        addInfoMessage('Exited plan mode');
+        // Transient UI state — no chat message needed
         break;
 
       case 'context_info':
@@ -702,7 +723,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
       case 'reasoning_changed':
         reasoningEffort = msg.effort;
-        addInfoMessage(`Reasoning effort set to ${msg.effort}`);
+        // State updated silently — reasoning effort selector provides visual feedback
         break;
 
       case 'session_idle':
@@ -717,10 +738,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'truncation':
-        addInfoMessage(
-          `Context truncated: ${msg.preTruncationMessages} → ${msg.postTruncationMessages} messages` +
-          ` (${msg.preTruncationTokens} → ${msg.postTruncationTokens} tokens)`,
-        );
+        // Technical detail — context bar shows window usage
         break;
 
       case 'tool_partial_result':
@@ -735,14 +753,11 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'context_changed':
-        addInfoMessage(
-          `Context: ${msg.repository ?? msg.cwd}` +
-          (msg.branch ? ` (${msg.branch})` : ''),
-        );
+        // State available in EnvInfo — no chat message needed
         break;
 
       case 'workspace_file_changed':
-        addInfoMessage(`Workspace file ${msg.operation}d: ${msg.path}`);
+        // Fires per file change, too spammy for chat
         break;
 
       case 'sessions_changed':

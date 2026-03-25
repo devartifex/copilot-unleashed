@@ -151,7 +151,7 @@ describe('createChatStore', () => {
     expect(store.canSend).toBe(true);
     expect(store.currentStreamContent).toBe('Hello world');
 
-    dispatch(store, { type: 'done' });
+    dispatch(store, { type: 'turn_end' });
 
     expect(store.isStreaming).toBe(false);
     expect(store.isWaiting).toBe(false);
@@ -264,8 +264,6 @@ describe('createChatStore', () => {
     expect(store.sessions).toEqual([{ id: 'session-2', title: 'Keep me' }]);
     expect(store.sessionDetail).toEqual(detail);
     expect(store.messages).toEqual([
-      expect.objectContaining({ role: 'info', content: 'Mode changed to Plan' }),
-      expect.objectContaining({ role: 'info', content: 'Model changed to gpt-5' }),
       expect.objectContaining({ role: 'info', content: 'Session reconnected' }),
       expect.objectContaining({ role: 'info', content: 'Session resumed: session-2' }),
       expect.objectContaining({ role: 'info', content: 'Session deleted' }),
@@ -286,6 +284,7 @@ describe('createChatStore', () => {
 
     dispatch(
       store,
+      { type: 'turn_start' },
       {
         type: 'usage',
         inputTokens: 100,
@@ -310,33 +309,33 @@ describe('createChatStore', () => {
       { type: 'reasoning_changed', effort: 'high' },
     );
 
-    expect(store.messages[0]).toMatchObject({
-      role: 'usage',
-      inputTokens: 100,
-      outputTokens: 250,
-      reasoningTokens: 40,
-      cacheReadTokens: 50,
-      cacheWriteTokens: 10,
-      duration: 1200,
-      cost: 0.12,
-      quotaSnapshots: initialQuota,
-      copilotUsage: [{ type: 'prompt', tokens: 100 }],
-    });
+    // Usage is accumulated, not emitted per-call (emitted on turn_end)
+    expect(store.messages.filter(m => m.role === 'usage')).toHaveLength(0);
     expect(store.quotaSnapshots).toEqual(updatedQuota);
     expect(store.contextInfo).toEqual({ tokenLimit: 64000, currentTokens: 4000, messagesLength: 12 });
     expect(store.plan).toEqual({ exists: true, content: '1. Investigate\n2. Ship\n3. Verify', path: '/tmp/plan.md' });
     expect(store.reasoningEffort).toBe('high');
 
+    // Emit turn_end to flush accumulated usage
+    dispatch(store, { type: 'turn_end' });
+
+    const usageMessages = store.messages.filter(m => m.role === 'usage');
+    expect(usageMessages).toHaveLength(1);
+    expect(usageMessages[0]).toMatchObject({
+      role: 'usage',
+      inputTokens: 100,
+      outputTokens: 250,
+    });
+
     dispatch(store, { type: 'plan_deleted' });
 
     expect(store.plan).toEqual({ exists: false, content: '' });
-    expect(store.messages.slice(1)).toEqual([
-      expect.objectContaining({ role: 'info', content: 'Plan updated' }),
+    // Suppressed events: plan_changed, compaction_complete verbose, compaction_result, reasoning_changed
+    const infoMessages = store.messages.filter(m => m.role === 'info');
+    expect(infoMessages).toEqual([
       expect.objectContaining({ role: 'info', content: 'Plan saved' }),
       expect.objectContaining({ role: 'info', content: 'Compacting conversation…' }),
-      expect.objectContaining({ role: 'info', content: 'Compaction complete: 5,000 → 4,880 tokens, removed 120 tokens, 3 messages' }),
-      expect.objectContaining({ role: 'info', content: 'Compaction result, 1 messages' }),
-      expect.objectContaining({ role: 'info', content: 'Reasoning effort set to high' }),
+      expect.objectContaining({ role: 'info', content: 'Compacted: 5,000 → 4,880 tokens' }),
       expect.objectContaining({ role: 'info', content: 'Plan deleted' }),
     ]);
   });
@@ -420,8 +419,6 @@ describe('createChatStore', () => {
       expect.objectContaining({ role: 'subagent', content: 'reviewer completed', agentName: 'reviewer' }),
       expect.objectContaining({ role: 'error', content: 'Sub-agent triager failed: boom' }),
       expect.objectContaining({ role: 'info', content: 'Info' }),
-      expect.objectContaining({ role: 'info', content: 'Exiting plan mode…' }),
-      expect.objectContaining({ role: 'info', content: 'Exited plan mode' }),
     ]);
   });
 
@@ -508,7 +505,7 @@ describe('createChatStore', () => {
       totalCost: 0, totalDurationMs: 0, apiCalls: 0, premiumRequests: 0,
     });
 
-    dispatch(store, {
+    dispatch(store, { type: 'turn_start' }, {
       type: 'usage',
       inputTokens: 100,
       outputTokens: 200,
@@ -539,6 +536,15 @@ describe('createChatStore', () => {
       totalCost: 5, totalDurationMs: 1200, apiCalls: 2, premiumRequests: 0,
     });
 
+    // turn_end emits one consolidated usage message
+    dispatch(store, { type: 'turn_end' });
+    const usageMessages = store.messages.filter(m => m.role === 'usage');
+    expect(usageMessages).toHaveLength(1);
+    expect(usageMessages[0]).toMatchObject({
+      inputTokens: 250,
+      outputTokens: 500,
+    });
+
     // clearMessages resets totals
     store.clearMessages();
     expect(store.sessionTotals.apiCalls).toBe(0);
@@ -549,10 +555,14 @@ describe('createChatStore', () => {
     const store = createChatStore(createWsStoreMock());
 
     dispatch(store, {
+      type: 'turn_start',
+    }, {
       type: 'usage',
       inputTokens: 100,
       outputTokens: 200,
       cost: 1,
+    }, {
+      type: 'turn_end',
     });
 
     dispatch(store, {
@@ -598,7 +608,7 @@ describe('createChatStore', () => {
 
     store.clearMessages();
 
-    // truncation adds descriptive info message
+    // truncation is suppressed (context bar shows window usage)
     dispatch(store, {
       type: 'truncation',
       tokenLimit: 128000,
@@ -607,25 +617,17 @@ describe('createChatStore', () => {
       postTruncationTokens: 60000,
       postTruncationMessages: 30,
     });
-    expect(store.messages).toEqual([
-      expect.objectContaining({
-        role: 'info',
-        content: 'Context truncated: 50 → 30 messages (100000 → 60000 tokens)',
-      }),
-    ]);
+    expect(store.messages).toEqual([]);
 
     store.clearMessages();
 
-    // context_changed and workspace_file_changed produce info messages
+    // context_changed and workspace_file_changed are suppressed
     dispatch(
       store,
       { type: 'context_changed', cwd: '/tmp', gitRoot: '/tmp', repository: 'o/r', branch: 'main' },
       { type: 'workspace_file_changed', path: 'plan.md', operation: 'update' },
     );
-    expect(store.messages).toEqual([
-      expect.objectContaining({ role: 'info', content: 'Context: o/r (main)' }),
-      expect.objectContaining({ role: 'info', content: 'Workspace file updated: plan.md' }),
-    ]);
+    expect(store.messages).toEqual([]);
 
     store.clearMessages();
 

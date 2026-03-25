@@ -60,7 +60,6 @@ export function wireSessionEvents(
   session.on('assistant.turn_end', () => {
     entry.isProcessing = false;
     poolSend(entry, { type: 'turn_end' });
-    poolSend(entry, { type: 'done' });
 
     // Persist the accumulated assistant message (fire-and-forget)
     if (userLogin && tabId && pendingAssistantContent) {

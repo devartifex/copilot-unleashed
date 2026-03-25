@@ -9,6 +9,7 @@ import type {
   SessionDetail,
   SessionSummary,
   SessionUsageTotals,
+  SourcedAgentInfo,
   ToolInfo,
 } from '$lib/types/index.js';
 
@@ -219,7 +220,10 @@ describe('createChatStore', () => {
     const store = createChatStore(createWsStoreMock());
     const modelInfo: ModelInfo = { id: 'claude-sonnet', name: 'Claude Sonnet' };
     const tools: ToolInfo[] = [{ name: 'bash', description: 'Run shell commands' }];
-    const agents: (AgentInfo | string)[] = ['explore', { name: 'reviewer', description: 'Reviews code' }];
+    const agents: SourcedAgentInfo[] = [
+      { name: 'explore', source: 'builtin', isSelected: false },
+      { name: 'reviewer', description: 'Reviews code', source: 'repo', isSelected: false },
+    ];
     const sessions: SessionSummary[] = [
       { id: 'session-1', title: 'Old title' },
       { id: 'session-2', title: 'Keep me' },

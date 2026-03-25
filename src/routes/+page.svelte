@@ -130,6 +130,17 @@
           settings.selectedMode = msg.mode;
         }
 
+        // Route customization list messages to settings store
+        if (msg.type === 'skills_list') {
+          settings.availableSkills = msg.skills;
+        }
+        if (msg.type === 'instructions_list') {
+          settings.instructions = msg.instructions;
+        }
+        if (msg.type === 'prompts_list') {
+          settings.prompts = msg.prompts;
+        }
+
         // Clear sessions loading state
         if (msg.type === 'sessions') {
           sessionsLoading = false;
@@ -362,6 +373,7 @@
         mode={chatStore.mode}
         supportsVision={supportsVision}
         pendingUserInput={chatStore.pendingUserInput}
+        prompts={settings.prompts}
         onSend={handleSend}
         onAbort={() => wsStore.abort()}
         onSetMode={handleSetMode}
@@ -409,6 +421,8 @@
       customTools={settings.customTools}
       mcpServers={settings.mcpServers}
       availableSkills={settings.availableSkills}
+      instructions={settings.instructions}
+      prompts={settings.prompts}
       onClose={() => settingsOpen = false}
       onSaveInstructions={(v) => { settings.additionalInstructions = v; }}
       onToggleTool={(name, enabled) => {
@@ -426,7 +440,12 @@
       onFetchTools={() => wsStore.listTools(chatStore.currentModel)}
       onFetchAgents={() => wsStore.listAgents()}
       onFetchQuota={() => wsStore.getQuota()}
-      onFetchSkills={() => settings.fetchSkills()}
+      onFetchSkills={() => wsStore.send({ type: 'list_skills_rpc' })}
+      onFetchInstructions={() => wsStore.send({ type: 'list_instructions' })}
+      onFetchPrompts={() => wsStore.send({ type: 'list_prompts' })}
+      onToggleSkill={(name, enabled) => wsStore.send({ type: 'toggle_skill_rpc', name, enabled })}
+      onToggleMcpServer={(name, enabled) => wsStore.send({ type: 'toggle_mcp_rpc', name, enabled })}
+      onUsePrompt={(_name, content) => { settingsOpen = false; handleSend(content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trim()); }}
       notificationsEnabled={settings.notificationsEnabled}
       onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
     />

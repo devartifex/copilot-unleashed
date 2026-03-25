@@ -30,5 +30,12 @@ export const GET: RequestHandler = async ({ locals }) => {
       ...(description && { description }),
       ...(tools && { tools }),
     })),
+    prompts: customizations.prompts.map(({ name, source, path, description, content }) => ({
+      name,
+      source,
+      path,
+      description,
+      content,
+    })),
   });
 };

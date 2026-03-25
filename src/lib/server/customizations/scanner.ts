@@ -18,9 +18,18 @@ export interface AgentFile {
   tools?: string[];
 }
 
+export interface PromptFile {
+  name: string;
+  source: string;
+  path: string;
+  description: string;
+  content: string;
+}
+
 export interface DiscoveredCustomizations {
   instructions: InstructionFile[];
   agents: AgentFile[];
+  prompts: PromptFile[];
 }
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
@@ -76,6 +85,7 @@ export async function scanCustomizations(
   const root = cwd ?? process.cwd();
   const instructions: InstructionFile[] = [];
   const agents: AgentFile[] = [];
+  const prompts: PromptFile[] = [];
 
   // 1. User-level instructions: copilotHome/copilot-instructions.md
   const userInstructionsPath = join(home, 'copilot-instructions.md');
@@ -158,7 +168,64 @@ export async function scanCustomizations(
     });
   }
 
-  cached = { instructions, agents };
+  // 6. User-level agents: copilotHome/agents/*.agent.md
+  const userAgentsDir = join(home, 'agents');
+  const userAgentFiles = await readdirSafe(userAgentsDir);
+  for (const file of userAgentFiles) {
+    if (!file.endsWith('.agent.md')) continue;
+    const filePath = join(userAgentsDir, file);
+    const content = await readFileSafe(filePath);
+    if (content === null) continue;
+
+    const fm = parseFrontmatter(content);
+    agents.push({
+      name: fm.name || file.replace('.agent.md', ''),
+      source: 'user',
+      path: filePath,
+      ...(fm.description && { description: fm.description }),
+      ...(fm.tools && { tools: parseToolsList(fm.tools) }),
+    });
+  }
+
+  // 7. Repo-level prompts: cwd/.github/prompts/*.prompt.md
+  const repoPromptsDir = join(root, '.github', 'prompts');
+  const repoPromptFiles = await readdirSafe(repoPromptsDir);
+  for (const file of repoPromptFiles) {
+    if (!file.endsWith('.prompt.md')) continue;
+    const filePath = join(repoPromptsDir, file);
+    const content = await readFileSafe(filePath);
+    if (content === null) continue;
+
+    const fm = parseFrontmatter(content);
+    prompts.push({
+      name: fm.description || file.replace('.prompt.md', ''),
+      source: 'repo',
+      path: filePath,
+      description: fm.description || file.replace('.prompt.md', ''),
+      content,
+    });
+  }
+
+  // 8. User-level prompts: copilotHome/prompts/*.prompt.md
+  const userPromptsDir = join(home, 'prompts');
+  const userPromptFiles = await readdirSafe(userPromptsDir);
+  for (const file of userPromptFiles) {
+    if (!file.endsWith('.prompt.md')) continue;
+    const filePath = join(userPromptsDir, file);
+    const content = await readFileSafe(filePath);
+    if (content === null) continue;
+
+    const fm = parseFrontmatter(content);
+    prompts.push({
+      name: fm.description || file.replace('.prompt.md', ''),
+      source: 'user',
+      path: filePath,
+      description: fm.description || file.replace('.prompt.md', ''),
+      content,
+    });
+  }
+
+  cached = { instructions, agents, prompts };
   return cached;
 }
 

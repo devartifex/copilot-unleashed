@@ -1,5 +1,7 @@
 import { poolSend } from '../session-pool.js';
 import type { MessageContext } from '../types.js';
+import { scanCustomizations } from '../../customizations/scanner.js';
+import { config } from '../../config.js';
 
 export async function handleListSkillsRpc(_msg: any, ctx: MessageContext): Promise<void> {
 	const { connectionEntry } = ctx;
@@ -10,7 +12,11 @@ export async function handleListSkillsRpc(_msg: any, ctx: MessageContext): Promi
 	}
 	try {
 		const result = await connectionEntry.session.rpc.skills.list();
-		poolSend(connectionEntry, { type: 'skills_list', skills: result?.skills || [] });
+		const skills = (result?.skills || []).map((s: any) => ({
+			...s,
+			source: s.source === 'personal' ? 'user' : s.source === 'project' ? 'repo' : 'builtin',
+		}));
+		poolSend(connectionEntry, { type: 'skills_list', skills });
 	} catch (err: any) {
 		console.error('List skills RPC error:', err.message);
 		poolSend(connectionEntry, { type: 'error', message: `Failed to list skills: ${err.message}` });
@@ -73,7 +79,11 @@ export async function handleListMcpRpc(_msg: any, ctx: MessageContext): Promise<
 	}
 	try {
 		const result = await connectionEntry.session.rpc.mcp.list();
-		poolSend(connectionEntry, { type: 'mcp_servers_list', servers: result?.servers || [] });
+		const servers = (result?.servers || []).map((s: any) => ({
+			...s,
+			source: s.source === 'user' ? 'user' : s.source === 'workspace' ? 'repo' : 'builtin',
+		}));
+		poolSend(connectionEntry, { type: 'mcp_servers_list', servers });
 	} catch (err: any) {
 		console.error('List MCP servers RPC error:', err.message);
 		poolSend(connectionEntry, { type: 'error', message: `Failed to list MCP servers: ${err.message}` });
@@ -107,5 +117,61 @@ export async function handleToggleMcpRpc(msg: any, ctx: MessageContext): Promise
 	} catch (err: any) {
 		console.error('Toggle MCP server RPC error:', err.message);
 		poolSend(connectionEntry, { type: 'error', message: `Failed to toggle MCP server: ${err.message}` });
+	}
+}
+
+export async function handleListInstructions(_msg: any, ctx: MessageContext): Promise<void> {
+	const { connectionEntry } = ctx;
+	try {
+		const customizations = await scanCustomizations(config.copilotConfigDir, config.copilotCwd);
+		const instructions = customizations.instructions.map(({ name, source, path, applyTo }) => ({
+			name,
+			source,
+			path,
+			...(applyTo && { applyTo }),
+		}));
+		poolSend(connectionEntry, { type: 'instructions_list', instructions });
+	} catch (err: any) {
+		console.error('List instructions error:', err.message);
+		poolSend(connectionEntry, { type: 'error', message: `Failed to list instructions: ${err.message}` });
+	}
+}
+
+export async function handleListPrompts(_msg: any, ctx: MessageContext): Promise<void> {
+	const { connectionEntry } = ctx;
+	try {
+		const customizations = await scanCustomizations(config.copilotConfigDir, config.copilotCwd);
+		const prompts = customizations.prompts.map(({ name, source, path, description, content }) => ({
+			name,
+			source,
+			path,
+			description,
+			content,
+		}));
+		poolSend(connectionEntry, { type: 'prompts_list', prompts });
+	} catch (err: any) {
+		console.error('List prompts error:', err.message);
+		poolSend(connectionEntry, { type: 'error', message: `Failed to list prompts: ${err.message}` });
+	}
+}
+
+export async function handleUsePrompt(msg: any, ctx: MessageContext): Promise<void> {
+	const { connectionEntry } = ctx;
+	const name = typeof msg.name === 'string' ? msg.name.trim() : '';
+	if (!name) {
+		poolSend(connectionEntry, { type: 'error', message: 'Prompt name is required' });
+		return;
+	}
+	try {
+		const customizations = await scanCustomizations(config.copilotConfigDir, config.copilotCwd);
+		const prompt = customizations.prompts.find(p => p.name === name);
+		if (!prompt) {
+			poolSend(connectionEntry, { type: 'error', message: `Prompt not found: ${name}` });
+			return;
+		}
+		poolSend(connectionEntry, { type: 'prompt_content', name: prompt.name, content: prompt.content });
+	} catch (err: any) {
+		console.error('Use prompt error:', err.message);
+		poolSend(connectionEntry, { type: 'error', message: `Failed to get prompt: ${err.message}` });
 	}
 }

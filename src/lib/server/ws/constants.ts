@@ -12,6 +12,7 @@ export const VALID_MESSAGE_TYPES = new Set([
   'delete_session', 'get_session_detail', 'get_plan', 'update_plan', 'delete_plan', 'start_fleet',
   'list_skills_rpc', 'toggle_skill_rpc', 'reload_skills',
   'list_mcp_rpc', 'toggle_mcp_rpc',
+  'list_instructions', 'list_prompts', 'use_prompt',
   'clear_chat',
 ]);
 

@@ -19,6 +19,7 @@
     onNewChat?: () => void;
     onOpenModelSheet?: () => void;
     onCompact?: () => void;
+    prompts?: Array<{ name: string; description: string; content: string }>;
   }
 
   const MAX_LENGTH = 10_000;
@@ -46,6 +47,7 @@
     onNewChat,
     onOpenModelSheet,
     onCompact,
+    prompts = [],
   }: Props = $props();
 
   const modes: { value: SessionMode; label: string }[] = [
@@ -93,6 +95,14 @@
   let issueError = $state('');
   let issueListEl: HTMLUListElement | undefined = $state();
   let issueFetchTimer: ReturnType<typeof setTimeout> | undefined;
+
+  // / prompt slash command autocomplete state
+  let promptOpen = $state(false);
+  let promptQuery = $state('');
+  let promptStartPos = $state(0);
+  let promptFiltered = $state<Array<{ name: string; description: string; content: string }>>([]);
+  let promptIndex = $state(0);
+  let promptListEl: HTMLUListElement | undefined = $state();
 
   // ? help overlay state
   let showHelp = $state(false);
@@ -200,6 +210,9 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
+    // Handle / prompt keyboard navigation first
+    if (handlePromptKeydown(event)) return;
+
     // Handle @ mention keyboard navigation first
     if (handleMentionKeydown(event)) return;
 
@@ -377,6 +390,7 @@
     autoResize();
     detectMention();
     detectIssue();
+    detectPromptSlash();
   }
 
   async function fetchMentionFiles(query: string) {
@@ -627,6 +641,109 @@
     });
   }
 
+  // ── / Prompt slash command autocomplete ──────────────────────────
+  function detectPromptSlash() {
+    if (!textareaEl || prompts.length === 0) return;
+    const pos = textareaEl.selectionStart;
+    const text = inputValue.slice(0, pos);
+
+    const lastSlash = text.lastIndexOf('/');
+    if (lastSlash === -1) {
+      closePromptSlash();
+      return;
+    }
+
+    // / must be at start of text or preceded by whitespace
+    if (lastSlash > 0 && !/\s/.test(text[lastSlash - 1])) {
+      closePromptSlash();
+      return;
+    }
+
+    const query = text.slice(lastSlash + 1);
+    // If there's a space in the query, the slash command is complete
+    if (/\s/.test(query)) {
+      closePromptSlash();
+      return;
+    }
+
+    // Don't show prompt autocomplete when built-in slash commands are active
+    if (showSlashHint) {
+      closePromptSlash();
+      return;
+    }
+
+    promptStartPos = lastSlash;
+    promptQuery = query.toLowerCase();
+    promptOpen = true;
+
+    promptFiltered = prompts.filter(p =>
+      p.name.toLowerCase().includes(promptQuery) ||
+      p.description.toLowerCase().includes(promptQuery)
+    );
+    promptIndex = 0;
+  }
+
+  function closePromptSlash() {
+    promptOpen = false;
+    promptFiltered = [];
+    promptQuery = '';
+    promptIndex = 0;
+  }
+
+  function selectSlashPrompt(prompt: { name: string; content: string }) {
+    const content = prompt.content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trim();
+    const before = inputValue.slice(0, promptStartPos);
+    inputValue = before + content;
+    closePromptSlash();
+    tick().then(() => {
+      if (textareaEl) {
+        textareaEl.selectionStart = inputValue.length;
+        textareaEl.selectionEnd = inputValue.length;
+        textareaEl.focus();
+        autoResize();
+      }
+    });
+  }
+
+  function handlePromptKeydown(event: KeyboardEvent): boolean {
+    if (!promptOpen) return false;
+
+    switch (event.key) {
+      case 'Escape':
+        event.preventDefault();
+        closePromptSlash();
+        return true;
+      case 'ArrowDown':
+        if (promptFiltered.length === 0) return false;
+        event.preventDefault();
+        promptIndex = (promptIndex + 1) % promptFiltered.length;
+        scrollPromptIntoView();
+        return true;
+      case 'ArrowUp':
+        if (promptFiltered.length === 0) return false;
+        event.preventDefault();
+        promptIndex = (promptIndex - 1 + promptFiltered.length) % promptFiltered.length;
+        scrollPromptIntoView();
+        return true;
+      case 'Enter':
+      case 'Tab':
+        if (promptFiltered.length === 0) return false;
+        event.preventDefault();
+        selectSlashPrompt(promptFiltered[promptIndex]);
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  function scrollPromptIntoView() {
+    tick().then(() => {
+      if (!promptListEl) return;
+      const active = promptListEl.querySelector('[aria-selected="true"]');
+      active?.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
   function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes}B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
@@ -756,6 +873,29 @@
             <span class="slash-desc">{cmd.desc}</span>
           </button>
         {/each}
+      </div>
+    {/if}
+
+    {#if promptOpen && promptFiltered.length > 0}
+      <div class="mention-popover" role="listbox" aria-label="Prompt suggestions">
+        <ul class="mention-list" bind:this={promptListEl}>
+          {#each promptFiltered.slice(0, 8) as prompt, i (prompt.name)}
+            <li
+              class="mention-item"
+              class:active={i === promptIndex}
+              role="option"
+              aria-selected={i === promptIndex}
+              onmousedown={(e) => { e.preventDefault(); selectSlashPrompt(prompt); }}
+              onmouseenter={() => { promptIndex = i; }}
+            >
+              <span class="prompt-cmd" aria-hidden="true">/{prompt.name}</span>
+              <span class="mention-path">{prompt.description}</span>
+            </li>
+          {/each}
+        </ul>
+        {#if promptFiltered.length > 8}
+          <div class="mention-more">{promptFiltered.length - 8} more…</div>
+        {/if}
       </div>
     {/if}
 
@@ -1224,6 +1364,15 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
+  }
+
+  /* ── / Prompt autocomplete ─────────────────────────────────────── */
+  .prompt-cmd {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--purple);
+    font-size: 0.85em;
   }
 
   .mention-more {

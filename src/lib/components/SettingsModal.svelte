@@ -7,21 +7,30 @@
     CustomToolDefinition,
     McpServerDefinition,
     SkillDefinition,
+    InstructionInfo,
+    PromptInfo,
+    SourcedAgentInfo,
+    SourcedSkillInfo,
+    SourcedMcpServerInfo,
+    CustomizationSource,
   } from '$lib/types/index.js';
   import { pickPrimaryQuota } from '$lib/types/index.js';
   import CustomToolsEditor from './CustomToolsEditor.svelte';
+  import SourceBadge from './SourceBadge.svelte';
 
   interface Props {
     open: boolean;
     tools: ToolInfo[];
-    agents: (AgentInfo | string)[];
+    agents: SourcedAgentInfo[];
     currentAgent: string | null;
     quotaSnapshots: QuotaSnapshots | null;
     additionalInstructions: string;
     excludedTools: string[];
     customTools: CustomToolDefinition[];
     mcpServers: McpServerDefinition[];
-    availableSkills: SkillDefinition[];
+    availableSkills: Array<{ name: string; description?: string; source?: string; enabled?: boolean; license?: string }>;
+    instructions: InstructionInfo[];
+    prompts: PromptInfo[];
     onClose: () => void;
     onSaveInstructions: (instructions: string) => void;
     onToggleTool: (toolName: string, enabled: boolean) => void;
@@ -34,6 +43,11 @@
     onFetchAgents: () => void;
     onFetchQuota: () => void;
     onFetchSkills: () => void;
+    onFetchInstructions: () => void;
+    onFetchPrompts: () => void;
+    onToggleSkill: (name: string, enabled: boolean) => void;
+    onToggleMcpServer: (name: string, enabled: boolean) => void;
+    onUsePrompt: (name: string, content: string) => void;
     notificationsEnabled: boolean;
     onToggleNotifications: (enabled: boolean) => void;
   }
@@ -49,6 +63,8 @@
     customTools,
     mcpServers,
     availableSkills,
+    instructions,
+    prompts,
     onClose,
     onSaveInstructions,
     onToggleTool,
@@ -61,6 +77,11 @@
     onFetchAgents,
     onFetchQuota,
     onFetchSkills,
+    onFetchInstructions,
+    onFetchPrompts,
+    onToggleSkill,
+    onToggleMcpServer,
+    onUsePrompt,
     notificationsEnabled,
     onToggleNotifications,
   }: Props = $props();
@@ -75,7 +96,7 @@
 
   type NotificationStatus = 'unsupported' | 'not-standalone-ios' | 'denied' | 'prompt' | 'subscribed' | 'granted-no-push' | 'loading';
 
-  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'custom-tools' | 'agents' | 'skills' | 'quota' | 'notifications' | 'compact' | null;
+  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'custom-tools' | 'agents' | 'skills' | 'quota' | 'notifications' | 'compact' | 'prompts' | null;
 
   let activeSection = $state<AccordionSection>(null);
   let instructionsDraft = $state('');
@@ -328,6 +349,8 @@
     if (section === 'agents') onFetchAgents();
     if (section === 'quota') onFetchQuota();
     if (section === 'skills') onFetchSkills();
+    if (section === 'instructions') onFetchInstructions();
+    if (section === 'prompts') onFetchPrompts();
   }
 
   function handleBackdropClick(e: MouseEvent) {
@@ -353,20 +376,23 @@
     onToggleTool(toolName, target.checked);
   }
 
-  function getAgentName(agent: AgentInfo | string): string {
-    return typeof agent === 'string' ? agent : agent.name;
-  }
-
-  function getAgentDescription(agent: AgentInfo | string): string | undefined {
-    return typeof agent === 'string' ? undefined : agent.description;
-  }
-
   function handleAgentClick(name: string) {
-    if (currentAgent === name) {
+    const agent = agents.find(a => a.name === name);
+    if (agent?.isSelected) {
       onDeselectAgent();
     } else {
       onSelectAgent(name);
     }
+  }
+
+  function groupBySource<T extends { source: CustomizationSource }>(items: T[]): Map<CustomizationSource, T[]> {
+    const groups = new Map<CustomizationSource, T[]>();
+    const order: CustomizationSource[] = ['builtin', 'repo', 'user'];
+    for (const src of order) {
+      const filtered = items.filter(i => i.source === src);
+      if (filtered.length > 0) groups.set(src, filtered);
+    }
+    return groups;
   }
 
   function formatResetDate(dateStr: string | undefined): string {
@@ -404,9 +430,26 @@
           </button>
           {#if activeSection === 'instructions'}
             <div class="settings-accordion-body">
-              <p class="settings-hint">
-                Quick supplementary instructions for this session. Custom instructions from <code>~/.copilot/</code> and <code>.github/</code> are loaded automatically by the CLI.
-              </p>
+              {#if instructions.length > 0}
+                <p class="settings-hint">Instruction files are auto-loaded by the Copilot CLI from <code>~/.copilot/</code> and <code>.github/</code>.</p>
+                {#each [...groupBySource(instructions).entries()] as [source, items] (source)}
+                  <div class="source-group">
+                    <div class="source-group-header"><SourceBadge {source} /> <span class="source-group-count">{items.length}</span></div>
+                    {#each items as inst (inst.path)}
+                      <div class="customization-item">
+                        <span class="customization-name">{inst.name}</span>
+                        {#if inst.applyTo}
+                          <span class="customization-meta">{inst.applyTo}</span>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                {/each}
+              {:else}
+                <p class="settings-hint">No instruction files found.</p>
+              {/if}
+              <div class="instructions-divider"></div>
+              <p class="settings-hint">Additional session instructions:</p>
               <textarea
                 class="settings-textarea"
                 bind:value={instructionsDraft}
@@ -495,6 +538,7 @@
                       />
                       <span class="mcp-server-name">{server.name}</span>
                     </label>
+                    <SourceBadge source="user" />
                     <span class="mcp-server-badge">{server.type}</span>
                     <button class="mcp-edit-btn" onclick={() => {
                       if (mcpExpandedIndex === i) {
@@ -600,21 +644,25 @@
               {#if agents.length === 0}
                 <p class="settings-hint">No agents available.</p>
               {:else}
-                {#each agents as agent (getAgentName(agent))}
-                  {@const name = getAgentName(agent)}
-                  <button
-                    class="agent-item"
-                    class:active={currentAgent === name}
-                    onclick={() => handleAgentClick(name)}
-                  >
-                    <span class="agent-name">{name}</span>
-                    {#if getAgentDescription(agent)}
-                      <span class="agent-desc">{getAgentDescription(agent)}</span>
-                    {/if}
-                    {#if currentAgent === name}
-                      <span class="agent-current">active</span>
-                    {/if}
-                  </button>
+                {#each [...groupBySource(agents).entries()] as [source, items] (source)}
+                  <div class="source-group">
+                    <div class="source-group-header"><SourceBadge {source} /> <span class="source-group-count">{items.length}</span></div>
+                    {#each items as agent (agent.name)}
+                      <button
+                        class="agent-item"
+                        class:active={agent.isSelected}
+                        onclick={() => handleAgentClick(agent.name)}
+                      >
+                        <span class="agent-name">{agent.displayName ?? agent.name}</span>
+                        {#if agent.description}
+                          <span class="agent-desc">{agent.description}</span>
+                        {/if}
+                        {#if agent.isSelected}
+                          <span class="agent-current">active</span>
+                        {/if}
+                      </button>
+                    {/each}
+                  </div>
                 {/each}
               {/if}
             </div>
@@ -654,20 +702,67 @@
           {#if activeSection === 'skills'}
             <div class="settings-accordion-body">
               <p class="settings-hint">
-                Skills are reusable prompt modules (SKILL.md) discovered from the <code>skills/</code> directory. Use RPC commands to manage skills at runtime.
+                Skills are reusable prompt modules discovered by the Copilot CLI.
               </p>
               {#if availableSkills.length === 0}
-                <p class="settings-hint">No skills available.</p>
+                <p class="settings-hint">No skills available. Start a session first.</p>
               {:else}
                 {#each availableSkills as skill (skill.name)}
-                  <div class="skill-item">
-                    <span class="skill-name">{skill.name}</span>
+                  <div class="customization-item">
+                    <label class="tool-toggle-label">
+                      <input
+                        type="checkbox"
+                        class="tool-toggle-check"
+                        checked={skill.enabled}
+                        onchange={() => onToggleSkill(skill.name, !skill.enabled)}
+                      />
+                      <span class="customization-name">{skill.name}</span>
+                    </label>
+                    {#if skill.source}
+                      <SourceBadge source={skill.source as CustomizationSource} />
+                    {/if}
                     {#if skill.description}
-                      <p class="skill-desc">{skill.description}</p>
+                      <p class="customization-desc">{skill.description}</p>
                     {/if}
-                    {#if skill.license}
-                      <span class="skill-meta">{skill.license}</span>
-                    {/if}
+                  </div>
+                {/each}
+              {/if}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Prompts -->
+        <div class="settings-accordion">
+          <button
+            class="settings-accordion-btn"
+            class:open={activeSection === 'prompts'}
+            onclick={() => toggleSection('prompts')}
+          >
+            Prompts
+            <span class="accordion-chevron">▸</span>
+          </button>
+          {#if activeSection === 'prompts'}
+            <div class="settings-accordion-body">
+              <p class="settings-hint">
+                Reusable prompt templates from <code>.github/prompts/</code> and <code>~/.copilot/prompts/</code>. Click "Use" to fill the chat input, or type <code>/name</code> in chat.
+              </p>
+              {#if prompts.length === 0}
+                <p class="settings-hint">No prompt files found.</p>
+              {:else}
+                {#each [...groupBySource(prompts).entries()] as [source, items] (source)}
+                  <div class="source-group">
+                    <div class="source-group-header"><SourceBadge {source} /> <span class="source-group-count">{items.length}</span></div>
+                    {#each items as prompt (prompt.name)}
+                      <div class="prompt-item">
+                        <div class="prompt-header">
+                          <span class="customization-name">{prompt.name}</span>
+                          <button class="action-btn use-btn" onclick={() => onUsePrompt(prompt.name, prompt.content)}>Use</button>
+                        </div>
+                        {#if prompt.description}
+                          <p class="customization-desc">{prompt.description}</p>
+                        {/if}
+                      </div>
+                    {/each}
                   </div>
                 {/each}
               {/if}
@@ -1189,5 +1284,77 @@
     padding: 1px 6px;
     background: var(--bg-overlay);
     border-radius: var(--radius-sm);
+  }
+
+  /* ── Source groups ──────────────────────────────────────────────────────── */
+  .source-group {
+    margin-bottom: var(--sp-3);
+  }
+  .source-group-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-1);
+  }
+  .source-group-count {
+    font-size: 0.7em;
+    color: var(--fg-dim);
+  }
+
+  /* ── Customization items (instructions, skills, prompts) ──────────────── */
+  .customization-item {
+    padding: var(--sp-1) 0;
+    border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+  }
+  .customization-item:last-child {
+    border-bottom: none;
+  }
+  .customization-name {
+    font-size: 0.82em;
+    color: var(--fg);
+    font-weight: 500;
+  }
+  .customization-desc {
+    font-size: 0.72em;
+    color: var(--fg-dim);
+    margin: var(--sp-1) 0 0 calc(16px + var(--sp-2));
+    line-height: 1.4;
+  }
+  .customization-meta {
+    display: inline-block;
+    font-size: 0.7em;
+    color: var(--fg-dim);
+    margin-left: var(--sp-2);
+    padding: 1px 6px;
+    background: var(--bg-overlay);
+    border-radius: var(--radius-sm);
+  }
+
+  /* ── Instructions divider ─────────────────────────────────────────────── */
+  .instructions-divider {
+    border-top: 1px solid var(--border);
+    margin: var(--sp-3) 0;
+  }
+
+  /* ── Prompt items ─────────────────────────────────────────────────────── */
+  .prompt-item {
+    padding: var(--sp-2) 0;
+    border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+  }
+  .prompt-item:last-child {
+    border-bottom: none;
+  }
+  .prompt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+  }
+  .use-btn {
+    font-size: 0.75em;
+    padding: 2px 8px;
+    color: var(--green);
+    border-color: rgba(63, 185, 80, 0.3);
+    min-height: unset;
   }
 </style>

@@ -298,7 +298,7 @@ export interface ToolsMessage {
 
 export interface AgentsMessage {
   type: 'agents';
-  agents: (AgentInfo | string)[];
+  agents: SourcedAgentInfo[];
   current: string | null;
 }
 
@@ -577,7 +577,7 @@ export interface SkillsListMessage {
   skills: {
     name: string;
     description: string;
-    source: string;
+    source: CustomizationSource;
     userInvocable: boolean;
     enabled: boolean;
     path?: string;
@@ -686,7 +686,10 @@ export type ServerMessage =
   | SkillsReloadedMessage
   | McpServersListMessage
   | McpServerToggledMessage
-  | SessionsChangedMessage;
+  | SessionsChangedMessage
+  | InstructionsListMessage
+  | PromptsListMessage
+  | PromptContentMessage;
 
 // ─── Session filesystem watcher ──────────────────────────────────────────────
 
@@ -868,6 +871,32 @@ export interface ClearChatMessage {
   type: 'clear_chat';
 }
 
+// ─── RPC discovery client messages ──────────────────────────────────────────
+
+export interface ListSkillsRpcMessage {
+  type: 'list_skills_rpc';
+}
+
+export interface ToggleSkillRpcMessage {
+  type: 'toggle_skill_rpc';
+  name: string;
+  enabled: boolean;
+}
+
+export interface ReloadSkillsMessage {
+  type: 'reload_skills';
+}
+
+export interface ListMcpRpcMessage {
+  type: 'list_mcp_rpc';
+}
+
+export interface ToggleMcpRpcMessage {
+  type: 'toggle_mcp_rpc';
+  name: string;
+  enabled: boolean;
+}
+
 export type ClientMessage =
   | NewSessionMessage
   | SendMessage
@@ -892,7 +921,15 @@ export type ClientMessage =
   | UpdatePlanMessage
   | DeletePlanMessage
   | StartFleetMessage
-  | ClearChatMessage;
+  | ClearChatMessage
+  | ListSkillsRpcMessage
+  | ToggleSkillRpcMessage
+  | ReloadSkillsMessage
+  | ListMcpRpcMessage
+  | ToggleMcpRpcMessage
+  | ListInstructionsMessage
+  | ListPromptsMessage
+  | UsePromptMessage;
 
 // ─── Chat message type for rendering ────────────────────────────────────────
 
@@ -1033,4 +1070,92 @@ export interface SkillDefinition {
   directory: string;
   license?: string;
   allowedTools?: string;
+}
+
+// ─── Customization source types ─────────────────────────────────────────────
+
+export type CustomizationSource = 'builtin' | 'user' | 'repo';
+
+/** Normalize SDK source strings to our standard labels */
+export function normalizeSource(sdkSource: string | undefined): CustomizationSource {
+  if (!sdkSource) return 'builtin';
+  const s = sdkSource.toLowerCase();
+  if (s === 'personal' || s === 'user') return 'user';
+  if (s === 'project' || s === 'workspace' || s === 'repo') return 'repo';
+  return 'builtin';
+}
+
+// ─── Source-labeled item types (for settings UI) ────────────────────────────
+
+export interface SourcedAgentInfo {
+  name: string;
+  displayName?: string;
+  description?: string;
+  source: CustomizationSource;
+  isSelected: boolean;
+}
+
+export interface SourcedSkillInfo {
+  name: string;
+  description: string;
+  source: CustomizationSource;
+  enabled: boolean;
+  userInvocable?: boolean;
+  path?: string;
+}
+
+export interface SourcedMcpServerInfo {
+  name: string;
+  source: CustomizationSource;
+  status: string;
+  error?: string;
+}
+
+export interface InstructionInfo {
+  name: string;
+  source: CustomizationSource;
+  path: string;
+  description?: string;
+  applyTo?: string;
+}
+
+export interface PromptInfo {
+  name: string;
+  source: CustomizationSource;
+  path: string;
+  description: string;
+  content: string;
+}
+
+// ─── New server→client messages for customizations ──────────────────────────
+
+export interface InstructionsListMessage {
+  type: 'instructions_list';
+  instructions: InstructionInfo[];
+}
+
+export interface PromptsListMessage {
+  type: 'prompts_list';
+  prompts: PromptInfo[];
+}
+
+export interface PromptContentMessage {
+  type: 'prompt_content';
+  name: string;
+  content: string;
+}
+
+// ─── New client→server messages for customizations ──────────────────────────
+
+export interface ListInstructionsMessage {
+  type: 'list_instructions';
+}
+
+export interface ListPromptsMessage {
+  type: 'list_prompts';
+}
+
+export interface UsePromptMessage {
+  type: 'use_prompt';
+  name: string;
 }

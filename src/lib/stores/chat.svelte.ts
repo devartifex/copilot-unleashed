@@ -9,6 +9,7 @@ import type {
   ModelInfo,
   ToolInfo,
   AgentInfo,
+  SourcedAgentInfo,
   SessionSummary,
   SessionDetail,
   UserInputState,
@@ -47,7 +48,7 @@ export interface ChatStore {
   // Data lists
   readonly models: Map<string, ModelInfo>;
   readonly tools: ToolInfo[];
-  readonly agents: (AgentInfo | string)[];
+  readonly agents: SourcedAgentInfo[];
   readonly sessions: SessionSummary[];
   readonly sessionDetail: SessionDetail | null;
 
@@ -114,7 +115,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   // ── Data lists ──────────────────────────────────────────────────────────
   let models = $state(new Map<string, ModelInfo>());
   let tools = $state<ToolInfo[]>([]);
-  let agents = $state<(AgentInfo | string)[]>([]);
+  let agents = $state<SourcedAgentInfo[]>([]);
   let sessions = $state<SessionSummary[]>([]);
   let sessionDetail = $state<SessionDetail | null>(null);
 

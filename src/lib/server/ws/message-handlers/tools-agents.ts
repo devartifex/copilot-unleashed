@@ -1,5 +1,7 @@
 import { poolSend } from '../session-pool.js';
 import type { MessageContext } from '../types.js';
+import { scanCustomizations } from '../../customizations/scanner.js';
+import { config } from '../../config.js';
 
 export async function handleListTools(msg: any, ctx: MessageContext): Promise<void> {
   const { connectionEntry } = ctx;
@@ -27,7 +29,33 @@ export async function handleListAgents(msg: any, ctx: MessageContext): Promise<v
     try {
       current = await connectionEntry.session.rpc.agent.getCurrent();
     } catch { /* no current agent */ }
-    poolSend(connectionEntry, { type: 'agents', agents: agents?.agents || [], current: current?.agent || null });
+
+    // Merge with scanner data for source metadata
+    let scannedAgents: { name: string; source: string }[] = [];
+    try {
+      const customizations = await scanCustomizations(config.copilotConfigDir, config.copilotCwd);
+      scannedAgents = customizations.agents.map(a => ({ name: a.name, source: a.source }));
+    } catch { /* scanner failure is non-fatal */ }
+
+    const currentName = current?.agent?.name ?? current?.agent ?? null;
+    const scannedMap = new Map(scannedAgents.map(a => [a.name.toLowerCase(), a.source]));
+
+    const sourcedAgents = (agents?.agents || []).map((a: any) => {
+      const name = typeof a === 'string' ? a : a.name;
+      const displayName = typeof a === 'string' ? undefined : a.displayName;
+      const description = typeof a === 'string' ? undefined : a.description;
+      const scanSource = scannedMap.get(name.toLowerCase());
+      const source = scanSource === 'user' ? 'user' : scanSource === 'repo' ? 'repo' : 'builtin';
+      return {
+        name,
+        ...(displayName && { displayName }),
+        ...(description && { description }),
+        source,
+        isSelected: name === currentName,
+      };
+    });
+
+    poolSend(connectionEntry, { type: 'agents', agents: sourcedAgents, current: currentName });
   } catch (err: any) {
     console.error('List agents error:', err.message);
     poolSend(connectionEntry, { type: 'agents', agents: [], current: null });

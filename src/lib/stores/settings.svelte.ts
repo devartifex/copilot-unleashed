@@ -4,8 +4,10 @@ import type {
   PersistedSettings,
   CustomToolDefinition,
   McpServerDefinition,
-  SkillDefinition,
+  SourcedSkillInfo,
   InfiniteSessionsConfig,
+  InstructionInfo,
+  PromptInfo,
 } from '$lib/types/index.js';
 
 const STORAGE_KEY = 'copilot-cli-settings';
@@ -69,7 +71,9 @@ export interface SettingsStore {
   selectedModel: string;
   selectedMode: SessionMode;
   mcpServers: McpServerDefinition[];
-  availableSkills: SkillDefinition[];
+  availableSkills: SourcedSkillInfo[];
+  instructions: InstructionInfo[];
+  prompts: PromptInfo[];
   infiniteSessions: InfiniteSessionsConfig;
   notificationsEnabled: boolean;
   load(): void;
@@ -86,7 +90,9 @@ export function createSettingsStore(): SettingsStore {
   let selectedModel = $state(DEFAULT_SETTINGS.model);
   let selectedMode = $state<SessionMode>(DEFAULT_SETTINGS.mode);
   let mcpServers = $state<McpServerDefinition[]>([...(DEFAULT_SETTINGS.mcpServers ?? [])]);
-  let availableSkills = $state<SkillDefinition[]>([]);
+  let availableSkills = $state<SourcedSkillInfo[]>([]);
+  let instructions = $state<InstructionInfo[]>([]);
+  let prompts = $state<PromptInfo[]>([]);
   let infiniteSessions = $state<InfiniteSessionsConfig>({ ...DEFAULT_INFINITE_SESSIONS });
   let notificationsEnabled = $state(DEFAULT_SETTINGS.notificationsEnabled ?? false);
 
@@ -202,7 +208,7 @@ export function createSettingsStore(): SettingsStore {
     try {
       const res = await fetch('/api/skills');
       if (!res.ok) return;
-      const body = await res.json() as { skills?: SkillDefinition[] };
+      const body = await res.json() as { skills?: SourcedSkillInfo[] };
       if (Array.isArray(body.skills)) {
         availableSkills = body.skills;
       }
@@ -234,7 +240,13 @@ export function createSettingsStore(): SettingsStore {
     set mcpServers(v: McpServerDefinition[]) { mcpServers = v.slice(0, 10); save(); },
 
     get availableSkills() { return availableSkills; },
-    set availableSkills(v: SkillDefinition[]) { availableSkills = v; },
+    set availableSkills(v: SourcedSkillInfo[]) { availableSkills = v; },
+
+    get instructions() { return instructions; },
+    set instructions(v: InstructionInfo[]) { instructions = v; },
+
+    get prompts() { return prompts; },
+    set prompts(v: PromptInfo[]) { prompts = v; },
 
     get infiniteSessions() { return infiniteSessions; },
     set infiniteSessions(v: InfiniteSessionsConfig) {

@@ -33,7 +33,7 @@ Browser (Svelte 5 SPA)
 | Build | Vite → `build/` via adapter-node |
 | Container | Multi-stage Dockerfile (builder + runtime) |
 | IaC | Bicep (Container Apps, ACR Basic, Key Vault RBAC, Managed Identity, Log Analytics) |
-| CI/CD | GitHub Actions (ci.yml + deploy.yml) |
+| CI/CD | GitHub Actions (ci.yml + release.yml) |
 | Testing | Playwright (desktop + mobile viewports) |
 
 ## Project Structure
@@ -52,15 +52,20 @@ src/
 │   │   ├── ChatMessage.svelte      # Message renderer (10 roles: user, assistant, tool, etc.)
 │   │   ├── DeviceFlowLogin.svelte  # GitHub Device Flow auth UI
 │   │   ├── EnvInfo.svelte          # Environment info (models, tools, context usage)
+│   │   ├── FleetProgress.svelte    # Fleet execution progress tracker
 │   │   ├── MessageList.svelte      # Scrollable message container with smart auto-scroll
+│   │   ├── ModelSheet.svelte       # Bottom sheet for model selection
 │   │   ├── PermissionPrompt.svelte # Tool permission request with countdown
 │   │   ├── PlanPanel.svelte        # Collapsible plan viewer/editor
 │   │   ├── QuotaDot.svelte         # Color-coded quota indicator
 │   │   ├── ReasoningBlock.svelte   # Collapsible "Thinking..." block with shimmer
+│   │   ├── SessionPreview.svelte   # Session history preview card
 │   │   ├── SessionsSheet.svelte    # Bottom sheet for session history
 │   │   ├── SettingsModal.svelte    # Accordion settings (instructions, tools, agents, quota)
 │   │   ├── Sidebar.svelte          # Slide-out menu (mode, model, reasoning, actions)
+│   │   ├── SourceBadge.svelte      # Source attribution badge for references
 │   │   ├── ToolCall.svelte         # Animated tool execution with Braille spinner
+│   │   ├── TopBar.svelte           # Top navigation bar with session controls
 │   │   └── UserInputPrompt.svelte  # Elicitation UI (choices + freeform)
 │   │
 │   ├── stores/                 # Svelte 5 rune stores (factory functions)
@@ -271,8 +276,8 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
 Discriminated unions on `type` field for all messages:
 
-- **ServerMessage** (34 types): `connected`, `delta`, `tool_start`, `permission_request`, etc.
-- **ClientMessage** (19 types): `new_session`, `message`, `set_mode`, `permission_response`, etc.
+- **ServerMessage** (79 types): `connected`, `delta`, `tool_start`, `permission_request`, etc.
+- **ClientMessage** (32 types): `new_session`, `message`, `set_mode`, `permission_response`, etc.
 - **ChatMessage** (10 roles): `user`, `assistant`, `tool`, `info`, `warning`, `error`, `intent`, `usage`, `skill`, `subagent`
 
 ## Security
@@ -363,7 +368,7 @@ All push API endpoints require GitHub authentication.
 
 - **Docker**: `npm run build` → `node build/index.js` (adapter-node output)
 - **Azure**: `azd up` → Container Apps + ACR + Managed Identity + monitoring
-- **CI/CD**: GitHub Actions — ci.yml (check + build), deploy.yml (Docker → ACR → ACA)
+- **CI/CD**: GitHub Actions — ci.yml (check + build), release.yml (release-please)
 
 ### Filesystem Persistence
 

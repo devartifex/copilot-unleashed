@@ -71,17 +71,35 @@ Source badges in Settings show where each customization was discovered: **CLI** 
 
 ## Quick Start
 
-**Prerequisites:** [GitHub account with Copilot](https://github.com/features/copilot#pricing) (free tier works) + a [GitHub OAuth App](https://github.com/settings/developers) (just copy the Client ID).
+**Prerequisites:** [GitHub account with Copilot](https://github.com/features/copilot#pricing) (free tier works) + a [GitHub OAuth App](https://github.com/settings/developers).
 
-**Docker** (recommended):
+> When creating the OAuth App, set **Homepage URL** to `http://localhost:3000` and leave **Authorization callback URL** blank — the app uses Device Flow, so no callback is needed.
+
+**1. Set required environment variables**
+
+Copy `.env.example` to `.env` (or create `.env`) and fill in the two required values:
 
 ```bash
-echo "GITHUB_CLIENT_ID=<your-id>" >> .env
-echo "SESSION_SECRET=$(openssl rand -hex 32)" >> .env
+GITHUB_CLIENT_ID=<your-oauth-app-client-id>   # From github.com/settings/developers
+SESSION_SECRET=<random-32-byte-hex>            # Generate: openssl rand -hex 32
+```
+
+**2. Run**
+
+_Docker (recommended):_
+
+```bash
 docker-compose up --build
 ```
 
-**Node.js 24+:**
+_Local development (Node.js 24+):_
+
+```bash
+npm install
+npm run dev
+```
+
+_Local production build:_
 
 ```bash
 npm install && npm run build && npm start
@@ -95,11 +113,11 @@ Open [localhost:3000](http://localhost:3000). Log in with GitHub. Done.
 
 | Variable | Required | Default | Purpose |
 |----------|:--------:|---------|---------|
-| `GITHUB_CLIENT_ID` | yes | — | OAuth App client ID |
-| `SESSION_SECRET` | yes | — | Cookie encryption key |
-| `PORT` | — | `3000` | Server port |
-| `ALLOWED_GITHUB_USERS` | — | — | Restrict access (comma-separated) |
-| `BASE_URL` | — | `http://localhost:3000` | Cookie domain + WS origin |
+| `GITHUB_CLIENT_ID` | **yes** | — | Client ID from your [GitHub OAuth App](https://github.com/settings/developers) |
+| `SESSION_SECRET` | **yes** | — | Random secret for cookie encryption — generate with `openssl rand -hex 32` |
+| `PORT` | — | `3000` | HTTP server port |
+| `ALLOWED_GITHUB_USERS` | — | — | Comma-separated GitHub usernames; omit to allow any authenticated user |
+| `BASE_URL` | — | `http://localhost:3000` | Public URL — sets cookie domain and WebSocket origin validation |
 
 <details>
 <summary>All options</summary>

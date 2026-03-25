@@ -16,6 +16,8 @@
 
 The only open-source web UI built on the official [`@github/copilot-sdk`](https://github.com/github/copilot-sdk). Self-host a ChatGPT-class experience powered by your GitHub Copilot subscription — with autopilot agents, live reasoning traces, native GitHub tools, and the current Copilot SDK customization model for agents, skills, prompts, instructions, and MCP servers.
 
+> This repo currently depends on `@github/copilot-sdk` `^0.2.0`. The current stable upstream release is `v0.2.0` — not `2.0.0`.
+
 <p align="center">
   <img src="docs/screenshots/usecase-autopilot-desktop.png" width="720" alt="Autopilot agent — reads a GitHub issue, implements the feature, runs tests, and opens a PR autonomously">
 </p>
@@ -37,6 +39,12 @@ The only open-source web UI built on the official [`@github/copilot-sdk`](https:
 The GitHub Copilot CLI is powerful, but it's stuck in your terminal. This project wraps the same official SDK in a web UI you can reach from any device — phone, tablet, laptop — with features the CLI doesn't have: persistent sessions, a visual plan editor, file and image attachments, and real-time streaming with a dark, touch-friendly interface.
 
 It now follows the newer Copilot SDK customization flow instead of layering a separate app-specific system on top. That means settings reflect what the SDK can actually use in a session: agents, skills, and MCP servers can be toggled live; prompts are slash shortcuts from chat; instructions are discovered and shown clearly instead of pretending to be runtime toggles.
+
+That refactor is aligned with the `v0.2.0` SDK capabilities this app already uses, including:
+
+- pre-selecting a custom agent when a session starts
+- fine-grained system prompt customization via section overrides
+- the current MCP/session configuration model used by the CLI subprocess
 
 Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, Gemini 3 Pro, and more through one account. This app lets you use them all from anywhere, on your own server, without handing your data to another SaaS.
 
@@ -93,7 +101,7 @@ Your Copilot subscription already gives you access to Claude Opus 4.6, GPT-5.4, 
 
 ## Customizations that are available
 
-The app now mirrors the Copilot SDK and CLI customization model instead of inventing a separate one.
+The app now mirrors the Copilot SDK and CLI customization model instead of inventing a separate one. In practice, this repo is aligned with `@github/copilot-sdk` `^0.2.0`, which is why the settings UI now follows actual SDK behavior instead of exposing fake activation flows.
 
 - **Instructions** — discovered from `~/.copilot/copilot-instructions.md`, `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, and agent guidance files like `AGENTS.md`. They are shown in settings for visibility; they are not chat commands.
 - **Agents** — discovered from `~/.copilot/agents/*.agent.md` and `.github/agents/*.agent.md`. Select one in settings to make it the active agent for the current session.

@@ -25,7 +25,7 @@ Browser (Svelte 5 SPA)
 | Language | TypeScript 5.7 (strict mode, ES2022) |
 | Framework | SvelteKit 5 with `adapter-node` |
 | Reactivity | Svelte 5 runes ($state, $derived, $effect, $props) |
-| AI Engine | `@github/copilot-sdk` ^0.1.32 |
+| AI Engine | `@github/copilot-sdk` ^0.2.0 |
 | Real-time | WebSocket (`ws` ^8.18) via custom `server.js` entry |
 | Markdown | `marked` + `dompurify` + `highlight.js` |
 | Security | Custom CSP/HSTS headers in hooks.server.ts, rate limiting, DOMPurify |
@@ -50,7 +50,6 @@ src/
 │   │   ├── Banner.svelte           # Welcome banner with Copilot icon
 │   │   ├── ChatInput.svelte        # Auto-expanding textarea, file attachments, status bar
 │   │   ├── ChatMessage.svelte      # Message renderer (10 roles: user, assistant, tool, etc.)
-│   │   ├── CustomToolsEditor.svelte # Webhook tool CRUD editor
 │   │   ├── DeviceFlowLogin.svelte  # GitHub Device Flow auth UI
 │   │   ├── EnvInfo.svelte          # Environment info (models, tools, context usage)
 │   │   ├── MessageList.svelte      # Scrollable message container with smart auto-scroll

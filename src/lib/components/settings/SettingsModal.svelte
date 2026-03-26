@@ -379,14 +379,7 @@
   .settings-accordion-body {
     padding: var(--sp-3);
     border-top: 1px solid var(--border);
-    max-height: 60vh;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
   }
-  .settings-accordion-body::-webkit-scrollbar { width: 4px; }
-  .settings-accordion-body::-webkit-scrollbar-track { background: transparent; }
-  .settings-accordion-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
   /* Mobile: fullscreen behavior */
   @media (max-width: 1023px) {
@@ -409,7 +402,7 @@
       padding-bottom: calc(var(--sp-4) + var(--safe-bottom));
     }
     .settings-accordion-body {
-      max-height: 250px;
+      max-height: none;
     }
   }
 </style>

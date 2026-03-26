@@ -32,6 +32,7 @@
   --sp-4: 16px;
   --sp-5: 20px;
   --sp-6: 24px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
   --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
   --font-size: clamp(14px, 3.8vw, 16px);
   --line-height: 1.6;
@@ -96,7 +97,7 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--font-size);
   line-height: var(--line-height);
   overflow: hidden;
@@ -104,6 +105,20 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+/* ── Utility: hide scrollbar ──────────────────────────────────────────────── */
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Utility: focus ring ──────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* ── Shared shimmer loading animation ─────────────────────────────────────── */

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import { FileText } from 'lucide-svelte';
 
   interface Props {
     inputValue: string;
@@ -163,7 +164,7 @@
             onmousedown={(e) => { e.preventDefault(); selectMentionFile(file); }}
             onmouseenter={() => { mentionIndex = i; }}
           >
-            <span class="mention-icon" aria-hidden="true">📄</span>
+            <span class="mention-icon" aria-hidden="true"><FileText size={14} /></span>
             <span class="mention-path">{file}</span>
           </li>
         {/each}
@@ -199,14 +200,12 @@
   .mention-loading {
     padding: var(--sp-2) var(--sp-3);
     color: var(--fg-dim);
-    font-family: var(--font-mono);
     font-size: 0.82em;
   }
 
   .mention-empty {
     padding: var(--sp-2) var(--sp-3);
     color: var(--fg-dim);
-    font-family: var(--font-mono);
     font-size: 0.82em;
     font-style: italic;
   }
@@ -217,7 +216,6 @@
     padding: var(--sp-1) 0;
     max-height: 280px;
     overflow-y: auto;
-    scrollbar-width: thin;
   }
 
   .mention-item {
@@ -226,7 +224,6 @@
     gap: var(--sp-2);
     padding: var(--sp-1) var(--sp-3);
     cursor: pointer;
-    font-family: var(--font-mono);
     font-size: 0.82em;
     color: var(--fg);
     transition: background 0.08s ease;
@@ -244,6 +241,7 @@
   }
 
   .mention-path {
+    font-family: var(--font-mono);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -253,7 +251,6 @@
   .mention-more {
     padding: var(--sp-1) var(--sp-3);
     color: var(--fg-dim);
-    font-family: var(--font-mono);
     font-size: 0.75em;
     border-top: 1px solid var(--border);
     text-align: center;

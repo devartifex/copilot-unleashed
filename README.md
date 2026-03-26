@@ -14,6 +14,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/copilot--sdk-v0.2.0-8A2BE2?logo=github" alt="Copilot SDK v0.2.0">
   <img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker">
+  <img src="https://img.shields.io/badge/accessibility-WCAG%202.2%20AA-0057B8?logo=accessibility" alt="WCAG 2.2 AA accessible">
   <a href="https://github.com/devartifex/copilot-unleashed/commits"><img src="https://img.shields.io/github/last-commit/devartifex/copilot-unleashed" alt="Last Commit"></a>
   <a href="https://github.com/devartifex/copilot-unleashed/stargazers"><img src="https://img.shields.io/github/stars/devartifex/copilot-unleashed?style=social" alt="Stars"></a>
 </p>
@@ -46,7 +47,7 @@
 - **Push notifications** — Web Push alerts when the browser is closed; full PWA support
 - **Plan & Fleet mode** — editable execution plans with disk sync; multi-agent parallel execution
 - **Quota tracking** — premium request usage, remaining balance, and reset date
-- **Mobile-first dark UI** — WCAG AA accessible, touch-optimized, reduced-motion support
+- **Accessible & responsive** — WCAG 2.2 AA compliant: semantic landmarks, keyboard navigation, visible focus rings, screen-reader labels, sufficient colour contrast, and reduced-motion support across all views and viewports
 - **Self-hosted** — your data never leaves your server; deploy with Docker or `azd up`
 
 ---
@@ -241,22 +242,60 @@ Device Flow OAuth (same as GitHub CLI). Tokens are server-side only, never sent 
 <details>
 <summary><strong>Screenshots</strong></summary>
 
+<br>
+
+**Desktop**
+
 <table>
 <tr>
-<td><img src="docs/screenshots/usecase-reasoning-desktop.png" width="480" alt="Extended reasoning with live thinking trace"></td>
-<td><img src="docs/screenshots/usecase-code-desktop.png" width="480" alt="Code generation with syntax highlighting"></td>
+<td><img src="docs/screenshots/usecase-autopilot-desktop.png" width="480" alt="Autopilot agent — reads a GitHub issue, plans, codes, runs tests, and opens a PR"></td>
+<td><img src="docs/screenshots/usecase-reasoning-desktop.png" width="480" alt="Extended reasoning — live collapsible thinking trace"></td>
 </tr>
 <tr>
+<td align="center"><em>Autopilot agent — issue → PR, zero intervention</em></td>
 <td align="center"><em>Extended thinking — live reasoning trace</em></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/usecase-code-desktop.png" width="480" alt="Code generation with syntax highlighting"></td>
+<td><img src="docs/screenshots/login-desktop.png" width="480" alt="GitHub Device Flow login screen"></td>
+</tr>
+<tr>
 <td align="center"><em>Code generation with syntax highlighting</em></td>
+<td align="center"><em>GitHub Device Flow login</em></td>
+</tr>
+</table>
+
+**Tablet (iPad)**
+
+<table>
+<tr>
+<td><img src="docs/screenshots/usecase-autopilot-ipad.png" width="320" alt="Autopilot agent on tablet"></td>
+<td><img src="docs/screenshots/usecase-code-ipad.png" width="320" alt="Code generation on tablet"></td>
+<td><img src="docs/screenshots/usecase-reasoning-ipad.png" width="320" alt="Extended reasoning on tablet"></td>
+<td><img src="docs/screenshots/login-ipad.png" width="320" alt="Login on tablet"></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/chat-desktop.png" width="480" alt="Chat desktop UI"></td>
-<td><img src="docs/screenshots/chat-mobile.png" width="200" alt="Mobile chat UI"></td>
+<td align="center"><em>Autopilot</em></td>
+<td align="center"><em>Code gen</em></td>
+<td align="center"><em>Reasoning</em></td>
+<td align="center"><em>Login</em></td>
+</tr>
+</table>
+
+**Mobile**
+
+<table>
+<tr>
+<td><img src="docs/screenshots/usecase-autopilot-mobile.png" width="220" alt="Autopilot agent on mobile"></td>
+<td><img src="docs/screenshots/usecase-code-mobile.png" width="220" alt="Code generation on mobile"></td>
+<td><img src="docs/screenshots/usecase-reasoning-mobile.png" width="220" alt="Extended reasoning on mobile"></td>
+<td><img src="docs/screenshots/login-mobile.png" width="220" alt="Login on mobile"></td>
 </tr>
 <tr>
-<td align="center"><em>Clean desktop interface</em></td>
-<td align="center"><em>Touch-optimized mobile</em></td>
+<td align="center"><em>Autopilot</em></td>
+<td align="center"><em>Code gen</em></td>
+<td align="center"><em>Reasoning</em></td>
+<td align="center"><em>Login</em></td>
 </tr>
 </table>
 

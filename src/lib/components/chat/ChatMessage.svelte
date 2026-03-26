@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { Attachment, ChatMessage } from '$lib/types/index.js';
   import { renderMarkdown, highlightCodeBlocks, addCopyButtons } from '$lib/utils/markdown.js';
+  import { Sparkles, Zap, AlertTriangle, Check, XCircle, ArrowRight, FileText } from 'lucide-svelte';
+  import Spinner from '$lib/components/shared/Spinner.svelte';
   import FleetProgress from './FleetProgress.svelte';
   import ToolCall from '$lib/components/chat/ToolCall.svelte';
   import ReasoningBlock from '$lib/components/chat/ReasoningBlock.svelte';
@@ -63,10 +65,9 @@
     message.role === 'skill' ? `skill/${message.skillName ?? message.content} invoked` : '',
   );
 
-  const subagentIcon = $derived.by(() => {
-    if (message.role !== 'subagent') return '';
-    return message.content.endsWith('completed') ? '✓' : '◐';
-  });
+  const subagentCompleted = $derived(
+    message.role === 'subagent' && message.content.endsWith('completed'),
+  );
 
   const toolState = $derived.by(() => {
     if (message.role !== 'tool') return null;
@@ -120,7 +121,7 @@
         {#each fileAttachments as file (file.name)}
           <li class="attachment-item">
             <a href={file.url} target="_blank" rel="noopener noreferrer" class="file-chip" aria-label="Attached file: {file.name}">
-              <span class="file-icon" aria-hidden="true">📄</span>
+              <span class="file-icon" aria-hidden="true"><FileText size={14} /></span>
               <span class="file-name">{file.name}</span>
             </a>
           </li>
@@ -153,7 +154,7 @@
 
 {:else if message.role === 'assistant'}
   <div class="message assistant">
-    <span class="assistant-marker">◆ Copilot</span>
+    <span class="assistant-marker"><Sparkles size={14} /> Copilot</span>
     <div class="content" bind:this={contentEl}>
       {@html renderedHtml}
     </div>
@@ -163,14 +164,14 @@
   <div class="info-line">{message.content}</div>
 
 {:else if message.role === 'warning'}
-  <div class="message warning">⚠ {message.content}</div>
+  <div class="message warning"><AlertTriangle size={14} /> {message.content}</div>
 
 {:else if message.role === 'error'}
-  <div class="message error"> {message.content}</div>
+  <div class="message error"><XCircle size={14} /> {message.content}</div>
 
 {:else if message.role === 'intent'}
   <div class="intent-line">
-    <span class="intent-icon">→</span>
+    <span class="intent-icon"><ArrowRight size={14} /></span>
     <span>{message.content}</span>
   </div>
 
@@ -179,19 +180,25 @@
 
 {:else if message.role === 'skill'}
   <div class="skill-line">
-    <span class="skill-icon">⚡</span>
+    <span class="skill-icon"><Zap size={14} /></span>
     <span>{skillLabel}</span>
   </div>
 
 {:else if message.role === 'subagent'}
   <div class="subagent-line">
-    <span class="subagent-icon">{subagentIcon}</span>
+    <span class="subagent-icon">
+        {#if subagentCompleted}
+          <Check size={14} />
+        {:else}
+          <Spinner color="var(--purple)" />
+        {/if}
+      </span>
     <span>agent/{message.content}</span>
   </div>
 
 {:else if message.role === 'fleet'}
   <div class="fleet-line">
-    <span class="fleet-line-icon">⚡</span>
+    <span class="fleet-line-icon"><Zap size={14} /></span>
     <span>{message.content}</span>
     {#if message.fleetAgents && message.fleetAgents.length > 0}
       <FleetProgress agents={message.fleetAgents} active={!message.content.includes('complete')} />
@@ -558,12 +565,9 @@
     color: var(--red);
     font-size: 0.85em;
     padding: var(--sp-1) var(--sp-3);
-  }
-
-  .message.error::before {
-    content: '✗';
-    color: var(--red);
-    font-weight: 700;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-1);
   }
 
   /* ── warning ───────────────────────────────────────────────────────────── */
@@ -572,6 +576,9 @@
     font-size: 0.85em;
     padding: var(--sp-1) var(--sp-2);
     opacity: 0.9;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-1);
   }
 
   /* ── info ───────────────────────────────────────────────────────────────── */

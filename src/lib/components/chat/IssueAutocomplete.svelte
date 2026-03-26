@@ -211,14 +211,12 @@
   .mention-loading {
     padding: var(--sp-2) var(--sp-3);
     color: var(--fg-dim);
-    font-family: var(--font-mono);
     font-size: 0.82em;
   }
 
   .mention-empty {
     padding: var(--sp-2) var(--sp-3);
     color: var(--fg-dim);
-    font-family: var(--font-mono);
     font-size: 0.82em;
     font-style: italic;
   }
@@ -229,7 +227,6 @@
     padding: var(--sp-1) 0;
     max-height: 280px;
     overflow-y: auto;
-    scrollbar-width: thin;
   }
 
   .mention-item {
@@ -238,7 +235,6 @@
     gap: var(--sp-2);
     padding: var(--sp-1) var(--sp-3);
     cursor: pointer;
-    font-family: var(--font-mono);
     font-size: 0.82em;
     color: var(--fg);
     transition: background 0.08s ease;
@@ -260,7 +256,6 @@
   .mention-more {
     padding: var(--sp-1) var(--sp-3);
     color: var(--fg-dim);
-    font-family: var(--font-mono);
     font-size: 0.75em;
     border-top: 1px solid var(--border);
     text-align: center;
@@ -292,7 +287,6 @@
 
   .issue-state {
     flex-shrink: 0;
-    font-family: var(--font-mono);
     font-size: 0.7em;
     padding: 1px 6px;
     border-radius: 10px;

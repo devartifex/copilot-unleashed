@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SessionSummary, SessionDetail } from '$lib/types/index.js';
   import SessionPreview from './SessionPreview.svelte';
+  import { X, Bookmark, ClipboardList, Cloud, Package } from 'lucide-svelte';
 
   interface Props {
     open: boolean;
@@ -157,7 +158,9 @@
         {:else}
           <span class="sheet-title">Sessions</span>
         {/if}
-        <button class="sheet-close" onclick={handleClose}>✕</button>
+        <button class="sheet-close" onclick={handleClose} aria-label="Close sessions">
+          <X size={20} />
+        </button>
       </div>
 
       {#if selectedSessionId}
@@ -247,17 +250,17 @@
       <span class="session-item-indicators">
         {#if session.checkpointCount && session.checkpointCount > 0}
           <span class="indicator" title="{session.checkpointCount} checkpoint{session.checkpointCount > 1 ? 's' : ''}">
-            🔖 {session.checkpointCount}
+            <Bookmark size={12} /> {session.checkpointCount}
           </span>
         {/if}
         {#if session.hasPlan}
-          <span class="indicator" title="Has plan">📋</span>
+          <span class="indicator" title="Has plan"><ClipboardList size={12} /></span>
         {/if}
         {#if session.isRemote}
-          <span class="indicator" title="Remote session">☁️</span>
+          <span class="indicator" title="Remote session"><Cloud size={12} /></span>
         {/if}
         {#if session.source === 'filesystem'}
-          <span class="indicator" title="Bundled session — will resume with context">📦</span>
+          <span class="indicator" title="Bundled session — will resume with context"><Package size={12} /></span>
         {/if}
       </span>
     </span>
@@ -289,6 +292,29 @@
     animation: fadeIn 0.15s ease;
   }
 
+  /* On desktop, same centered modal pattern as settings */
+  @media (min-width: 1024px) {
+    .sheet-overlay {
+      left: var(--sidebar-width, 0px);
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sheet-panel {
+      max-height: 80vh;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-lg);
+      background: var(--bg-raised);
+      overflow: hidden;
+    }
+    .sheet-header {
+      padding-top: var(--sp-3);
+    }
+  }
+
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -316,7 +342,6 @@
   }
 
   .sheet-title {
-    font-family: var(--font-mono);
     font-size: 0.9em;
     font-weight: 600;
     color: var(--fg);
@@ -326,7 +351,6 @@
     background: none;
     border: none;
     color: var(--accent);
-    font-family: var(--font-mono);
     font-size: 0.85em;
     cursor: pointer;
     padding: 4px 8px;
@@ -362,8 +386,6 @@
     overflow-y: auto;
     padding: 0 var(--sp-4) var(--sp-3);
     padding-bottom: calc(var(--sp-3) + var(--safe-bottom));
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
     min-height: 0;
   }
 
@@ -389,7 +411,6 @@
     color: var(--bg);
     border: none;
     border-radius: var(--radius-sm);
-    font-family: var(--font-mono);
     font-size: 0.85em;
     font-weight: 600;
     padding: var(--sp-2) var(--sp-3);
@@ -407,7 +428,6 @@
   .sheet-body::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
 
   .sheet-empty {
-    font-family: var(--font-mono);
     font-size: 0.82em;
     color: var(--fg-dim);
     text-align: center;
@@ -429,7 +449,6 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     color: var(--fg);
-    font-family: var(--font-mono);
     font-size: 0.82em;
     padding: var(--sp-2) var(--sp-3);
     outline: none;
@@ -457,7 +476,6 @@
   }
 
   .session-group-name {
-    font-family: var(--font-mono);
     font-size: 0.75em;
     font-weight: 600;
     color: var(--fg-muted);
@@ -466,7 +484,6 @@
   }
 
   .session-group-count {
-    font-family: var(--font-mono);
     font-size: 0.7em;
     color: var(--fg-dim);
     background: var(--border);
@@ -488,7 +505,6 @@
     background: none;
     border: none;
     color: var(--fg);
-    font-family: var(--font-mono);
     font-size: 0.85em;
     padding: var(--sp-2) var(--sp-3);
     border-radius: var(--radius-sm);
@@ -557,6 +573,9 @@
 
   .indicator {
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
   }
 
   .session-delete-btn {

@@ -67,13 +67,12 @@
     border-radius: var(--radius-lg);
     z-index: 101;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    animation: helpIn 0.15s ease;
+    animation: overlayIn 0.15s ease;
     max-height: 70vh;
     overflow-y: auto;
-    scrollbar-width: thin;
   }
 
-  @keyframes helpIn {
+  @keyframes overlayIn {
     from { opacity: 0; transform: translateX(-50%) translateY(4px); }
     to { opacity: 1; transform: translateX(-50%) translateY(0); }
   }

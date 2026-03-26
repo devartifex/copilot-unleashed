@@ -1,5 +1,6 @@
 <script lang="ts">
   import { isImageFile, hasImageAttachments as checkImageAttachments } from '$lib/utils/image.js';
+  import { FileText } from 'lucide-svelte';
   import type { FileAttachment } from '$lib/types/index.js';
 
   const MAX_FILES = 5;
@@ -139,7 +140,7 @@
 />
 
 {#if selectedFiles.length > 0}
-  <div class="file-preview-row">
+  <div class="file-preview-row scrollbar-hidden">
     {#each selectedFiles as file, i (file.name + i)}
       <div class="file-chip">
         {#if isImageFile(file)}
@@ -149,7 +150,7 @@
             alt={file.name}
           />
         {:else}
-          <span class="file-chip-icon" aria-hidden="true">📄</span>
+          <span class="file-chip-icon" aria-hidden="true"><FileText size={14} /></span>
         {/if}
         <span class="file-chip-name">{file.name}</span>
         {#if !isImageFile(file)}
@@ -182,11 +183,6 @@
     gap: var(--sp-1);
     padding: var(--sp-2) var(--sp-1) 0;
     overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .file-preview-row::-webkit-scrollbar {
-    display: none;
   }
 
   .file-chip {
@@ -198,7 +194,6 @@
     border-radius: var(--radius-sm);
     padding: 2px var(--sp-2);
     font-size: 0.78em;
-    font-family: var(--font-mono);
     color: var(--fg-dim);
     max-width: 180px;
   }
@@ -247,7 +242,6 @@
   .vision-warning {
     padding: 0 var(--sp-3) var(--sp-2);
     color: var(--yellow);
-    font-family: var(--font-mono);
     font-size: 0.75em;
     line-height: 1.4;
   }

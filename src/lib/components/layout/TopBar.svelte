@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ConnectionState, QuotaSnapshots } from '$lib/types/index.js';
+  import { Menu, ChevronDown } from 'lucide-svelte';
   import QuotaDot from '$lib/components/model/QuotaDot.svelte';
 
   interface Props {
@@ -7,39 +8,34 @@
     connectionState: ConnectionState;
     sessionTitle: string | null;
     quotaSnapshots: QuotaSnapshots | null;
+    modelSheetOpen?: boolean;
     onToggleSidebar: () => void;
     onOpenModelSheet: () => void;
   }
 
   const {
     currentModel,
-    connectionState,
     sessionTitle,
     quotaSnapshots,
+    modelSheetOpen = false,
     onToggleSidebar,
     onOpenModelSheet,
   }: Props = $props();
 
-  const connectionDotClass = $derived.by(() => {
-    switch (connectionState) {
-      case 'connected': return 'dot-connected';
-      case 'connecting':
-      case 'reconnecting': return 'dot-connecting';
-      default: return 'dot-disconnected';
-    }
+  const modelFamilyColor = $derived.by(() => {
+    if (!currentModel) return 'var(--fg-dim)';
+    if (currentModel.startsWith('gpt-')) return 'var(--green)';
+    if (currentModel.startsWith('claude-')) return 'var(--purple)';
+    if (currentModel.startsWith('gemini-')) return 'var(--blue)';
+    return 'var(--fg-dim)';
   });
 
   const displayModel = $derived(currentModel || 'Select model');
-  const displayTitle = $derived(sessionTitle || 'Copilot Unleashed');
 </script>
 
 <div class="top-bar">
   <button class="tb-btn hamburger-btn" onclick={onToggleSidebar} aria-label="Open menu">
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-      <line x1="3" y1="5" x2="15" y2="5"/>
-      <line x1="3" y1="9" x2="15" y2="9"/>
-      <line x1="3" y1="13" x2="15" y2="13"/>
-    </svg>
+    <Menu size={20} />
   </button>
 
   {#if sessionTitle}
@@ -51,17 +47,17 @@
     </span>
   {/if}
 
-  <button class="model-pill" onclick={onOpenModelSheet} aria-label="Select model">
-    <span class="conn-dot {connectionDotClass}"></span>
+  <button class="model-pill" class:open={modelSheetOpen} onclick={onOpenModelSheet} aria-label="Select model">
+    <span class="family-dot" style:background={modelFamilyColor}></span>
     {#if currentModel}
       <span class="model-name">{displayModel}</span>
     {:else}
       <span class="model-name loading-text">{displayModel}</span>
     {/if}
     <QuotaDot {quotaSnapshots} />
-    <svg class="chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M2.5 4 L5 6.5 L7.5 4"/>
-    </svg>
+    <span class="chevron-wrap" class:chevron-open={modelSheetOpen}>
+      <ChevronDown size={14} />
+    </span>
   </button>
 </div>
 
@@ -105,7 +101,6 @@
 
   /* ── Session title ──────────────────────────────────────────────── */
   .title-text {
-    font-family: var(--font-mono);
     font-size: 0.82em;
     color: var(--fg-muted);
     white-space: nowrap;
@@ -133,7 +128,6 @@
   }
 
   .brand-name {
-    font-family: var(--font-mono);
     font-size: 0.95em;
     font-weight: 700;
     color: var(--fg);
@@ -165,10 +159,10 @@
     background: transparent;
     border: none;
     border-radius: var(--radius-md);
-    padding: 5px 10px;
+    padding: 6px 12px;
     cursor: pointer;
-    min-height: 30px;
-    max-width: 200px;
+    min-height: 40px;
+    max-width: 220px;
     -webkit-tap-highlight-color: transparent;
     transition: background 0.15s ease;
   }
@@ -177,13 +171,12 @@
     background: var(--bg-overlay);
   }
 
-  .model-pill:active {
-    background: var(--bg-overlay);
-    transform: scale(0.97);
+  .model-pill:active,
+  .model-pill.open {
+    background: var(--border);
   }
 
   .model-name {
-    font-family: var(--font-mono);
     font-size: 0.78em;
     color: var(--fg-muted);
     white-space: nowrap;
@@ -202,34 +195,28 @@
     animation: pulse-text 1.5s ease-in-out infinite;
   }
 
-  .chevron {
+  /* ── Chevron with rotation ─────────────────────────────────────── */
+  .chevron-wrap {
+    display: flex;
+    align-items: center;
     flex-shrink: 0;
     color: var(--fg-dim);
     opacity: 0.6;
+    transition: transform 0.2s ease;
   }
 
-  /* ── Connection dot ────────────────────────────────────────────── */
-  .conn-dot {
+  .chevron-wrap.chevron-open {
+    transform: rotate(180deg);
+  }
+
+  /* ── Model family dot ──────────────────────────────────────────── */
+  .family-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
-  }
-
-  .dot-connected {
-    background: var(--green);
-    box-shadow: 0 0 4px var(--green);
-  }
-
-  .dot-connecting {
-    background: var(--yellow);
-    box-shadow: 0 0 4px var(--yellow);
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-
-  .dot-disconnected {
-    background: var(--red);
-    box-shadow: 0 0 4px var(--red);
+    background-color: currentColor;
+    box-shadow: 0 0 4px currentColor;
   }
 
   /* ── Responsive ────────────────────────────────────────────────── */
@@ -244,6 +231,10 @@
   }
 
   @media (min-width: 1024px) {
+    .hamburger-btn {
+      display: none;
+    }
+
     .top-bar {
       max-width: 880px;
     }

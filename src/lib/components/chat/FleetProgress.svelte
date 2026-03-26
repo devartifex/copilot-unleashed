@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { Zap, Check, XCircle } from 'lucide-svelte';
+  import Spinner from '$lib/components/shared/Spinner.svelte';
+
   interface FleetAgent {
     agentId: string;
     agentType: string;
@@ -21,7 +24,7 @@
 {#if agents.length > 0}
   <div class="fleet-progress" class:fleet-done={!active}>
     <div class="fleet-header">
-      <span class="fleet-icon">⚡</span>
+      <span class="fleet-icon"><Zap size={14} /></span>
       <span class="fleet-title">Fleet Mode</span>
       {#if active}
         <span class="fleet-badge running">{running} running</span>
@@ -42,9 +45,12 @@
           class:agent-failed={agent.status === 'failed'}
         >
           <span class="agent-status-icon">
-            {#if agent.status === 'running'}◐
-            {:else if agent.status === 'completed'}✓
-            {:else}✗
+            {#if agent.status === 'running'}
+              <Spinner color="var(--purple)" />
+            {:else if agent.status === 'completed'}
+              <Check size={14} />
+            {:else}
+              <XCircle size={14} />
             {/if}
           </span>
           <span class="agent-name">{agent.agentType || agent.agentId}</span>
@@ -82,7 +88,8 @@
 
   .fleet-icon {
     color: var(--purple);
-    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
   }
 
   .fleet-title {
@@ -129,17 +136,14 @@
   }
 
   .agent-status-icon {
-    font-weight: 700;
-    width: 1em;
-    text-align: center;
     display: inline-flex;
+    align-items: center;
     justify-content: center;
     flex-shrink: 0;
   }
 
   .agent-running .agent-status-icon {
     color: var(--purple);
-    animation: spin 1.5s linear infinite;
   }
 
   .agent-completed .agent-status-icon {
@@ -163,9 +167,5 @@
   @keyframes msg-in {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
   }
 </style>

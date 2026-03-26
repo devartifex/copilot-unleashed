@@ -1,25 +1,18 @@
 <script lang="ts">
   import type { ToolCallState } from '$lib/types/index.js';
+  import { Check, XCircle, ChevronDown } from 'lucide-svelte';
+  import Spinner from '$lib/components/shared/Spinner.svelte';
 
   interface Props {
     tool: ToolCallState;
   }
 
-  const BRAILLE_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-
   const { tool }: Props = $props();
 
-  let spinnerIndex = $state(0);
   let expanded = $state(false);
 
   const isActive = $derived(tool.status === 'running' || tool.status === 'progress');
   const hasProgress = $derived((tool.progressMessages?.length ?? 0) > 0);
-
-  const icon = $derived.by(() => {
-    if (tool.status === 'complete') return '✓';
-    if (tool.status === 'failed') return '✕';
-    return BRAILLE_FRAMES[spinnerIndex];
-  });
 
   const displayName = $derived(
     tool.mcpServerName && tool.mcpToolName
@@ -37,17 +30,17 @@
   function toggle() {
     if (hasProgress) expanded = !expanded;
   }
-
-  $effect(() => {
-    if (!isActive) return;
-
-    const interval = setInterval(() => {
-      spinnerIndex = (spinnerIndex + 1) % BRAILLE_FRAMES.length;
-    }, 80);
-
-    return () => clearInterval(interval);
-  });
 </script>
+
+{#snippet toolIcon()}
+  {#if tool.status === 'complete'}
+    <Check size={14} />
+  {:else if tool.status === 'failed'}
+    <XCircle size={14} />
+  {:else}
+    <Spinner color="var(--yellow)" />
+  {/if}
+{/snippet}
 
 <div class="tool-call-wrapper" class:expanded>
   {#if hasProgress}
@@ -60,8 +53,8 @@
       aria-expanded={expanded}
       onclick={toggle}
     >
-      <span class="tool-chevron">▼</span>
-      <span class="tool-icon">{icon}</span>
+      <span class="tool-chevron"><ChevronDown size={14} /></span>
+      <span class="tool-icon">{@render toolIcon()}</span>
       <span class="tool-name">{displayName}</span>
       {#if statusText}
         <span class="tool-status">{statusText}</span>
@@ -78,7 +71,7 @@
       class:completed={tool.status === 'complete'}
       class:failed={tool.status === 'failed'}
     >
-      <span class="tool-icon">{icon}</span>
+      <span class="tool-icon">{@render toolIcon()}</span>
       <span class="tool-name">{displayName}</span>
       {#if statusText}
         <span class="tool-status">{statusText}</span>
@@ -102,7 +95,6 @@
     min-height: 24px;
     background: none;
     border: none;
-    font-family: inherit;
     font-size: inherit;
     width: 100%;
     text-align: left;
@@ -120,14 +112,13 @@
 
   .tool-chevron {
     color: var(--fg-dim);
-    font-size: 0.65em;
     transition: transform 0.2s ease;
-    display: inline-block;
+    display: inline-flex;
     flex-shrink: 0;
   }
 
-  .tool-call-wrapper:not(.expanded) .tool-chevron {
-    transform: rotate(-90deg);
+  .expanded .tool-chevron {
+    transform: rotate(180deg);
   }
 
   .tool-name {
@@ -147,8 +138,8 @@
   .tool-icon {
     color: var(--yellow);
     flex-shrink: 0;
-    width: 1em;
-    text-align: center;
+    display: inline-flex;
+    align-items: center;
   }
 
   .tool-call.completed .tool-icon {

@@ -187,17 +187,18 @@
 
   function handleFileSelect() {
     attachMenuOpen = false;
-    attachComp?.openFileSelect();
+    // Delay native picker so iOS dismisses the menu first
+    requestAnimationFrame(() => attachComp?.openFileSelect());
   }
 
   function handleCameraCapture() {
     attachMenuOpen = false;
-    attachComp?.openCamera();
+    requestAnimationFrame(() => attachComp?.openCamera());
   }
 
   function handleGallerySelect() {
     attachMenuOpen = false;
-    attachComp?.openGallery();
+    requestAnimationFrame(() => attachComp?.openGallery());
   }
 
   async function send() {
@@ -256,18 +257,33 @@
     const viewport = window.visualViewport;
     if (!viewport) return;
 
-    function onResize() {
+    function onViewportChange() {
       const vh = viewport?.height ?? window.innerHeight;
       document.documentElement.style.setProperty('--vh', `${vh}px`);
     }
 
-    onResize();
-    viewport.addEventListener('resize', onResize);
+    onViewportChange();
+    viewport.addEventListener('resize', onViewportChange);
+    viewport.addEventListener('scroll', onViewportChange);
 
     return () => {
-      viewport.removeEventListener('resize', onResize);
+      viewport.removeEventListener('resize', onViewportChange);
+      viewport.removeEventListener('scroll', onViewportChange);
     };
   });
+
+  // Force viewport recalc on textarea focus (iOS keyboard animation delay)
+  function handleTextareaFocus() {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    // Schedule two updates to catch keyboard animation start and settle
+    requestAnimationFrame(() => {
+      document.documentElement.style.setProperty('--vh', `${viewport.height}px`);
+    });
+    setTimeout(() => {
+      document.documentElement.style.setProperty('--vh', `${viewport.height}px`);
+    }, 300);
+  }
 </script>
 
 <div class="input-area">
@@ -292,6 +308,7 @@
     {/if}
 
     <textarea
+      class="scrollbar-hidden"
       bind:this={textareaEl}
       bind:value={inputValue}
       placeholder={inputPlaceholder}
@@ -300,6 +317,7 @@
       rows={2}
       oninput={handleInput}
       onkeydown={handleKeydown}
+      onfocus={handleTextareaFocus}
     ></textarea>
 
     <SlashCommandPalette
@@ -488,7 +506,6 @@
     color: var(--purple);
     font-weight: 500;
     font-size: 0.85em;
-    font-family: var(--font-mono);
     line-height: 1.4;
   }
 
@@ -504,7 +521,6 @@
     border: 1px solid rgba(110, 64, 201, 0.30);
     border-radius: var(--radius-sm);
     color: var(--purple);
-    font-family: var(--font-mono);
     font-size: 0.78em;
     padding: 4px 10px;
     cursor: pointer;
@@ -535,12 +551,6 @@
     -webkit-appearance: none;
     appearance: none;
     min-height: 52px;
-    /* Hide scrollbar but keep scrolling */
-    scrollbar-width: none;
-  }
-
-  textarea::-webkit-scrollbar {
-    display: none;
   }
 
   textarea::placeholder {
@@ -588,7 +598,6 @@
   .steering-indicator {
     padding: 0 var(--sp-4);
     color: var(--fg-dim);
-    font-family: var(--font-mono);
     font-size: 0.75em;
     line-height: 1.4;
   }
@@ -640,7 +649,6 @@
     background: transparent;
     border: none;
     color: var(--fg-dim);
-    font-family: var(--font-mono);
     font-size: 0.8em;
     padding: 4px 10px;
     border-radius: 4px;
@@ -711,8 +719,8 @@
   }
 
   @keyframes menuFadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
   .attach-menu-item {
@@ -723,7 +731,6 @@
     background: none;
     border: none;
     color: var(--fg);
-    font-family: var(--font-mono);
     font-size: 0.85em;
     padding: var(--sp-2) var(--sp-3);
     cursor: pointer;

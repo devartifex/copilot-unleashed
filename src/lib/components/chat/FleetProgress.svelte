@@ -46,7 +46,7 @@
         >
           <span class="agent-status-icon">
             {#if agent.status === 'running'}
-              <Spinner size={14} color="var(--purple)" />
+              <Spinner color="var(--purple)" />
             {:else if agent.status === 'completed'}
               <Check size={14} />
             {:else}

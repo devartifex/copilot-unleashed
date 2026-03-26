@@ -83,7 +83,7 @@
 
     {#if showWaiting}
       <div class="waiting-indicator">
-        <Spinner size={14} color="var(--yellow)" />
+        <Spinner color="var(--yellow)" />
         <span class="waiting-label">Thinking</span>
       </div>
     {/if}

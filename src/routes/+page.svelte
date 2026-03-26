@@ -509,9 +509,11 @@
       display: grid;
       grid-template-columns: 280px 1fr;
       flex-direction: unset;
+      --sidebar-width: 280px;
     }
     .app-layout.sidebar-collapsed {
       grid-template-columns: 56px 1fr;
+      --sidebar-width: 56px;
     }
   }
 

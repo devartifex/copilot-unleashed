@@ -1,32 +1,28 @@
 <script lang="ts">
+  const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
   interface Props {
-    size?: number;
     color?: string;
     class?: string;
   }
 
-  let { size = 16, color = 'var(--fg-muted)', class: className = '' }: Props = $props();
+  let { color = 'currentColor', class: className = '' }: Props = $props();
+  let frame = $state(0);
+
+  $effect(() => {
+    const id = setInterval(() => {
+      frame = (frame + 1) % FRAMES.length;
+    }, 80);
+    return () => clearInterval(id);
+  });
 </script>
 
-<span
-  class="spinner {className}"
-  role="status"
-  aria-label="Loading"
-  style:width="{size}px"
-  style:height="{size}px"
-  style:border-color="{color}"
-></span>
+<span class="spinner {className}" role="status" aria-label="Loading" style:color={color}>{FRAMES[frame]}</span>
 
 <style>
   .spinner {
     display: inline-block;
-    border: 2px solid;
-    border-right-color: transparent;
-    border-radius: 50%;
-    animation: spin 0.75s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
+    font-family: var(--font-mono);
+    line-height: 1;
   }
 </style>

@@ -365,7 +365,10 @@
   @media (min-width: 1024px) {
     .sheet-overlay {
       position: fixed;
-      inset: 0;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: var(--sidebar-width, 0px);
       z-index: 95;
       background: transparent;
       display: flex;
@@ -376,8 +379,6 @@
     .sheet-panel {
       position: relative;
       margin-top: 56px;
-      margin-left: auto;
-      margin-right: auto;
       width: 320px;
       max-width: 320px;
       max-height: 480px;

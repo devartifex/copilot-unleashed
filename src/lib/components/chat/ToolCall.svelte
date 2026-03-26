@@ -38,7 +38,7 @@
   {:else if tool.status === 'failed'}
     <XCircle size={14} />
   {:else}
-    <Spinner size={14} color="var(--yellow)" />
+    <Spinner color="var(--yellow)" />
   {/if}
 {/snippet}
 

@@ -181,7 +181,7 @@
         {#if subagentCompleted}
           <Check size={14} />
         {:else}
-          <Spinner size={14} color="var(--purple)" />
+          <Spinner color="var(--purple)" />
         {/if}
       </span>
     <span>agent/{message.content}</span>

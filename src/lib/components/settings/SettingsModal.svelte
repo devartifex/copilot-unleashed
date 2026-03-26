@@ -380,7 +380,12 @@
     border-top: 1px solid var(--border);
     max-height: 60vh;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
+  .settings-accordion-body::-webkit-scrollbar { width: 4px; }
+  .settings-accordion-body::-webkit-scrollbar-track { background: transparent; }
+  .settings-accordion-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
   /* Mobile: fullscreen behavior */
   @media (max-width: 1023px) {

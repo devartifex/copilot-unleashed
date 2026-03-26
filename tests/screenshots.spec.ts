@@ -81,19 +81,17 @@ for (const vp of VIEWPORTS) {
 // ── Use-case screens ──────────────────────────────────────────────────────────
 
 async function openChat(browser: Browser, viewport: { width: number; height: number }) {
-  const ctx = await browser.newContext({ viewport });
+  const ctx = await browser.newContext({ viewport, serviceWorkers: 'block' });
   const page = await ctx.newPage();
 
   // Intercept SSR HTML: patch embedded SvelteKit data to set authenticated=true with user
-  await page.route('/', async (route) => {
+  await page.route((url) => url.pathname === '/', async (route) => {
     const response = await route.fetch();
     let html = await response.text();
-    // Replace the embedded data payload in the SvelteKit script block
     html = html.replace(
-      /data:\{authenticated:false,user:null\}/g,
-      'data:{authenticated:true,user:{login:"devartifex",name:"Dev Artifex"}}',
+      /authenticated:false,user:null/g,
+      'authenticated:true,user:{login:"devartifex",name:"Dev Artifex"}',
     );
-    // Also remove the login screen HTML so Svelte hydration matches
     await route.fulfill({ response, body: html });
   });
 
@@ -134,7 +132,7 @@ for (const vp of VIEWPORTS) {
 
     const { page, ctx } = await openChat(browser, vp);
 
-    await page.routeWebSocket('**/ws', (ws) => {
+    await page.routeWebSocket('**/ws**', (ws) => {
       ws.send(JSON.stringify({ type: 'connected', user: 'devartifex' }));
 
       ws.onMessage((data) => {
@@ -212,7 +210,7 @@ for (const vp of VIEWPORTS) {
 
     const { page, ctx } = await openChat(browser, vp);
 
-    await page.routeWebSocket('**/ws', (ws) => {
+    await page.routeWebSocket('**/ws**', (ws) => {
       ws.send(JSON.stringify({ type: 'connected', user: 'devartifex' }));
 
       ws.onMessage((data) => {
@@ -295,7 +293,7 @@ for (const vp of VIEWPORTS) {
 
     const { page, ctx } = await openChat(browser, vp);
 
-    await page.routeWebSocket('**/ws', (ws) => {
+    await page.routeWebSocket('**/ws**', (ws) => {
       ws.send(JSON.stringify({ type: 'connected', user: 'devartifex' }));
 
       ws.onMessage((data) => {

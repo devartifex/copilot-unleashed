@@ -15,7 +15,6 @@
 
   const {
     currentModel,
-    connectionState,
     sessionTitle,
     quotaSnapshots,
     modelSheetOpen = false,

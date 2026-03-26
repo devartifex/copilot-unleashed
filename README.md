@@ -47,7 +47,7 @@
 - **Push notifications** — Web Push alerts when the browser is closed; full PWA support
 - **Plan & Fleet mode** — editable execution plans with disk sync; multi-agent parallel execution
 - **Quota tracking** — premium request usage, remaining balance, and reset date
-- **Accessible & responsive** — WCAG 2.2 AA compliant: semantic landmarks, keyboard navigation, visible focus rings, screen-reader labels, sufficient colour contrast, and reduced-motion support across all views and viewports
+- **Accessible & responsive** — WCAG 2.2 AA compliant: semantic landmarks, keyboard navigation, no keyboard traps (off-screen panels use `visibility:hidden`), visible focus rings, screen-reader labels, sufficient colour contrast, and reduced-motion support across all views and viewports
 - **Self-hosted** — your data never leaves your server; deploy with Docker or `azd up`
 
 ---

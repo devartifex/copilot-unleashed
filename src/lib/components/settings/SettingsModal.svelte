@@ -350,6 +350,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     overflow: hidden;
+    flex-shrink: 0;
   }
   .settings-accordion-btn {
     width: 100%;

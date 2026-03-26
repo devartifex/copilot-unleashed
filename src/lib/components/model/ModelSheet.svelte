@@ -381,7 +381,7 @@
       margin-top: 56px;
       width: 320px;
       max-width: 320px;
-      max-height: 480px;
+      max-height: min(600px, 70vh);
       flex: none;
       background: var(--bg-raised);
       border: 1px solid var(--border);
@@ -402,7 +402,7 @@
 
     .sheet-body {
       padding-bottom: var(--sp-3);
-      max-height: calc(480px - 52px);
+      max-height: calc(min(600px, 70vh) - 52px);
     }
   }
 </style>

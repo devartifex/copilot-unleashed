@@ -17,7 +17,7 @@
   });
 </script>
 
-<span class="spinner {className}" role="status" aria-label="Loading" style:color={color}>{FRAMES[frame]}</span>
+<span class="spinner {className}" aria-hidden="true" style:color={color}>{FRAMES[frame]}</span>
 
 <style>
   .spinner {

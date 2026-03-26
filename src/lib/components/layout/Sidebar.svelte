@@ -102,7 +102,7 @@
       <span class="sidebar-title">Menu</span>
     {/if}
     <!-- Desktop collapse toggle -->
-    <button class="sidebar-toggle desktop-only" onclick={onToggleCollapse} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+    <button class="sidebar-toggle desktop-only" onclick={onToggleCollapse} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
       {#if collapsed}
         <PanelLeftOpen size={18} />
       {:else}
@@ -124,11 +124,11 @@
 
     <!-- Actions section -->
     <div class="sidebar-section">
-      <button class="sidebar-action" onclick={onOpenSessions} title="Sessions">
+      <button class="sidebar-action" onclick={onOpenSessions} title="Sessions" aria-label="Sessions">
         <History size={18} />
         {#if !collapsed}<span>Sessions</span>{/if}
       </button>
-      <button class="sidebar-action" onclick={onOpenSettings} title="Settings">
+      <button class="sidebar-action" onclick={onOpenSettings} title="Settings" aria-label="Settings">
         <Settings size={18} />
         {#if !collapsed}<span>Settings</span>{/if}
       </button>

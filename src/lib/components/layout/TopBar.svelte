@@ -216,6 +216,7 @@
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
+    background-color: currentColor;
     box-shadow: 0 0 4px currentColor;
   }
 

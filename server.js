@@ -16,6 +16,15 @@ const tokenMaxAge = parseInt(process.env.TOKEN_MAX_AGE_MS || String(7 * 24 * 60 
 if (!process.env.ORIGIN) {
   process.env.ORIGIN = process.env.BASE_URL || `http://localhost:${port}`;
 }
+
+// Trust reverse-proxy headers (X-Forwarded-For, X-Forwarded-Proto) when TRUST_PROXY=1.
+// Required when Tailscale Serve (or any reverse proxy) sits in front of the app.
+// Set automatically by docker-compose.remote.yml for the remote-access profile.
+if (process.env.TRUST_PROXY === '1') {
+  process.env.ADDRESS_HEADER = 'X-Forwarded-For';
+  process.env.XFF_DEPTH = process.env.XFF_DEPTH || '1';
+}
+
 const { handler } = await import('./build/handler.js');
 
 if (!isDev && !process.env.SESSION_SECRET) {

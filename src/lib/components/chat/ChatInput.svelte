@@ -187,17 +187,18 @@
 
   function handleFileSelect() {
     attachMenuOpen = false;
-    attachComp?.openFileSelect();
+    // Delay native picker so iOS dismisses the menu first
+    requestAnimationFrame(() => attachComp?.openFileSelect());
   }
 
   function handleCameraCapture() {
     attachMenuOpen = false;
-    attachComp?.openCamera();
+    requestAnimationFrame(() => attachComp?.openCamera());
   }
 
   function handleGallerySelect() {
     attachMenuOpen = false;
-    attachComp?.openGallery();
+    requestAnimationFrame(() => attachComp?.openGallery());
   }
 
   async function send() {
@@ -256,18 +257,33 @@
     const viewport = window.visualViewport;
     if (!viewport) return;
 
-    function onResize() {
+    function onViewportChange() {
       const vh = viewport?.height ?? window.innerHeight;
       document.documentElement.style.setProperty('--vh', `${vh}px`);
     }
 
-    onResize();
-    viewport.addEventListener('resize', onResize);
+    onViewportChange();
+    viewport.addEventListener('resize', onViewportChange);
+    viewport.addEventListener('scroll', onViewportChange);
 
     return () => {
-      viewport.removeEventListener('resize', onResize);
+      viewport.removeEventListener('resize', onViewportChange);
+      viewport.removeEventListener('scroll', onViewportChange);
     };
   });
+
+  // Force viewport recalc on textarea focus (iOS keyboard animation delay)
+  function handleTextareaFocus() {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    // Schedule two updates to catch keyboard animation start and settle
+    requestAnimationFrame(() => {
+      document.documentElement.style.setProperty('--vh', `${viewport.height}px`);
+    });
+    setTimeout(() => {
+      document.documentElement.style.setProperty('--vh', `${viewport.height}px`);
+    }, 300);
+  }
 </script>
 
 <div class="input-area">
@@ -301,6 +317,7 @@
       rows={2}
       oninput={handleInput}
       onkeydown={handleKeydown}
+      onfocus={handleTextareaFocus}
     ></textarea>
 
     <SlashCommandPalette
@@ -702,8 +719,8 @@
   }
 
   @keyframes menuFadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
   .attach-menu-item {

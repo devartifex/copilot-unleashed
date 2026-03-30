@@ -26,11 +26,9 @@ export const HANDLED_EVENT_TYPES = new Set([
 ]);
 
 export function createCatchAllHandler(entry: PoolEntry, handledTypes: Set<string>): (event: any) => void {
-  return (event: any) => {
-    if (!handledTypes.has(event.type)) {
-      console.log('[EVENT] unhandled SDK event:', event.type, JSON.stringify(event.data ?? {}).slice(0, 200));
-    }
-  };
+  // Silently ignore all unhandled SDK events in production.
+  // To debug new event types during development, add a console.log here temporarily.
+  return (_event: any) => {};
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -88,15 +86,12 @@ export function wireSessionEvents(
     pendingAssistantContent = '';
   });
   session.on('tool.execution_start', (event: any) => {
-    console.log('[TOOL] execution_start:', event.data.toolName, 'mcp:', event.data.mcpServerName, '/', event.data.mcpToolName);
     poolSend(entry, { type: 'tool_start', toolCallId: event.data.toolCallId, toolName: event.data.toolName, mcpServerName: event.data.mcpServerName, mcpToolName: event.data.mcpToolName });
   });
   session.on('tool.execution_complete', (event: any) => {
-    console.log('[TOOL] execution_complete:', event.data.toolCallId);
     poolSend(entry, { type: 'tool_end', toolCallId: event.data.toolCallId });
   });
   session.on('tool.execution_progress', (event: any) => {
-    console.log('[TOOL] execution_progress:', event.data.toolCallId, event.data.message);
     poolSend(entry, { type: 'tool_progress', toolCallId: event.data.toolCallId, message: event.data.message });
   });
   session.on('session.mode_changed', (event: any) => {

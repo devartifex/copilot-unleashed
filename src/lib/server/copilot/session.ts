@@ -230,18 +230,14 @@ export async function createCopilotSession(
   githubToken: string,
   options: CreateSessionOptions = {}
 ) {
-  // Wrap the permission handler to log calls for diagnostics
-  const wrappedApproveAll: SessionConfig['onPermissionRequest'] = (request: any, context) => {
-    console.log('[PERMISSION] approveAll called:', JSON.stringify({
-      toolName: request?.toolName ?? request?.tool?.name,
-      sessionId: context?.sessionId,
-    }));
+  // Default permission handler: approve all tool calls automatically (autopilot mode)
+  const approveAll: SessionConfig['onPermissionRequest'] = (_request: any, _context) => {
     return { kind: 'approved' as const };
   };
 
   const permissionHandler = options.permissionMode === 'prompt' && options.onPermissionRequest
     ? options.onPermissionRequest
-    : wrappedApproveAll;
+    : approveAll;
 
   console.log('[SESSION] Creating session with permissionMode:', options.permissionMode || 'approve_all (default)');
 

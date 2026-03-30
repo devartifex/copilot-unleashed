@@ -1,3 +1,8 @@
+// server.js — Production entry point.
+// Wraps SvelteKit's adapter-node handler with:
+//   • express-session (cookie-based auth persistence)
+//   • WebSocket server (real-time AI streaming)
+//   • Auth cookie restore (survives container restarts)
 import { createServer } from 'http';
 import session from 'express-session';
 import FileStoreFactory from 'session-file-store';
@@ -22,6 +27,8 @@ if (!isDev && !process.env.SESSION_SECRET) {
   throw new Error('SESSION_SECRET environment variable is required in production');
 }
 
+// Session store: file-based, 24-hour TTL.
+// rolling:true refreshes the cookie on every request to keep active users logged in.
 const sessionStorePath = process.env.SESSION_STORE_PATH || (isDev ? '.sessions' : '/data/sessions');
 const sessionMiddleware = session({
   store: new FileStore({ path: sessionStorePath, ttl: 86400, retries: 0, logFn: () => {} }),
@@ -58,9 +65,13 @@ function restoreAuthFromCookie(req) {
 const server = createServer((req, res) => {
   sessionMiddleware(req, res, () => {
     restoreAuthFromCookie(req);
+
+    // Bridge: pass the Express session to SvelteKit via a request header.
+    // SvelteKit's hooks.server.ts reads x-session-id to attach session data to locals.
     const sessionId = registerSession(req.session);
     req.headers['x-session-id'] = sessionId;
 
+    // Clean up the session bridge entry when the response is sent
     const origEnd = res.end.bind(res);
     res.end = function (...args) {
       deleteSessionById(sessionId);
@@ -71,6 +82,7 @@ const server = createServer((req, res) => {
   });
 });
 
+// Attach the WebSocket server to the same HTTP server (same port, path: /ws)
 setupWebSocket(server, sessionMiddleware);
 
 server.listen(port, () => {
@@ -82,6 +94,7 @@ server.listen(port, () => {
   console.log('');
 });
 
+// Graceful shutdown: allow in-flight requests to finish (5 s hard limit)
 function shutdown() {
   console.log('\nShutting down...');
   server.close(() => process.exit(0));

@@ -20,17 +20,13 @@ export function registerSession(session: SessionData): string {
 	g[COUNTER_KEY] = ((g[COUNTER_KEY] as number) || 0) + 1;
 	const id = String(g[COUNTER_KEY]);
 	getMap().set(id, session);
-	console.log(`[SESSION-STORE] register id=${id} hasToken=${!!session.githubToken} user=${session.githubUser?.login ?? 'none'} mapSize=${getMap().size}`);
 	return id;
 }
 
 export function getSessionById(id: string): SessionData | undefined {
-	const session = getMap().get(id);
-	console.log(`[SESSION-STORE] get id=${id} found=${!!session} hasToken=${!!session?.githubToken} user=${session?.githubUser?.login ?? 'none'} mapSize=${getMap().size}`);
-	return session;
+	return getMap().get(id);
 }
 
 export function deleteSessionById(id: string): void {
-	console.log(`[SESSION-STORE] delete id=${id} mapSize=${getMap().size - 1}`);
 	getMap().delete(id);
 }

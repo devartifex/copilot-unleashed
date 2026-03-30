@@ -18,6 +18,17 @@ import type { SessionMiddleware, MessageContext } from './types.js';
 
 export { cleanupAllSessions, cleanupUserSessions } from './session-pool.js';
 
+/**
+ * Attaches a WebSocket server to the existing HTTP server.
+ *
+ * Full lifecycle per connection:
+ *   1. Origin validation (CSRF protection)
+ *   2. Express session extraction from the HTTP upgrade request
+ *   3. Auth cookie restore (survives container restarts / EmptyDir wipes)
+ *   4. GitHub token revalidation (catches revoked tokens)
+ *   5. Pool lookup — reconnect to existing session or create a new one
+ *   6. Message dispatch via the handler registry
+ */
 export function setupWebSocket(
   server: Server,
   sessionMiddleware: SessionMiddleware
@@ -40,7 +51,7 @@ export function setupWebSocket(
   wss.on('close', () => clearInterval(heartbeat));
 
   wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
-    console.log('[WS-SERVER] New connection attempt from', req.socket.remoteAddress);
+    console.log('[WS] New connection from', req.socket.remoteAddress);
     (ws as any).missedPings = 0;
     ws.on('pong', () => { (ws as any).missedPings = 0; });
 
@@ -61,7 +72,6 @@ export function setupWebSocket(
     });
 
     const session = (req as any).session;
-    console.log('[WS-SERVER] Session extracted:', !!session, 'token:', !!session?.githubToken, 'user:', session?.githubUser?.login);
 
     // Restore auth from encrypted cookie when session file is missing (e.g. after EmptyDir wipe)
     if (session && !session.githubToken) {
@@ -73,13 +83,12 @@ export function setupWebSocket(
           session.githubUser = data.githubUser;
           session.githubAuthTime = data.githubAuthTime;
           session.save(() => {});
-          console.log(`[WS-SERVER] Restored auth from cookie for user=${data.githubUser.login}`);
+          console.log(`[WS] Restored auth from cookie for user=${data.githubUser.login}`);
         }
       }
     }
 
     const auth = checkAuth(session);
-    console.log('[WS-SERVER] Auth check result:', auth.authenticated, auth.error || 'ok');
     if (!auth.authenticated) {
       logSecurity('warn', 'ws_unauthorized', {
         ip: req.socket.remoteAddress,
@@ -110,11 +119,10 @@ export function setupWebSocket(
     const tabId = isValidTabId(rawTabId) ? rawTabId : 'default';
     const lastSeq = parseInt(reqUrl.searchParams.get('lastSeq') || '-1', 10);
     const poolKey = `${userLogin}:${tabId}`;
-    console.log('[WS-SERVER] Authenticated user:', userLogin, 'tab:', tabId, 'lastSeq:', lastSeq, 'checking pool...');
+    console.log('[WS] Authenticated:', userLogin, 'tab:', tabId);
     let entry = sessionPool.get(poolKey);
 
     if (entry) {
-      console.log('[WS-SERVER] Existing pool entry found for', poolKey);
       // Reattach to existing pool entry
       if (entry.ws && entry.ws !== ws && entry.ws.readyState === WebSocket.OPEN) {
         entry.ws.close(4002, 'Replaced by new connection');
@@ -136,7 +144,7 @@ export function setupWebSocket(
         }
       }
 
-      console.log('[WS-SERVER] Sending session_reconnected to', poolKey, 'hasSession:', !!entry.session);
+      console.log('[WS] Reconnected:', poolKey, 'activeSession:', !!entry.session);
       poolSend(entry, {
         type: 'session_reconnected',
         user: userLogin,
@@ -170,10 +178,9 @@ export function setupWebSocket(
     } else {
       // Create new pool entry — enforce per-user session cap
       if (countUserSessions(userLogin) >= config.maxSessionsPerUser) {
-        console.log('[WS-SERVER] Session cap reached for', userLogin, '— evicting oldest');
+        console.log('[WS] Session cap reached for', userLogin, '— evicting oldest');
         await evictOldestUserSession(userLogin);
       }
-      console.log('[WS-SERVER] Creating new pool entry for', poolKey);
       const client = createCopilotClient(githubToken, config.copilotConfigDir);
       entry = createPoolEntry(client, ws);
       sessionPool.set(poolKey, entry);
@@ -189,7 +196,7 @@ export function setupWebSocket(
       }
 
       const hasPersistedState = !!(persistedState && persistedState.messages.length > 0);
-      console.log('[WS-SERVER] Sending connected to', poolKey, 'persisted:', hasPersistedState);
+      console.log('[WS] Connected:', poolKey, hasPersistedState ? '(resuming persisted state)' : '(new)');
       poolSend(entry, {
         type: 'connected',
         user: userLogin,
@@ -213,7 +220,7 @@ export function setupWebSocket(
     const connectionEntry = entry;
 
     ws.on('close', (code: number, reason: Buffer) => {
-      console.log('[WS-SERVER] Client disconnected:', poolKey, 'code:', code, 'reason:', reason?.toString());
+      console.log('[WS] Disconnected:', poolKey, 'code:', code);
       if (connectionEntry.ws === ws) {
         connectionEntry.ws = null;
         connectionEntry.ttlTimer = setTimeout(async () => {
@@ -231,7 +238,6 @@ export function setupWebSocket(
     ws.on('message', async (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
-        console.log('[WS-SERVER] Message from', userLogin, ':', msg.type);
 
         if (!msg.type || !VALID_MESSAGE_TYPES.has(msg.type)) {
           poolSend(connectionEntry, { type: 'error', message: 'Unknown message type' });
@@ -261,6 +267,9 @@ export function setupWebSocket(
           rateLimitWindow.push(now);
         }
 
+        // Dispatch to the registered handler for this message type.
+        // Each handler lives in src/lib/server/ws/message-handlers/ and
+        // is keyed by the message type string.
         const handler = messageHandlers[msg.type];
         if (handler) {
           const ctx: MessageContext = { connectionEntry, githubToken, userLogin, poolKey, ws };

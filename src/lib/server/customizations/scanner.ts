@@ -264,6 +264,5 @@ export async function scanCustomizations(
 
   cached = { instructions, agents, prompts, mcpServers };
   cachedAt = Date.now();
-  console.log(`[scanner] Discovered ${instructions.length} instructions, ${agents.length} agents, ${prompts.length} prompts, ${mcpServers.length} mcp servers (home=${home}, root=${root})`);
   return cached;
 }

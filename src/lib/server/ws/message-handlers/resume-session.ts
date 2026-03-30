@@ -66,12 +66,11 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
       });
       resumed = true;
     } catch (resumeErr: any) {
-      console.log(`[RESUME] SDK resumeSession failed for ${sessionId}: ${resumeErr.message}`);
+      console.warn(`[RESUME] SDK resumeSession failed for ${sessionId}: ${resumeErr.message}`);
     }
 
     // Fallback: create a new session with context from the filesystem session
     if (!resumed) {
-      console.log(`[RESUME] Attempting context-based fallback for ${sessionId}…`);
       const context = await buildSessionContext(sessionId);
       if (!context) {
         throw new Error(`Session not found: ${sessionId}`);
@@ -85,7 +84,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
         onEvent,
         onHookEvent: (message) => poolSend(connectionEntry, message),
       });
-      console.log(`[RESUME] Fallback session created for ${sessionId} with context injection`);
+      console.log(`[RESUME] Context-based fallback for ${sessionId}`);
     }
 
     wireSessionEvents(connectionEntry.session, connectionEntry, sessionId, ctx.userLogin, ctx.poolKey.split(':').slice(1).join(':'));
@@ -110,7 +109,6 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
     if (detail?.plan) {
       try {
         await connectionEntry.session.rpc.plan.update({ content: detail.plan });
-        console.log(`[RESUME] Plan restored into SDK for session ${sessionId}`);
       } catch (planErr: any) {
         console.warn(`[RESUME] Failed to restore plan into SDK: ${planErr.message}`);
       }

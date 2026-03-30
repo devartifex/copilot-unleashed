@@ -11,10 +11,8 @@ initServerSideEffects();
 // Extract express-session from the bridge and attach to event.locals
 const sessionHandle: Handle = async ({ event, resolve }) => {
 	const sessionId = event.request.headers.get('x-session-id');
-	console.log(`[HOOKS] ${event.request.method} ${event.url.pathname} sessionId=${sessionId ?? 'NONE'}`);
 	if (sessionId) {
 		const session = getSessionById(sessionId) ?? null;
-		console.log(`[HOOKS] session resolved: hasSession=${!!session} hasToken=${!!session?.githubToken} user=${session?.githubUser?.login ?? 'none'}`);
 
 		// Restore auth from encrypted cookie when session file was lost (e.g. deploy wipe)
 		if (session && !session.githubToken) {
@@ -26,14 +24,13 @@ const sessionHandle: Handle = async ({ event, resolve }) => {
 					session.githubUser = data.githubUser;
 					session.githubAuthTime = data.githubAuthTime;
 					session.save(() => {});
-					console.log(`[HOOKS] Restored auth from cookie for user=${data.githubUser.login}`);
+					console.log(`[AUTH] Restored session from cookie for user=${data.githubUser.login}`);
 				}
 			}
 		}
 
 		event.locals.session = session;
 	} else {
-		console.log(`[HOOKS] NO x-session-id header — session will be null`);
 		event.locals.session = null;
 	}
 	return resolve(event);

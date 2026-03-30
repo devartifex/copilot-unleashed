@@ -9,6 +9,10 @@ function rawTabId(ctx: MessageContext): string {
   return ctx.poolKey.split(':').slice(1).join(':');
 }
 
+// ╔══════════════════════════════════════════════════════════════╗
+// ║ DEMO — Step 5: Inviare Messaggi all'SDK                      ║
+// ║ Una singola chiamata session.send() con prompt e allegati.   ║
+// ╚══════════════════════════════════════════════════════════════╝
 export async function handleChat(msg: any, ctx: MessageContext): Promise<void> {
   const { connectionEntry } = ctx;
 

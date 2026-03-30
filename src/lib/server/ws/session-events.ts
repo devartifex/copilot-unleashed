@@ -33,6 +33,11 @@ export function createCatchAllHandler(entry: PoolEntry, handledTypes: Set<string
   };
 }
 
+// ╔══════════════════════════════════════════════════════════════╗
+// ║ DEMO — Step 4: Ascoltare gli Eventi del SDK                  ║
+// ║ 26+ tipi di eventi: streaming testo, reasoning, tool,        ║
+// ║ piani, sub-agenti, compaction, e molto altro.                ║
+// ╚══════════════════════════════════════════════════════════════╝
 export function wireSessionEvents(
   session: any,
   entry: PoolEntry,

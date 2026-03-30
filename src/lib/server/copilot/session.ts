@@ -220,6 +220,11 @@ export function buildSessionHooks(onHookEvent: HookEventCallback): SessionConfig
   };
 }
 
+// ╔══════════════════════════════════════════════════════════════╗
+// ║ DEMO — Step 3: Creare una Sessione con il SDK               ║
+// ║ SessionConfig è il cuore dell'integrazione: modello,         ║
+// ║ streaming, MCP servers, hook, agenti, istruzioni custom.     ║
+// ╚══════════════════════════════════════════════════════════════╝
 export async function createCopilotSession(
   client: CopilotClient,
   githubToken: string,

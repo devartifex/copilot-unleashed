@@ -2,6 +2,11 @@ import { homedir } from 'node:os';
 import { CopilotClient } from '@github/copilot-sdk';
 import { config } from '../config.js';
 
+// ╔══════════════════════════════════════════════════════════════╗
+// ║ DEMO — Step 2: Creare il CopilotClient                     ║
+// ║ L'SDK si collega alla CLI di Copilot come subprocess.       ║
+// ║ Basta un token GitHub per iniziare.                         ║
+// ╚══════════════════════════════════════════════════════════════╝
 export function createCopilotClient(githubToken: string, configDir?: string): CopilotClient {
   const clientEnv: Record<string, string | undefined> = { ...process.env, GH_TOKEN: githubToken };
 

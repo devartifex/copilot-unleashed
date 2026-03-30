@@ -1,28 +1,41 @@
-# 🎤 Demo Walkthrough — GitHub Copilot SDK
+# 🎤 Demo — GitHub Copilot Dev Days
 
-> **Tempo stimato:** ~5 minuti di walkthrough codice + UI live
+> **Sessione:** 30 minuti · **Demo live:** ~5 minuti · **Branch:** `demo/devdays`
+
+## 📋 File da aprire durante la demo
+
+| Step | File | Link diretto |
+|------|------|-------------|
+| 1 · Dipendenza | `package.json` line 41 | [📄 package.json](https://github.com/devartifex/copilot-unleashed/blob/demo/devdays/package.json#L41) |
+| 2 · CopilotClient | `src/lib/server/copilot/client.ts` | [📄 client.ts](https://github.com/devartifex/copilot-unleashed/blob/demo/devdays/src/lib/server/copilot/client.ts) |
+| 3 · SessionConfig | `src/lib/server/copilot/session.ts` | [📄 session.ts](https://github.com/devartifex/copilot-unleashed/blob/demo/devdays/src/lib/server/copilot/session.ts#L229) |
+| 4 · Eventi SDK | `src/lib/server/ws/session-events.ts` | [📄 session-events.ts](https://github.com/devartifex/copilot-unleashed/blob/demo/devdays/src/lib/server/ws/session-events.ts#L43) |
+| 5 · session.send() | `src/lib/server/ws/message-handlers/chat.ts` | [📄 chat.ts](https://github.com/devartifex/copilot-unleashed/blob/demo/devdays/src/lib/server/ws/message-handlers/chat.ts#L13) |
+
+---
 
 ## Panoramica
 
 **Copilot Unleashed** è un'applicazione chat multi-modello self-hosted costruita
 interamente con il **GitHub Copilot SDK** (`@github/copilot-sdk`).
 
-Architettura: **Browser (Svelte 5)** → **WebSocket** → **Node.js Server** → **Copilot SDK** → **GitHub Copilot**
+```
+Browser (Svelte 5)  →  WebSocket  →  Node.js Server  →  Copilot SDK  →  GitHub Copilot
+```
 
 ---
 
-## Step 1 — La dipendenza (package.json)
+## Step 1 · La dipendenza — [`package.json`](https://github.com/devartifex/copilot-unleashed/blob/demo/devdays/package.json#L41)
 
-```bash
-# Mostrare la riga 41 di package.json
+```json
 "@github/copilot-sdk": "^0.2.0"
 ```
 
-> Questa è l'unica dipendenza necessaria per integrare il Copilot SDK.
+> L'unica dipendenza necessaria. Disponibile in TypeScript, Python, .NET e Go.
 
 ---
 
-## Step 2 — Creare il Client (src/lib/server/copilot/client.ts)
+## Step 2 · Creare il Client — [`client.ts`](https://github.com/devartifex/copilot-unleashed/blob/demo/devdays/src/lib/server/copilot/client.ts)
 
 ```typescript
 import { CopilotClient } from '@github/copilot-sdk';
@@ -36,11 +49,11 @@ export function createCopilotClient(githubToken: string): CopilotClient {
 }
 ```
 
-> **Punto chiave:** bastano 3 righe per creare un client. Il token GitHub è tutto ciò che serve.
+> **Punto chiave:** bastano 3 righe. Il token GitHub è tutto ciò che serve.
 
 ---
 
-## Step 3 — Creare una Sessione (src/lib/server/copilot/session.ts)
+## Step 3 · Creare una Sessione — [`session.ts`](https://github.com/devartifex/copilot-unleashed/blob/demo/devdays/src/lib/server/copilot/session.ts#L229)
 
 ```typescript
 const sessionConfig: SessionConfig = {
@@ -54,36 +67,32 @@ const sessionConfig: SessionConfig = {
 return client.createSession(sessionConfig);
 ```
 
-> **Punto chiave:** SessionConfig è dove configurate tutto — modello, streaming,
-> istruzioni custom, server MCP, agenti personalizzati, hook per il ciclo di vita.
+> **Punto chiave:** `SessionConfig` è dove configurate tutto — modello, streaming,
+> istruzioni custom, MCP servers, agenti personalizzati, hook del ciclo di vita.
 
 ---
 
-## Step 4 — Ascoltare gli Eventi (src/lib/server/ws/session-events.ts)
+## Step 4 · Ascoltare gli Eventi — [`session-events.ts`](https://github.com/devartifex/copilot-unleashed/blob/demo/devdays/src/lib/server/ws/session-events.ts#L43)
 
 ```typescript
 session.on('assistant.message_delta', (event) => {
-  // Streaming del testo in tempo reale
   poolSend(entry, { type: 'delta', content: event.data.deltaContent });
 });
 
 session.on('tool.execution_start', (event) => {
-  // L'agente sta usando uno strumento
   poolSend(entry, { type: 'tool_start', toolName: event.data.toolName });
 });
 
 session.on('assistant.turn_end', () => {
-  // Il turno è completo
   poolSend(entry, { type: 'turn_end' });
 });
 ```
 
-> **Punto chiave:** 26+ tipi di eventi — dal testo in streaming, al reasoning,
-> all'esecuzione di tool, alla gestione dei piani, fino ai sub-agenti.
+> **Punto chiave:** 26+ tipi di eventi — streaming, reasoning, tool, piani, sub-agenti.
 
 ---
 
-## Step 5 — Inviare Messaggi (src/lib/server/ws/message-handlers/chat.ts)
+## Step 5 · Inviare Messaggi — [`chat.ts`](https://github.com/devartifex/copilot-unleashed/blob/demo/devdays/src/lib/server/ws/message-handlers/chat.ts#L13)
 
 ```typescript
 await connectionEntry.session.send({
@@ -93,20 +102,20 @@ await connectionEntry.session.send({
 });
 ```
 
-> **Punto chiave:** una singola chiamata `session.send()` per inviare messaggi.
-> Supporta allegati, menzioni di file, e diverse modalità di invio.
+> **Punto chiave:** una sola chiamata `session.send()`. Supporta allegati e modalità diverse.
 
 ---
 
-## Step 6 — Demo Live 🚀
+## Step 6 · Demo Live 🚀
 
 ```bash
 npm run dev
+# → http://localhost:3000
 ```
 
-> Aprire il browser su http://localhost:3000 e mostrare:
-> 1. Login con GitHub (Device Flow)
-> 2. Selezione del modello (Claude, GPT, Gemini...)
-> 3. Invio di un messaggio e streaming della risposta
-> 4. Tool execution in tempo reale
-> 5. Cambio modalità (Chat → Autopilot)
+Mostrare in sequenza:
+1. Login con GitHub (Device Flow — no password, solo codice)
+2. Selezione del modello (Claude, GPT-4.1, Gemini…)
+3. Invio di un messaggio → streaming della risposta in tempo reale
+4. Tool execution visibile nell'UI
+5. Cambio modalità: Chat → Autopilot

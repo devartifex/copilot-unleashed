@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { CopilotClient } from '@github/copilot-sdk';
 import type { SessionConfig, SystemPromptSection, SectionOverride, MCPServerConfig } from '@github/copilot-sdk';
 
@@ -129,6 +130,80 @@ function normalizeStringRecord(value: unknown): Record<string, string> | undefin
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+interface McpOAuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  scope: string;
+}
+
+/**
+ * Reads M365 OAuth tokens managed by the Copilot CLI.
+ * The CLI stores tokens in ~/.copilot/mcp-oauth-config/{SHA256(serverUrl)}.tokens.json
+ * after the user authenticates via `copilot /mcp` → re-auth flow.
+ * Returns the access token if valid, or a warning message if expired/missing.
+ */
+async function loadCliOAuthToken(
+  serverUrl: string,
+  configDir: string,
+): Promise<{ token?: string; expired?: boolean }> {
+  const hash = createHash('sha256').update(serverUrl).digest('hex');
+  const tokensPath = join(configDir, 'mcp-oauth-config', `${hash}.tokens.json`);
+
+  try {
+    const raw = await readFile(tokensPath, 'utf8');
+    const tokens: McpOAuthTokens = JSON.parse(raw);
+
+    if (!tokens.accessToken) {
+      return {};
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (tokens.expiresAt && tokens.expiresAt <= nowSec) {
+      return { expired: true };
+    }
+
+    return { token: tokens.accessToken };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * For HTTP MCP servers that require OAuth (no static Authorization header),
+ * attempt to inject a bearer token from the Copilot CLI's token store.
+ */
+async function injectOAuthHeaders(
+  servers: Record<string, MCPServerConfig>,
+  configDir: string,
+): Promise<string[]> {
+  const warnings: string[] = [];
+
+  for (const [name, server] of Object.entries(servers)) {
+    if (server.type !== 'http' && server.type !== 'sse') continue;
+
+    const httpServer = server as { url: string; headers?: Record<string, string> };
+    // Skip servers that already have an Authorization header
+    if (httpServer.headers?.Authorization || httpServer.headers?.authorization) continue;
+
+    const result = await loadCliOAuthToken(httpServer.url, configDir);
+
+    if (result.expired) {
+      warnings.push(
+        `[MCP] OAuth token for "${name}" has expired. Run \`copilot\` CLI and use /mcp → re-auth to refresh.`,
+      );
+      continue;
+    }
+
+    if (result.token) {
+      httpServer.headers = { ...httpServer.headers, Authorization: `Bearer ${result.token}` };
+      console.log(`[MCP] Injected OAuth token for "${name}" from CLI token store`);
+    }
+  }
+
+  return warnings;
+}
+
 async function loadConfiguredMcpServers(configDir?: string): Promise<Record<string, MCPServerConfig>> {
   const resolvedConfigDir = configDir || config.copilotConfigDir || join(homedir(), '.copilot');
   const configPath = join(resolvedConfigDir, 'mcp-config.json');
@@ -168,7 +243,8 @@ async function loadConfiguredMcpServers(configDir?: string): Promise<Record<stri
     }
 
     return result;
-  } catch {
+  } catch (err) {
+    console.error('[MCP] Failed to load configured MCP servers:', err instanceof Error ? err.message : err);
     return {};
   }
 }
@@ -177,7 +253,14 @@ export async function buildSessionMcpServers(
   githubToken: string,
   configDir?: string,
 ) : Promise<Record<string, MCPServerConfig>> {
+  const resolvedConfigDir = configDir || config.copilotConfigDir || join(homedir(), '.copilot');
   const configuredMcpServers = await loadConfiguredMcpServers(configDir);
+
+  // Inject OAuth tokens from the Copilot CLI's token store for HTTP servers
+  const warnings = await injectOAuthHeaders(configuredMcpServers, resolvedConfigDir);
+  for (const warning of warnings) {
+    console.warn(warning);
+  }
 
   return {
     ...configuredMcpServers,

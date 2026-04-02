@@ -67,6 +67,18 @@ const server = createServer((req, res) => {
       return origEnd(...args);
     };
 
+    const origSetHeader = res.setHeader.bind(res);
+    res.setHeader = function (...args) {
+      if (!res.headersSent) return origSetHeader(...args);
+      return res;
+    };
+
+    const origWriteHead = res.writeHead.bind(res);
+    res.writeHead = function (...args) {
+      if (!res.headersSent) return origWriteHead(...args);
+      return res;
+    };
+
     handler(req, res);
   });
 });

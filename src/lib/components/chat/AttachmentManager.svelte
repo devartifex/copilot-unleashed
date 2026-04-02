@@ -116,6 +116,12 @@
     input.onchange = (e) => handleFilesChanged(e);
     input.click();
   }
+
+  export function addFiles(files: File[]) {
+    if (files.length === 0) return;
+    const combined = [...selectedFiles, ...files].slice(0, MAX_FILES);
+    selectedFiles = combined;
+  }
 </script>
 
 <input

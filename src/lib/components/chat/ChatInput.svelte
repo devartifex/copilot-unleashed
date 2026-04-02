@@ -272,6 +272,42 @@
     };
   });
 
+  // ── Paste & drop handlers ────────────────────────────────────────
+  let isDragging = $state(false);
+
+  function extractFiles(dataTransfer: DataTransfer | null): File[] {
+    if (!dataTransfer) return [];
+    return Array.from(dataTransfer.files).filter(
+      (f) => f.type.startsWith('image/') || f.type.startsWith('text/'),
+    );
+  }
+
+  function handlePaste(event: ClipboardEvent) {
+    const files = extractFiles(event.clipboardData);
+    if (files.length === 0) return;
+    event.preventDefault();
+    attachComp?.addFiles(files.slice(0, MAX_FILES - selectedFiles.length));
+  }
+
+  function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    isDragging = false;
+    const files = extractFiles(event.dataTransfer);
+    if (files.length === 0) return;
+    attachComp?.addFiles(files.slice(0, MAX_FILES - selectedFiles.length));
+  }
+
+  function handleDragOver(event: DragEvent) {
+    event.preventDefault();
+    isDragging = true;
+  }
+
+  function handleDragLeave(event: DragEvent) {
+    // Only clear when leaving the container, not entering a child
+    if (event.currentTarget instanceof HTMLElement && event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+    isDragging = false;
+  }
+
   // Force viewport recalc on textarea focus (iOS keyboard animation delay)
   function handleTextareaFocus() {
     const viewport = window.visualViewport;
@@ -293,7 +329,15 @@
     {supportsVision}
   />
 
-  <div class="input-container" class:user-input-active={!!pendingUserInput}>
+  <div
+    class="input-container"
+    class:user-input-active={!!pendingUserInput}
+    class:drag-over={isDragging}
+    ondrop={handleDrop}
+    ondragover={handleDragOver}
+    ondragleave={handleDragLeave}
+    role="presentation"
+  >
     {#if pendingUserInput}
       <div class="user-input-banner">
         <span class="user-input-question">{pendingUserInput.question}</span>
@@ -318,6 +362,7 @@
       oninput={handleInput}
       onkeydown={handleKeydown}
       onfocus={handleTextareaFocus}
+      onpaste={handlePaste}
     ></textarea>
 
     <SlashCommandPalette
@@ -488,6 +533,11 @@
 
   .input-container.user-input-active {
     border-color: var(--purple);
+  }
+
+  .input-container.drag-over {
+    border-color: var(--purple);
+    background: color-mix(in srgb, var(--purple) 8%, var(--bg-overlay));
   }
 
   /* ── User input prompt (inline) ─────────────────────────────────── */

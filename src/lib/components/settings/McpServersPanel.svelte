@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { ToolInfo, SourcedMcpServerInfo } from '$lib/types/index.js';
-  import SourceBadge from '$lib/components/shared/SourceBadge.svelte';
 
   interface Props {
     discoveredMcpServers: SourcedMcpServerInfo[];
@@ -47,17 +46,20 @@
 {:else if discoveredMcpServers.length > 0}
   {#each discoveredMcpServers as server (server.name)}
     {@const sessionTools = getMcpTools(server.name)}
+    {@const isAuthError = server.error?.includes('HTTP error') || server.error?.includes('401') || server.error?.includes('Streamable HTTP')}
+    {@const effectiveStatus = isAuthError && server.status === 'failed' ? 'auth_required' : server.status}
     <div class="mcp-server-item">
       <div class="mcp-server-header">
         <span class="mcp-server-name">{server.name}</span>
-        <SourceBadge source={server.source} />
         <span class="mcp-server-badge">{server.type || 'mcp'}</span>
-        {#if server.status && server.status !== 'not_configured'}
-          <span class="mcp-server-badge {server.status === 'connected' ? 'status-ok' : server.status === 'failed' ? 'status-err' : ''}">{server.status}</span>
+        {#if effectiveStatus && effectiveStatus !== 'not_configured'}
+          <span class="mcp-server-badge {effectiveStatus === 'connected' ? 'status-ok' : effectiveStatus === 'auth_required' ? 'status-warn' : effectiveStatus === 'failed' ? 'status-err' : ''}">{effectiveStatus === 'auth_required' ? 'needs auth' : effectiveStatus}</span>
         {/if}
       </div>
       <div class="tool-toggle-desc">{server.url || server.command || 'CLI-configured'}</div>
-      {#if server.error}
+      {#if isAuthError}
+        <div class="tool-toggle-desc" style="color: var(--warning, #d29922)">Run <code>copilot</code> CLI and use /mcp to authenticate this server.</div>
+      {:else if server.error}
         <div class="tool-toggle-desc" style="color: var(--danger)">{server.error}</div>
       {/if}
       {#if sessionTools.length > 0}
@@ -72,7 +74,7 @@
             To test this MCP, ask for one of these capabilities explicitly so the model has a clear reason to call it.
           </p>
         </div>
-      {:else if server.status === 'failed'}
+      {:else if effectiveStatus === 'failed'}
         <p class="settings-hint mcp-test-hint">
           This server is configured but failed to start, so it cannot expose tools to the current session yet.
         </p>
@@ -137,6 +139,7 @@
     border: 1px solid var(--border);
   }
   .mcp-server-badge.status-ok { color: var(--success, #3fb950); border-color: var(--success, #3fb950); }
+  .mcp-server-badge.status-warn { color: var(--warning, #d29922); border-color: var(--warning, #d29922); }
   .mcp-server-badge.status-err { color: var(--danger); border-color: var(--danger); }
   .mcp-tools-block {
     margin-top: var(--sp-2);

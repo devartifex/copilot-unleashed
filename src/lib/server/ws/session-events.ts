@@ -25,9 +25,20 @@ export const HANDLED_EVENT_TYPES = new Set([
   'system.notification',
 ]);
 
+// Events that are safe to silently ignore (high-frequency or SDK-internal)
+const SUPPRESSED_EVENT_TYPES = new Set([
+  'pending_messages.modified',
+  'assistant.streaming_delta',
+  'user.message',
+  'hook.start',
+  'hook.end',
+  'session.mcp_servers_loaded',
+  'session.tools_updated',
+]);
+
 export function createCatchAllHandler(entry: PoolEntry, handledTypes: Set<string>): (event: any) => void {
   return (event: any) => {
-    if (!handledTypes.has(event.type)) {
+    if (!handledTypes.has(event.type) && !SUPPRESSED_EVENT_TYPES.has(event.type)) {
       console.log('[EVENT] unhandled SDK event:', event.type, JSON.stringify(event.data ?? {}).slice(0, 200));
     }
   };

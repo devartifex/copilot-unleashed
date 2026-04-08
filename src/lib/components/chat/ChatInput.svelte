@@ -277,9 +277,9 @@
 
   function extractFiles(dataTransfer: DataTransfer | null): File[] {
     if (!dataTransfer) return [];
-    return Array.from(dataTransfer.files).filter(
-      (f) => f.type.startsWith('image/') || f.type.startsWith('text/'),
-    );
+    // No MIME filter — browsers report empty or generic types for code files.
+    // AttachmentManager + server-side allowlist are the source of truth.
+    return Array.from(dataTransfer.files);
   }
 
   function handlePaste(event: ClipboardEvent) {

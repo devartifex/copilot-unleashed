@@ -243,6 +243,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       case 'session_created':
         currentModel = msg.model;
         if (msg.sessionId) currentSessionId = msg.sessionId;
+        plan = { exists: false, content: '' };
         wsStore.getQuota();
         wsStore.listSessions();
         break;
@@ -810,6 +811,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     sessionDetail = null;
     baselineUsedRequests = null;
     sessionTotals = { ...emptyTotals };
+    plan = { exists: false, content: '' };
 
     // Notify server to delete persisted state
     wsStore.send({ type: 'clear_chat' });

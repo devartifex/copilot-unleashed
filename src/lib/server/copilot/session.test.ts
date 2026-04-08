@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -225,6 +226,188 @@ describe('createCopilotSession', () => {
 
     const mcpServers = getSessionConfig(client).mcpServers as Record<string, Record<string, unknown>>;
     expect(Object.keys(mcpServers)).toEqual(['github']);
+  });
+
+  it('injects OAuth token from CLI token store for HTTP MCP servers without Authorization', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'copilot-mcp-oauth-'));
+    const serverUrl = 'https://agent365.svc.cloud.microsoft/agents/tenants/test/servers/mcp_MailTools';
+    const hash = createHash('sha256').update(serverUrl).digest('hex');
+    const oauthDir = join(dir, 'mcp-oauth-config');
+    await mkdir(oauthDir, { recursive: true });
+
+    await writeFile(join(dir, 'mcp-config.json'), JSON.stringify({
+      mcpServers: {
+        'm365-mail': { type: 'http', url: serverUrl, headers: {} },
+      },
+    }));
+
+    await writeFile(join(oauthDir, `${hash}.tokens.json`), JSON.stringify({
+      accessToken: 'test-m365-token',
+      refreshToken: 'test-refresh',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      scope: 'https://agent365.svc.cloud.microsoft/.default',
+    }));
+
+    try {
+      const mcpServers = await buildSessionMcpServers('gh-token', dir);
+      const mailServer = mcpServers['m365-mail'] as { headers?: Record<string, string> };
+      expect(mailServer.headers?.Authorization).toBe('Bearer test-m365-token');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not inject OAuth token when server already has an Authorization header', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'copilot-mcp-oauth-'));
+    const serverUrl = 'https://example.com/mcp';
+    const hash = createHash('sha256').update(serverUrl).digest('hex');
+    const oauthDir = join(dir, 'mcp-oauth-config');
+    await mkdir(oauthDir, { recursive: true });
+
+    await writeFile(join(dir, 'mcp-config.json'), JSON.stringify({
+      mcpServers: {
+        'custom-server': { type: 'http', url: serverUrl, headers: { Authorization: 'Bearer static-token' } },
+      },
+    }));
+
+    await writeFile(join(oauthDir, `${hash}.tokens.json`), JSON.stringify({
+      accessToken: 'should-not-be-used',
+      refreshToken: 'r',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      scope: 'test',
+    }));
+
+    try {
+      const mcpServers = await buildSessionMcpServers('gh-token', dir);
+      const server = mcpServers['custom-server'] as { headers?: Record<string, string> };
+      expect(server.headers?.Authorization).toBe('Bearer static-token');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('warns and skips injection when OAuth token is expired', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'copilot-mcp-oauth-'));
+    const serverUrl = 'https://agent365.svc.cloud.microsoft/agents/tenants/test/servers/mcp_CalendarTools';
+    const hash = createHash('sha256').update(serverUrl).digest('hex');
+    const oauthDir = join(dir, 'mcp-oauth-config');
+    await mkdir(oauthDir, { recursive: true });
+
+    await writeFile(join(dir, 'mcp-config.json'), JSON.stringify({
+      mcpServers: {
+        'm365-calendar': { type: 'http', url: serverUrl, headers: {} },
+      },
+    }));
+
+    // Expired token with no config file for refresh
+    await writeFile(join(oauthDir, `${hash}.tokens.json`), JSON.stringify({
+      accessToken: 'expired-token',
+      refreshToken: 'r',
+      expiresAt: Math.floor(Date.now() / 1000) - 60,
+      scope: 'test',
+    }));
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    try {
+      const mcpServers = await buildSessionMcpServers('gh-token', dir);
+      const server = mcpServers['m365-calendar'] as { headers?: Record<string, string> };
+      expect(server.headers?.Authorization).toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('expired'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes an expired OAuth token using the refresh_token grant', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'copilot-mcp-oauth-'));
+    const serverUrl = 'https://agent365.svc.cloud.microsoft/agents/tenants/test/servers/mcp_MailTools';
+    const hash = createHash('sha256').update(serverUrl).digest('hex');
+    const oauthDir = join(dir, 'mcp-oauth-config');
+    await mkdir(oauthDir, { recursive: true });
+
+    await writeFile(join(dir, 'mcp-config.json'), JSON.stringify({
+      mcpServers: {
+        'm365-mail': { type: 'http', url: serverUrl, headers: {} },
+      },
+    }));
+
+    // Expired token
+    await writeFile(join(oauthDir, `${hash}.tokens.json`), JSON.stringify({
+      accessToken: 'expired-token',
+      refreshToken: 'valid-refresh-token',
+      expiresAt: Math.floor(Date.now() / 1000) - 60,
+      scope: 'https://agent365.svc.cloud.microsoft/.default',
+    }));
+
+    // OAuth config with authorization server details
+    await writeFile(join(oauthDir, `${hash}.json`), JSON.stringify({
+      serverUrl,
+      authorizationServerUrl: 'https://login.microsoftonline.com/organizations/v2.0',
+      clientId: 'test-client-id',
+      redirectUri: 'http://127.0.0.1:12345/',
+      resourceUrl: serverUrl,
+      issuedAt: 0,
+      isStatic: false,
+    }));
+
+    // Mock the token endpoint response
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: 'fresh-access-token',
+        refresh_token: 'fresh-refresh-token',
+        expires_in: 3600,
+        scope: 'https://agent365.svc.cloud.microsoft/.default',
+      }),
+    });
+
+    try {
+      const mcpServers = await buildSessionMcpServers('gh-token', dir);
+      const server = mcpServers['m365-mail'] as { headers?: Record<string, string> };
+      expect(server.headers?.Authorization).toBe('Bearer fresh-access-token');
+
+      // Verify fetch was called with correct params
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://login.microsoftonline.com/organizations/oauth2/v2.0/token',
+        expect.objectContaining({ method: 'POST' }),
+      );
+
+      // Verify tokens were written back to disk
+      const { readFile: rf } = await import('node:fs/promises');
+      const updated = JSON.parse(await rf(join(oauthDir, `${hash}.tokens.json`), 'utf8'));
+      expect(updated.accessToken).toBe('fresh-access-token');
+      expect(updated.refreshToken).toBe('fresh-refresh-token');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('gracefully handles missing OAuth token files', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'copilot-mcp-oauth-'));
+
+    await writeFile(join(dir, 'mcp-config.json'), JSON.stringify({
+      mcpServers: {
+        'm365-teams': {
+          type: 'http',
+          url: 'https://agent365.svc.cloud.microsoft/agents/tenants/test/servers/mcp_TeamsServer',
+          headers: {},
+        },
+      },
+    }));
+
+    try {
+      const mcpServers = await buildSessionMcpServers('gh-token', dir);
+      const server = mcpServers['m365-teams'] as { headers?: Record<string, string> };
+      expect(server.headers?.Authorization).toBeUndefined();
+      expect(mcpServers.github).toBeDefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('wires session hooks when onHookEvent callback is provided', async () => {

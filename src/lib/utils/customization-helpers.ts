@@ -20,7 +20,9 @@ export function normalizeCustomizationSource(raw: string | undefined): Customiza
       : 'builtin';
 }
 
-/** Merge incoming MCP server list with existing, deduplicating by name */
+/** Merge incoming MCP server list with existing, deduplicating by name.
+ *  Only overwrites fields when the incoming value is defined, and prefers
+ *  live status (connected/failed) over static status (not_configured). */
 export function mergeMcpServers(
   current: SourcedMcpServerInfo[],
   incoming: Array<{
@@ -38,10 +40,22 @@ export function mergeMcpServers(
   for (const server of incoming) {
     const key = server.name.toLowerCase();
     const existing = merged.get(key);
+
+    // Pick the more informative status: live status wins over static
+    const existingIsLive = existing?.status === 'connected' || existing?.status === 'failed' || existing?.status === 'auth_required';
+    const incomingIsLive = server.status === 'connected' || server.status === 'failed';
+    const status = incomingIsLive ? server.status
+      : existingIsLive ? existing!.status
+      : server.status || existing?.status || 'not_configured';
+
     merged.set(key, {
-      ...existing,
-      ...server,
+      name: server.name,
       source: normalizeCustomizationSource(server.source ?? existing?.source),
+      status,
+      type: server.type ?? existing?.type,
+      url: server.url ?? existing?.url,
+      command: server.command ?? existing?.command,
+      error: incomingIsLive ? server.error : (server.error ?? existing?.error),
     });
   }
 

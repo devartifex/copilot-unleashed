@@ -34,8 +34,8 @@
         const a = att as { type: 'file'; path: string; name: string };
         const ext = a.name.split('.').pop()?.toLowerCase() ?? '';
         const isImage = IMAGE_EXTENSIONS.has(ext);
-        // Extract uploadId and filename from path: /tmp/copilot-uploads/{uploadId}/{filename}
-        const parts = a.path.split('/');
+        // Extract uploadId and filename from path (handles both / and \ separators)
+        const parts = a.path.split(/[/\\]/);
         const filename = parts[parts.length - 1];
         const uploadId = parts[parts.length - 2];
         const url = `/api/upload/files/${encodeURIComponent(uploadId)}/${encodeURIComponent(filename)}`;

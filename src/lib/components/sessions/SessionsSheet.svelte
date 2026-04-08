@@ -140,7 +140,7 @@
   function formatPath(cwd: string | undefined): string {
     if (!cwd) return '';
     // Show last 2 path segments
-    const parts = cwd.split('/').filter(Boolean);
+    const parts = cwd.split(/[/\\]/).filter(Boolean);
     return parts.length > 2 ? `…/${parts.slice(-2).join('/')}` : cwd;
   }
 </script>

@@ -23,7 +23,7 @@
 
   function formatPath(cwd: string | undefined): string {
     if (!cwd) return '';
-    const parts = cwd.split('/').filter(Boolean);
+    const parts = cwd.split(/[/\\]/).filter(Boolean);
     return parts.length > 3 ? `…/${parts.slice(-3).join('/')}` : cwd;
   }
 </script>

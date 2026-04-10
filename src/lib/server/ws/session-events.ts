@@ -24,6 +24,17 @@ export const HANDLED_EVENT_TYPES = new Set([
   'elicitation.requested', 'elicitation.completed',
   'exit_plan_mode.requested', 'exit_plan_mode.completed',
   'system.notification',
+  // Phase 10: newly wired events
+  'session.start', 'session.resume',
+  'session.remote_steerable_changed', 'session.snapshot_rewind',
+  'session.handoff', 'session.background_tasks_changed',
+  'session.skills_loaded', 'session.custom_agents_updated',
+  'session.mcp_server_status_changed', 'session.extensions_loaded',
+  'session.mcp_servers_loaded', 'session.tools_updated',
+  'abort',
+  'mcp.oauth_required', 'mcp.oauth_completed',
+  'sampling.requested', 'sampling.completed',
+  'external_tool.requested', 'external_tool.completed',
 ]);
 
 // High-frequency or SDK-internal events safe to silently ignore
@@ -33,8 +44,6 @@ const SUPPRESSED_EVENT_TYPES = new Set([
   'user.message',
   'hook.start',
   'hook.end',
-  'session.mcp_servers_loaded',
-  'session.tools_updated',
 ]);
 
 export function createCatchAllHandler(entry: PoolEntry, handledTypes: Set<string>): (event: any) => void {
@@ -279,6 +288,65 @@ export function wireSessionEvents(
 
   session.on('system.notification', (event: any) => {
     poolSend(entry, { type: 'system_notification', content: event.data?.content, kind: event.data?.kind });
+  });
+
+  // Phase 10: newly wired events
+  session.on('session.start', (event: any) => {
+    poolSend(entry, { type: 'session_start', ...event.data });
+  });
+  session.on('session.resume', (event: any) => {
+    poolSend(entry, { type: 'session_resume', ...event.data });
+  });
+  session.on('session.remote_steerable_changed', (event: any) => {
+    poolSend(entry, { type: 'remote_steerable_changed', ...event.data });
+  });
+  session.on('session.snapshot_rewind', (event: any) => {
+    poolSend(entry, { type: 'snapshot_rewind', ...event.data });
+  });
+  session.on('session.handoff', (event: any) => {
+    poolSend(entry, { type: 'session_handoff', ...event.data });
+  });
+  session.on('session.background_tasks_changed', (event: any) => {
+    poolSend(entry, { type: 'background_tasks_changed', agents: event.data?.agents });
+  });
+  session.on('session.skills_loaded', (event: any) => {
+    poolSend(entry, { type: 'skills_loaded', ...event.data });
+  });
+  session.on('session.custom_agents_updated', (event: any) => {
+    poolSend(entry, { type: 'custom_agents_updated', ...event.data });
+  });
+  session.on('session.mcp_server_status_changed', (event: any) => {
+    poolSend(entry, { type: 'mcp_server_status_changed', name: event.data?.name, status: event.data?.status, error: event.data?.error });
+  });
+  session.on('session.extensions_loaded', (event: any) => {
+    poolSend(entry, { type: 'extensions_loaded', ...event.data });
+  });
+  session.on('session.mcp_servers_loaded', (event: any) => {
+    poolSend(entry, { type: 'mcp_servers_loaded', ...event.data });
+  });
+  session.on('session.tools_updated', (event: any) => {
+    poolSend(entry, { type: 'tools_updated', ...event.data });
+  });
+  session.on('abort', () => {
+    poolSend(entry, { type: 'abort' });
+  });
+  session.on('mcp.oauth_required', (event: any) => {
+    poolSend(entry, { type: 'mcp_oauth_required', serverName: event.data?.serverName, authUrl: event.data?.authUrl });
+  });
+  session.on('mcp.oauth_completed', (event: any) => {
+    poolSend(entry, { type: 'mcp_oauth_completed', serverName: event.data?.serverName });
+  });
+  session.on('sampling.requested', (event: any) => {
+    poolSend(entry, { type: 'sampling_requested', ...event.data });
+  });
+  session.on('sampling.completed', (event: any) => {
+    poolSend(entry, { type: 'sampling_completed', ...event.data });
+  });
+  session.on('external_tool.requested', (event: any) => {
+    poolSend(entry, { type: 'external_tool_requested', ...event.data });
+  });
+  session.on('external_tool.completed', (event: any) => {
+    poolSend(entry, { type: 'external_tool_completed', ...event.data });
   });
 
   // Catch-all: log unhandled event types for debugging / future audit

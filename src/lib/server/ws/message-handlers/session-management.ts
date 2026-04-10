@@ -130,6 +130,61 @@ export async function handleGetSessionDetail(msg: any, ctx: MessageContext): Pro
   }
 }
 
+export async function handleGetSessionHistory(msg: any, ctx: MessageContext): Promise<void> {
+  const { connectionEntry } = ctx;
+
+  const session = connectionEntry.session;
+  if (!session) {
+    poolSend(connectionEntry, { type: 'error', message: 'No active session' });
+    return;
+  }
+
+  try {
+    const events = await session.getMessages();
+    const eventList = Array.isArray(events) ? events : [];
+    debug('[SESSION_HISTORY] Got', eventList.length, 'events');
+
+    const messages: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }> = eventList
+      .filter((e: any) => e.type === 'assistant.message' || e.type === 'user.message')
+      .map((e: any, i: number) => ({
+        id: `hist-${i}-${Date.now()}`,
+        role: e.type === 'user.message' ? 'user' as const : 'assistant' as const,
+        content: e.data?.content ?? '',
+        timestamp: e.timestamp ? new Date(e.timestamp).getTime() : Date.now(),
+      }));
+
+    poolSend(connectionEntry, { type: 'session_history', messages });
+  } catch (err: any) {
+    console.error('[SESSION_HISTORY] Error:', err.message);
+    poolSend(connectionEntry, { type: 'error', message: `Failed to get session history: ${err.message}` });
+  }
+}
+
+export async function handleSessionLog(msg: any, ctx: MessageContext): Promise<void> {
+  const { connectionEntry } = ctx;
+
+  const session = connectionEntry.session;
+  if (!session) {
+    poolSend(connectionEntry, { type: 'error', message: 'No active session' });
+    return;
+  }
+
+  const logMessage = typeof msg.message === 'string' ? msg.message.trim() : '';
+  if (!logMessage) {
+    poolSend(connectionEntry, { type: 'error', message: 'Log message is required' });
+    return;
+  }
+
+  try {
+    const level = msg.level === 'warning' || msg.level === 'error' ? msg.level : 'info';
+    await session.log(logMessage, { level });
+    debug('[SESSION_LOG] Logged:', level, logMessage.slice(0, 80));
+  } catch (err: any) {
+    console.error('[SESSION_LOG] Error:', err.message);
+    poolSend(connectionEntry, { type: 'error', message: `Failed to log message: ${err.message}` });
+  }
+}
+
 export async function handleListModels(msg: any, ctx: MessageContext): Promise<void> {
   const { connectionEntry } = ctx;
 

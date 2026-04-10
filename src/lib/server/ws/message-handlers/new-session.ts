@@ -5,8 +5,9 @@ import { config } from '../../config.js';
 import { poolSend } from '../session-pool.js';
 import { VALID_MODES } from '../constants.js';
 import { wireSessionEvents, createCatchAllHandler, HANDLED_EVENT_TYPES } from '../session-events.js';
-import { makeUserInputHandler, makePermissionHandler } from '../permissions.js';
+import { makeUserInputHandler, makePermissionHandler, makeElicitationHandler } from '../permissions.js';
 import { chatStateStore } from '../../chat-state-singleton.js';
+import { loadProviderConfig } from '../../byok/provider-store.js';
 import type { MessageContext } from '../types.js';
 
 function rawTabId(ctx: MessageContext): string {
@@ -102,6 +103,12 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
 
     const agent = typeof msg.agent === 'string' ? msg.agent.trim() : undefined;
 
+    // Load BYOK provider config if enabled and user has one configured
+    let provider: Awaited<ReturnType<typeof loadProviderConfig>> = null;
+    if (config.byokEnabled && msg.useByok !== false) {
+      provider = await loadProviderConfig(ctx.userLogin);
+    }
+
     const onEvent = createCatchAllHandler(connectionEntry, HANDLED_EVENT_TYPES);
 
     connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, {
@@ -113,6 +120,7 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       onUserInputRequest: makeUserInputHandler(connectionEntry, ctx.userLogin),
       permissionMode,
       onPermissionRequest: makePermissionHandler(connectionEntry, ctx.userLogin),
+      onElicitationRequest: makeElicitationHandler(connectionEntry, ctx.userLogin),
       configDir: config.copilotConfigDir,
       skillDirectories,
       disabledSkills,
@@ -120,6 +128,9 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       agent,
       onEvent,
       systemPromptSections,
+      ...(msg.modelCapabilities ? { modelCapabilities: msg.modelCapabilities } : {}),
+      ...(msg.enableConfigDiscovery != null ? { enableConfigDiscovery: msg.enableConfigDiscovery } : {}),
+      ...(provider ? { provider } : {}),
       onHookEvent: (message) => poolSend(connectionEntry, message),
     });
 

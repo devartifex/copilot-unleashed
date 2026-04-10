@@ -2,6 +2,7 @@ import { WebSocket } from 'ws';
 import { poolSend, type PoolEntry } from './session-pool.js';
 import { sendPushToUser } from '../push/sender.js';
 import { subscriptionStore } from '../push-singleton.js';
+import type { ElicitationResult } from '@github/copilot-sdk';
 
 export function makeUserInputHandler(entry: PoolEntry, userLogin?: string) {
   return (request: any) => {
@@ -103,6 +104,34 @@ function extractPermissionDisplay(request: any): {
         toolArgs: request.args ?? request.tool?.args ?? {},
       };
   }
+}
+
+export function makeElicitationHandler(entry: PoolEntry, userLogin?: string) {
+  return (context: any) => {
+    return new Promise<ElicitationResult>((resolve) => {
+      entry.elicitationResolve = resolve;
+      const prompt = {
+        type: 'elicitation_requested',
+        elicitationId: context.elicitationId ?? `elic-${Date.now()}`,
+        message: context.message,
+        requestedSchema: context.requestedSchema,
+        mode: context.mode,
+        elicitationSource: context.elicitationSource,
+      };
+      entry.pendingElicitationPrompt = prompt;
+      poolSend(entry, prompt);
+
+      // Push notification when browser is closed
+      if ((!entry.ws || entry.ws.readyState !== WebSocket.OPEN) && userLogin) {
+        sendPushToUser(userLogin, {
+          title: 'Copilot needs your input',
+          body: context.message?.slice(0, 100) || 'A form needs your attention',
+          url: '/',
+          tag: 'elicitation-request',
+        }, subscriptionStore).catch(() => {});
+      }
+    });
+  };
 }
 
 export function makePermissionHandler(entry: PoolEntry, userLogin?: string) {

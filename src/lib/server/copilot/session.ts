@@ -3,11 +3,12 @@ import { join } from 'node:path';
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { CopilotClient } from '@github/copilot-sdk';
-import type { SessionConfig, SystemPromptSection, SectionOverride, MCPServerConfig } from '@github/copilot-sdk';
+import type { SessionConfig, SystemPromptSection, SectionOverride, MCPServerConfig, ModelCapabilitiesOverride } from '@github/copilot-sdk';
 
 export type HookEventCallback = (message: Record<string, unknown>) => void;
 import { isIP } from 'node:net';
 import { config } from '../config.js';
+import { createSessionFsHandlerFactory } from './session-fs.js';
 
 type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 
@@ -41,6 +42,10 @@ export interface CreateSessionOptions {
   onEvent?: (event: any) => void;
   onHookEvent?: HookEventCallback;
   systemPromptSections?: Partial<Record<SystemPromptSection, SectionOverride>>;
+  modelCapabilities?: ModelCapabilitiesOverride;
+  enableConfigDiscovery?: boolean;
+  provider?: SessionConfig['provider'];
+  onElicitationRequest?: SessionConfig['onElicitationRequest'];
 }
 
 function isPrivateIpv4(hostname: string): boolean {
@@ -464,6 +469,10 @@ export async function createCopilotSession(
     sessionConfig.onUserInputRequest = options.onUserInputRequest;
   }
 
+  if (options.onElicitationRequest) {
+    sessionConfig.onElicitationRequest = options.onElicitationRequest;
+  }
+
   if (options.infiniteSessions) {
     sessionConfig.infiniteSessions = {
       enabled: options.infiniteSessions.enabled,
@@ -502,6 +511,24 @@ export async function createCopilotSession(
 
   if (options.onHookEvent) {
     sessionConfig.hooks = buildSessionHooks(options.onHookEvent);
+  }
+
+  if (options.modelCapabilities) {
+    sessionConfig.modelCapabilities = options.modelCapabilities;
+  }
+
+  if (options.enableConfigDiscovery != null) {
+    sessionConfig.enableConfigDiscovery = options.enableConfigDiscovery;
+  }
+
+  if (options.provider) {
+    sessionConfig.provider = options.provider;
+  }
+
+  // Provide a sandboxed filesystem handler so the SDK can manage session workspace files
+  if (config.copilotConfigDir) {
+    const workspaceRoot = join(config.copilotConfigDir, 'session-state');
+    sessionConfig.createSessionFsHandler = createSessionFsHandlerFactory(workspaceRoot);
   }
 
   return client.createSession(sessionConfig);

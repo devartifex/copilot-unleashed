@@ -6,7 +6,7 @@ export interface InfiniteSessionsConfig {
   bufferThreshold: number;
 }
 
-export type { SystemPromptSection, SectionOverride, SectionOverrideAction } from '@github/copilot-sdk';
+export type { SystemPromptSection, SectionOverride, SectionOverrideAction, ModelCapabilitiesOverride } from '@github/copilot-sdk';
 
 export interface SystemPromptSectionInput {
   action: 'replace' | 'remove' | 'append' | 'prepend';
@@ -21,6 +21,8 @@ export interface NewSessionConfig {
   excludedTools?: string[];
   infiniteSessions?: InfiniteSessionsConfig;
   systemPromptSections?: Record<string, SystemPromptSectionInput>;
+  modelCapabilities?: ModelCapabilitiesOverride;
+  enableConfigDiscovery?: boolean;
 }
 
 export interface PersistedSettings {

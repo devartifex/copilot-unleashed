@@ -6,14 +6,18 @@ export const MAX_MESSAGE_LENGTH = 10_000;
 export const VALID_MESSAGE_TYPES = new Set([
   'new_session', 'message', 'list_models', 'set_mode',
   'abort', 'set_model', 'set_reasoning', 'user_input_response',
-  'permission_response', 'ping',
+  'permission_response', 'elicitation_response', 'ping',
   'list_tools', 'list_agents', 'select_agent', 'deselect_agent',
   'get_quota', 'compact', 'list_sessions', 'resume_session',
   'delete_session', 'get_session_detail', 'get_plan', 'update_plan', 'delete_plan', 'start_fleet',
   'list_skills_rpc', 'toggle_skill_rpc', 'reload_skills',
   'list_mcp_rpc', 'toggle_mcp_rpc',
   'list_instructions', 'list_prompts', 'use_prompt',
+  'list_extensions', 'toggle_extension', 'reload_extensions',
+  'shell_exec', 'shell_kill',
+  'workspace_list_files', 'workspace_read_file', 'workspace_create_file',
   'clear_chat',
+  'get_session_history', 'session_log',
 ]);
 
 export const VALID_MODES = new Set(['interactive', 'plan', 'autopilot']);

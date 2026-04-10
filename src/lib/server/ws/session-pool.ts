@@ -1,5 +1,5 @@
 import { WebSocket } from 'ws';
-import type { CopilotClient } from '@github/copilot-sdk';
+import type { CopilotClient, ElicitationResult } from '@github/copilot-sdk';
 import { config } from '../config.js';
 
 const MAX_BUFFER_SIZE = 500;
@@ -49,6 +49,10 @@ export interface PoolEntry {
   workspaceCwd: string | null;
   /** Latest git root reported by the SDK session */
   workspaceGitRoot: string | null;
+  /** Resolver for pending elicitation request — server-side `onElicitationRequest` promise */
+  elicitationResolve: ((result: ElicitationResult) => void) | null;
+  /** Stored pending elicitation prompt for re-send on reconnect */
+  pendingElicitationPrompt: Record<string, unknown> | null;
 }
 
 export const sessionPool = new Map<string, PoolEntry>();
@@ -74,6 +78,8 @@ export function createPoolEntry(client: CopilotClient, ws: WebSocket): PoolEntry
     lastPingAt: Date.now(),
     workspaceCwd: null,
     workspaceGitRoot: null,
+    elicitationResolve: null,
+    pendingElicitationPrompt: null,
   };
 }
 

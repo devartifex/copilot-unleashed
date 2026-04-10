@@ -6,6 +6,7 @@
   import EnvInfo from '$lib/components/layout/EnvInfo.svelte';
   import PlanPanel from '$lib/components/plan/PlanPanel.svelte';
   import PermissionPrompt from '$lib/components/auth/PermissionPrompt.svelte';
+  import ElicitationDialog from '$lib/components/chat/ElicitationDialog.svelte';
   import Sidebar from '$lib/components/layout/Sidebar.svelte';
   import SettingsModal from '$lib/components/settings/SettingsModal.svelte';
   import SessionsSheet from '$lib/components/sessions/SessionsSheet.svelte';
@@ -32,6 +33,22 @@
   let modelSheetOpen = $state(false);
   let sessionsLoading = $state(false);
   let sessionLoading = $state(true);
+
+  // ── Terminal state ──────────────────────────────────────────────────────
+  let shellResults = $state<Array<{
+    command: string;
+    stdout: string;
+    stderr: string;
+    exitCode: number | null;
+    pid?: number;
+    timestamp: number;
+  }>>([]);
+  let shellLoading = $state(false);
+
+  // ── Workspace state ────────────────────────────────────────────────────
+  let workspaceFiles = $state<string[]>([]);
+  let workspaceSelectedFile = $state<{ path: string; content: string } | null>(null);
+  let workspaceLoading = $state(false);
 
   // Use the confirmed model from the active session; fall back to the user's saved preference
   // so the TopBar/ModelSheet show the correct model immediately before session_created arrives.
@@ -135,6 +152,17 @@
         if (msg.type === 'skills_list') {
           settings.availableSkills = msg.skills;
         }
+        if (msg.type === 'extensions_list') {
+          settings.extensions = msg.extensions;
+        }
+        if (msg.type === 'extension_toggled') {
+          settings.extensions = settings.extensions.map(e =>
+            e.name === msg.name ? { ...e, enabled: msg.enabled } : e
+          );
+        }
+        if (msg.type === 'extensions_reloaded') {
+          wsStore.send({ type: 'list_extensions' });
+        }
         if (msg.type === 'instructions_list') {
           settings.instructions = msg.instructions;
         }
@@ -148,6 +176,40 @@
         // Clear sessions loading state
         if (msg.type === 'sessions') {
           sessionsLoading = false;
+        }
+
+        // Shell execution results
+        if (msg.type === 'shell_exec_result') {
+          const last = shellResults[shellResults.length - 1];
+          if (last && last.exitCode === null) {
+            // Update the pending entry
+            shellResults[shellResults.length - 1] = {
+              ...last,
+              stdout: msg.stdout,
+              stderr: msg.stderr,
+              exitCode: msg.exitCode,
+              pid: msg.pid ?? last.pid,
+            };
+          }
+          shellLoading = false;
+        }
+        if (msg.type === 'shell_kill_result') {
+          shellLoading = false;
+        }
+
+        // Workspace file messages
+        if (msg.type === 'workspace_files_list') {
+          workspaceFiles = msg.files;
+          workspaceSelectedFile = null;
+          workspaceLoading = false;
+        }
+        if (msg.type === 'workspace_file_content') {
+          workspaceSelectedFile = { path: msg.path, content: msg.content };
+          workspaceLoading = false;
+        }
+        if (msg.type === 'workspace_file_created') {
+          // Refresh file list after creation
+          wsStore.send({ type: 'workspace_list_files' });
         }
       });
 
@@ -301,6 +363,11 @@
     wsStore.respondToPermission(requestId, kind, toolName, decision);
     chatStore.clearPendingPermission(requestId);
   }
+
+  function handleElicitationResponse(response: { action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown> }): void {
+    wsStore.respondToElicitation(response.action, response.content);
+    chatStore.clearPendingElicitation();
+  }
 </script>
 
 <svelte:head>
@@ -372,6 +439,17 @@
 
       {/if}
 
+        {#if chatStore.pendingElicitation}
+          <ElicitationDialog
+            elicitationId={chatStore.pendingElicitation.elicitationId}
+            message={chatStore.pendingElicitation.message}
+            requestedSchema={chatStore.pendingElicitation.requestedSchema}
+            mode={chatStore.pendingElicitation.mode}
+            elicitationSource={chatStore.pendingElicitation.elicitationSource}
+            onRespond={handleElicitationResponse}
+          />
+        {/if}
+
         {#if chatStore.pendingPermissions.length > 0}
           {#each chatStore.pendingPermissions as perm (perm.requestId)}
             <PermissionPrompt
@@ -431,6 +509,7 @@
       excludedTools={settings.excludedTools}
       discoveredMcpServers={settings.discoveredMcpServers}
       availableSkills={settings.availableSkills}
+      extensions={settings.extensions}
       instructions={settings.instructions}
       prompts={settings.prompts}
       onClose={() => settingsOpen = false}
@@ -449,6 +528,7 @@
       onFetchAgents={() => wsStore.listAgents()}
       onFetchQuota={() => wsStore.getQuota()}
       onFetchSkills={() => wsStore.send({ type: 'list_skills_rpc' })}
+      onFetchExtensions={() => wsStore.send({ type: 'list_extensions' })}
       onFetchMcpServers={() => {
         wsStore.send({ type: 'list_mcp_rpc' });
         fetch('/api/customizations')
@@ -475,9 +555,36 @@
       onFetchInstructions={() => wsStore.send({ type: 'list_instructions' })}
       onFetchPrompts={() => wsStore.send({ type: 'list_prompts' })}
       onToggleSkill={(name, enabled) => wsStore.send({ type: 'toggle_skill_rpc', name, enabled })}
+      onToggleExtension={(name, enabled) => wsStore.send({ type: 'toggle_extension', name, enabled })}
+      onReloadExtensions={() => wsStore.send({ type: 'reload_extensions' })}
       onToggleMcpServer={(name, enabled) => wsStore.send({ type: 'toggle_mcp_rpc', name, enabled })}
       notificationsEnabled={settings.notificationsEnabled}
       onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
+      byokEnabled={data.byokEnabled}
+      {shellResults}
+      {shellLoading}
+      onShellExec={(command, cwd) => {
+        shellLoading = true;
+        shellResults = [...shellResults, { command, stdout: '', stderr: '', exitCode: null, timestamp: Date.now() }];
+        wsStore.send({ type: 'shell_exec', command, ...(cwd ? { cwd } : {}) });
+      }}
+      onShellKill={(pid) => {
+        wsStore.send({ type: 'shell_kill', pid });
+      }}
+      {workspaceFiles}
+      {workspaceSelectedFile}
+      {workspaceLoading}
+      onListWorkspaceFiles={() => {
+        workspaceLoading = true;
+        wsStore.send({ type: 'workspace_list_files' });
+      }}
+      onReadWorkspaceFile={(path) => {
+        workspaceLoading = true;
+        wsStore.send({ type: 'workspace_read_file', path });
+      }}
+      onCreateWorkspaceFile={(path, content) => {
+        wsStore.send({ type: 'workspace_create_file', path, content });
+      }}
     />
 
     <SessionsSheet

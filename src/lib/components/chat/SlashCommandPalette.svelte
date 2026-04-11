@@ -59,13 +59,6 @@
     if (onCompact) {
       cmds.push({ cmd: '/compact', desc: 'Compact conversation context', action: () => { onCompact(); inputValue = ''; textareaEl?.focus(); } });
     }
-    // Commands that show results in the chat (handled by handleSend)
-    cmds.push({ cmd: '/skills', desc: 'List skills', action: () => { /* sent through chat */ } });
-    cmds.push({ cmd: '/extensions', desc: 'List extensions', action: () => { /* sent through chat */ } });
-    cmds.push({ cmd: '/mcp', desc: 'List MCP servers', action: () => { /* sent through chat */ } });
-    cmds.push({ cmd: '/tools', desc: 'List available tools', action: () => { /* sent through chat */ } });
-    cmds.push({ cmd: '/quota', desc: 'Show usage & quota', action: () => { /* sent through chat */ } });
-    cmds.push({ cmd: '/status', desc: 'Show session status', action: () => { /* sent through chat */ } });
     cmds.push({ cmd: '/run', desc: 'Run a shell command', action: () => { inputValue = '/run '; textareaEl?.focus(); } });
     cmds.push({ cmd: '/help', desc: 'Show keyboard shortcuts', action: () => { inputValue = ''; onShowHelp(); } });
     if (onOpenSessions) {

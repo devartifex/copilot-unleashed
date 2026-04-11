@@ -34,9 +34,6 @@
   let sessionsLoading = $state(false);
   let sessionLoading = $state(true);
 
-  /** Tracks which slash commands are pending a response to show results in chat */
-  let pendingSlashCommands = $state(new Set<string>());
-
   // ── Workspace state ────────────────────────────────────────────────────
   let workspaceFiles = $state<string[]>([]);
   let workspaceSelectedFile = $state<{ path: string; content: string } | null>(null);
@@ -154,21 +151,9 @@
         // Route customization list messages to settings store
         if (msg.type === 'skills_list') {
           settings.availableSkills = msg.skills;
-          if (pendingSlashCommands.has('list_skills_rpc')) {
-            pendingSlashCommands.delete('list_skills_rpc');
-            pendingSlashCommands = new Set(pendingSlashCommands);
-            const lines = msg.skills.map((s: any) => `- ${s.enabled ? '✅' : '⬚'} **${s.name}**${s.description ? ` — ${s.description}` : ''}`);
-            chatStore.addInfoMessage(lines.length ? `**Skills** (${lines.length})\n${lines.join('\n')}` : 'No skills available.');
-          }
         }
         if (msg.type === 'extensions_list') {
           settings.extensions = msg.extensions;
-          if (pendingSlashCommands.has('list_extensions')) {
-            pendingSlashCommands.delete('list_extensions');
-            pendingSlashCommands = new Set(pendingSlashCommands);
-            const lines = msg.extensions.map((e: any) => `- ${e.enabled ? '✅' : '⬚'} **${e.name}**${e.description ? ` — ${e.description}` : ''}`);
-            chatStore.addInfoMessage(lines.length ? `**Extensions** (${lines.length})\n${lines.join('\n')}` : 'No extensions available.');
-          }
         }
         if (msg.type === 'extension_toggled') {
           settings.extensions = settings.extensions.map(e =>
@@ -186,48 +171,11 @@
         }
         if (msg.type === 'mcp_servers_list') {
           settings.discoveredMcpServers = mergeMcpServers(settings.discoveredMcpServers, msg.servers);
-          if (pendingSlashCommands.has('list_mcp_rpc')) {
-            pendingSlashCommands.delete('list_mcp_rpc');
-            pendingSlashCommands = new Set(pendingSlashCommands);
-            const lines = msg.servers.map((s: any) => {
-              const icon = s.status === 'connected' ? '🟢' : s.status === 'failed' ? '🔴' : '⚪';
-              return `- ${icon} **${s.name}** — ${s.status}${s.error ? ` (${s.error})` : ''}`;
-            });
-            chatStore.addInfoMessage(lines.length ? `**MCP Servers** (${lines.length})\n${lines.join('\n')}` : 'No MCP servers configured.');
-          }
         }
 
         // Clear sessions loading state
         if (msg.type === 'sessions') {
           sessionsLoading = false;
-        }
-
-        // Tools list → chat display
-        if (msg.type === 'tools' && pendingSlashCommands.has('list_tools')) {
-          pendingSlashCommands.delete('list_tools');
-          pendingSlashCommands = new Set(pendingSlashCommands);
-          const tools = msg.tools || [];
-          const lines = tools.slice(0, 50).map((t: any) => `- \`${t.name}\`${t.description ? ` — ${t.description}` : ''}`);
-          const suffix = tools.length > 50 ? `\n\n…and ${tools.length - 50} more` : '';
-          chatStore.addInfoMessage(lines.length ? `**Tools** (${tools.length})\n${lines.join('\n')}${suffix}` : 'No tools available.');
-        }
-
-        // Quota → chat display
-        if (msg.type === 'quota' && pendingSlashCommands.has('get_quota')) {
-          pendingSlashCommands.delete('get_quota');
-          pendingSlashCommands = new Set(pendingSlashCommands);
-          const qs = msg.quotaSnapshots;
-          if (qs) {
-            const lines: string[] = [];
-            for (const [name, snap] of Object.entries(qs) as [string, any][]) {
-              if (snap && typeof snap.percentUsed === 'number') {
-                lines.push(`- **${name}**: ${snap.percentUsed.toFixed(1)}% used (${snap.used ?? '?'}/${snap.limit ?? '?'})`);
-              }
-            }
-            chatStore.addInfoMessage(lines.length ? `**Quota**\n${lines.join('\n')}` : 'Quota information not available.');
-          } else {
-            chatStore.addInfoMessage('Quota information not available.');
-          }
         }
 
         // Workspace file messages
@@ -317,39 +265,6 @@
       return;
     }
 
-    // Chat-based slash commands — show results inline
-    const chatCommands: Record<string, { type: string; label: string }> = {
-      '/skills': { type: 'list_skills_rpc', label: 'Skills' },
-      '/extensions': { type: 'list_extensions', label: 'Extensions' },
-      '/mcp': { type: 'list_mcp_rpc', label: 'MCP Servers' },
-      '/tools': { type: 'list_tools', label: 'Tools' },
-      '/quota': { type: 'get_quota', label: 'Quota' },
-    };
-
-    const chatCmd = chatCommands[trimmed];
-    if (chatCmd) {
-      chatStore.addUserMessage(content);
-      chatStore.addInfoMessage(`Fetching ${chatCmd.label}…`);
-      pendingSlashCommands = new Set([...pendingSlashCommands, chatCmd.type]);
-      wsStore.send({ type: chatCmd.type } as any);
-      return;
-    }
-
-    if (trimmed === '/status') {
-      chatStore.addUserMessage(content);
-      const model = settings.model || 'unknown';
-      const mode = settings.mode || 'interactive';
-      const reasoning = settings.reasoningEffort || 'off';
-      const connected = wsStore.connectionState === 'connected' ? '✅ Connected' : '❌ Disconnected';
-      chatStore.addInfoMessage(
-        `**Status**\n` +
-        `- Connection: ${connected}\n` +
-        `- Model: \`${model}\`\n` +
-        `- Mode: ${mode}\n` +
-        `- Reasoning: ${reasoning}`,
-      );
-      return;
-    }
 
     // Queue during streaming instead of steering immediately
     if (chatStore.isStreaming || chatStore.isWaiting) {

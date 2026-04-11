@@ -29,6 +29,7 @@
   let sidebarOpen = $state(false);
   let sidebarCollapsed = $state(false);
   let settingsOpen = $state(false);
+  let settingsInitialSection = $state<string | null>(null);
   let sessionsOpen = $state(false);
   let modelSheetOpen = $state(false);
   let sessionsLoading = $state(false);
@@ -49,6 +50,17 @@
   let workspaceFiles = $state<string[]>([]);
   let workspaceSelectedFile = $state<{ path: string; content: string } | null>(null);
   let workspaceLoading = $state(false);
+  let workspaceLoadingTimer: ReturnType<typeof setTimeout> | undefined;
+
+  // Auto-reset workspaceLoading after 10s timeout to prevent stuck state
+  $effect(() => {
+    if (workspaceLoading) {
+      workspaceLoadingTimer = setTimeout(() => { workspaceLoading = false; }, 10_000);
+    } else {
+      clearTimeout(workspaceLoadingTimer);
+    }
+    return () => clearTimeout(workspaceLoadingTimer);
+  });
 
   // Use the confirmed model from the active session; fall back to the user's saved preference
   // so the TopBar/ModelSheet show the correct model immediately before session_created arrives.
@@ -211,6 +223,11 @@
           // Refresh file list after creation
           wsStore.send({ type: 'workspace_list_files' });
         }
+
+        // Reset workspace loading on server error
+        if (msg.type === 'error' && workspaceLoading) {
+          workspaceLoading = false;
+        }
       });
 
       return () => {
@@ -364,8 +381,8 @@
     chatStore.clearPendingPermission(requestId);
   }
 
-  function handleElicitationResponse(response: { action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown> }): void {
-    wsStore.respondToElicitation(response.action, response.content);
+  function handleElicitationResponse(response: { action: 'accept' | 'decline' | 'cancel'; elicitationId?: string; content?: Record<string, unknown> }): void {
+    wsStore.respondToElicitation(response.action, response.elicitationId, response.content);
     chatStore.clearPendingElicitation();
   }
 </script>
@@ -482,6 +499,30 @@
         onNewChat={handleNewChat}
         onOpenModelSheet={() => { modelSheetOpen = true; }}
         onCompact={() => wsStore.compact()}
+        onOpenSessions={handleOpenSessions}
+        onOpenSettings={(section) => {
+          sidebarOpen = false;
+          settingsInitialSection = section ?? null;
+          settingsOpen = true;
+        }}
+        onStatus={() => {
+          const model = chatStore.currentModel || settings.selectedModel || 'gpt-4.1';
+          const mode = chatStore.mode;
+          const conn = wsStore.connectionState;
+          const reasoning = chatStore.reasoningEffort ?? settings.reasoningEffort ?? 'none';
+          const msgCount = chatStore.messages.length;
+          const agent = chatStore.currentAgent;
+          const lines = [
+            `**Connection:** ${conn}`,
+            `**Model:** ${model}`,
+            `**Mode:** ${mode}`,
+            `**Reasoning:** ${reasoning}`,
+            `**Messages:** ${msgCount}`,
+          ];
+          if (agent) lines.push(`**Agent:** ${agent}`);
+          if (chatStore.sessionTitle) lines.push(`**Session:** ${chatStore.sessionTitle}`);
+          chatStore.addInfoMessage(lines.join(' · '));
+        }}
       />
     </div>
     <!-- End .terminal -->
@@ -501,6 +542,7 @@
 
     <SettingsModal
       open={settingsOpen}
+      initialSection={settingsInitialSection}
       tools={chatStore.tools}
       agents={chatStore.agents}
       currentAgent={chatStore.currentAgent}
@@ -512,7 +554,7 @@
       extensions={settings.extensions}
       instructions={settings.instructions}
       prompts={settings.prompts}
-      onClose={() => settingsOpen = false}
+      onClose={() => { settingsOpen = false; settingsInitialSection = null; }}
       onSaveInstructions={(v) => { settings.additionalInstructions = v; }}
       onToggleTool={(name, enabled) => {
         if (enabled) {
@@ -571,6 +613,7 @@
       onShellKill={(pid) => {
         wsStore.send({ type: 'shell_kill', pid });
       }}
+      onShellClear={() => { shellResults = []; }}
       {workspaceFiles}
       {workspaceSelectedFile}
       {workspaceLoading}
@@ -585,6 +628,7 @@
       onCreateWorkspaceFile={(path, content) => {
         wsStore.send({ type: 'workspace_create_file', path, content });
       }}
+      onDeselectWorkspaceFile={() => { workspaceSelectedFile = null; }}
     />
 
     <SessionsSheet

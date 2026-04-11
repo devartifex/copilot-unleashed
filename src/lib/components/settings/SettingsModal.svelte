@@ -22,6 +22,8 @@
   import ByokPanel from './ByokPanel.svelte';
   import WorkspacePanel from './WorkspacePanel.svelte';
 
+  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'extensions' | 'quota' | 'notifications' | 'compact' | 'prompts' | 'byok' | 'terminal' | 'workspace' | null;
+
   interface Props {
     open: boolean;
     tools: ToolInfo[];
@@ -63,9 +65,12 @@
     shellLoading?: boolean;
     onShellExec: (command: string, cwd?: string) => void;
     onShellKill: (pid: number) => void;
+    onShellClear?: () => void;
     onListWorkspaceFiles?: () => void;
     onReadWorkspaceFile?: (path: string) => void;
     onCreateWorkspaceFile?: (path: string, content: string) => void;
+    onDeselectWorkspaceFile?: () => void;
+    initialSection?: string | null;
   }
 
   const {
@@ -106,17 +111,25 @@
     shellLoading = false,
     onShellExec,
     onShellKill,
+    onShellClear,
     workspaceFiles = [],
     workspaceSelectedFile = null,
     workspaceLoading = false,
     onListWorkspaceFiles = () => {},
     onReadWorkspaceFile = () => {},
     onCreateWorkspaceFile = () => {},
+    onDeselectWorkspaceFile,
+    initialSection = null,
   }: Props = $props();
 
-  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'extensions' | 'quota' | 'notifications' | 'compact' | 'prompts' | 'byok' | 'terminal' | 'workspace' | null;
-
   let activeSection = $state<AccordionSection>(null);
+
+  // When opened with an initialSection, navigate to it automatically
+  $effect(() => {
+    if (open && initialSection) {
+      toggleSection(initialSection as AccordionSection);
+    }
+  });
   let toolsLoading = $state(false);
   let agentsLoading = $state(false);
   let skillsLoading = $state(false);
@@ -422,6 +435,7 @@
                 loading={shellLoading}
                 onExec={onShellExec}
                 onKill={onShellKill}
+                onClear={onShellClear}
               />
             </div>
           {/if}
@@ -446,6 +460,7 @@
                 onListFiles={onListWorkspaceFiles}
                 onReadFile={onReadWorkspaceFile}
                 onCreateFile={onCreateWorkspaceFile}
+                onDeselectFile={onDeselectWorkspaceFile}
               />
             </div>
           {/if}

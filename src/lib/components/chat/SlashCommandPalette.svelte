@@ -14,6 +14,9 @@
     onDetectMention: () => void;
     onDetectIssue: () => void;
     onShowHelp: () => void;
+    onOpenSessions?: () => void;
+    onOpenSettings?: (section?: string) => void;
+    onStatus?: () => void;
   }
 
   let {
@@ -28,6 +31,9 @@
     onDetectMention,
     onDetectIssue,
     onShowHelp,
+    onOpenSessions,
+    onOpenSettings,
+    onStatus,
   }: Props = $props();
 
   interface SlashCommand {
@@ -53,6 +59,24 @@
     }
     if (onCompact) {
       cmds.push({ cmd: '/compact', desc: 'Compact conversation context', action: () => { onCompact(); inputValue = ''; textareaEl?.focus(); } });
+    }
+    cmds.push({ cmd: '/help', desc: 'Show keyboard shortcuts', action: () => { inputValue = ''; onShowHelp(); } });
+    if (onOpenModelSheet) {
+      cmds.push({ cmd: '/reasoning', desc: 'Set reasoning effort', action: () => { onOpenModelSheet(); inputValue = ''; } });
+    }
+    if (onOpenSessions) {
+      cmds.push({ cmd: '/sessions', desc: 'Browse & resume sessions', action: () => { onOpenSessions(); inputValue = ''; } });
+    }
+    if (onOpenSettings) {
+      cmds.push({ cmd: '/settings', desc: 'Open settings', action: () => { onOpenSettings(); inputValue = ''; } });
+      cmds.push({ cmd: '/skills', desc: 'Manage skills', action: () => { onOpenSettings('skills'); inputValue = ''; } });
+      cmds.push({ cmd: '/extensions', desc: 'Manage extensions', action: () => { onOpenSettings('extensions'); inputValue = ''; } });
+      cmds.push({ cmd: '/mcp', desc: 'Manage MCP servers', action: () => { onOpenSettings('mcp'); inputValue = ''; } });
+      cmds.push({ cmd: '/tools', desc: 'Manage tools', action: () => { onOpenSettings('tools'); inputValue = ''; } });
+      cmds.push({ cmd: '/quota', desc: 'Show usage & quota', action: () => { onOpenSettings('quota'); inputValue = ''; } });
+    }
+    if (onStatus) {
+      cmds.push({ cmd: '/status', desc: 'Show session status', action: () => { onStatus(); inputValue = ''; textareaEl?.focus(); } });
     }
     cmds.push(
       { cmd: '@', desc: 'Mention a file', action: () => { inputValue = '@'; textareaEl?.focus(); tick().then(() => onDetectMention()); } },

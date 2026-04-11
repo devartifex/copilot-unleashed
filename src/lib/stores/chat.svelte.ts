@@ -75,6 +75,7 @@ export interface ChatStore {
   handleServerMessage(msg: ServerMessage): void;
   clearMessages(): void;
   addUserMessage(content: string, attachments?: Attachment[]): void;
+  addInfoMessage(content: string): void;
   addQueuedMessage(content: string, attachments?: Attachment[]): void;
   sendQueuedMessage(id: string): { content: string; attachments?: Attachment[] } | null;
   cancelQueuedMessage(id: string): void;
@@ -941,6 +942,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     handleServerMessage,
     clearMessages,
     addUserMessage,
+    addInfoMessage,
     addQueuedMessage,
     sendQueuedMessage,
     cancelQueuedMessage,

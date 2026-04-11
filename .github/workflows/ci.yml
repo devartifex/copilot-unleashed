@@ -13,15 +13,20 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_VERSION: '24'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
       - run: npm ci
@@ -45,18 +50,51 @@ jobs:
       - name: Run unit tests with coverage
         run: npm run test:unit:coverage
 
+      - name: Smoke test — start server and verify health
+        env:
+          PORT: '3099'
+          GITHUB_CLIENT_ID: smoke-test-id
+          SESSION_SECRET: smoke-test-secret-min-32-chars-long
+          NODE_ENV: production
+          SESSION_STORE_PATH: /tmp/ci-sessions
+          SETTINGS_STORE_PATH: /tmp/ci-settings
+          CHAT_STATE_PATH: /tmp/ci-chat-state
+          PUSH_STORE_PATH: /tmp/ci-push
+        run: |
+          node server.js &
+          SERVER_PID=$!
+
+          # Wait for server to be ready (max 15s)
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3099/health > /dev/null 2>&1; then
+              echo "✅ Server is healthy"
+              curl -s http://localhost:3099/health | jq .
+              kill $SERVER_PID 2>/dev/null || true
+              exit 0
+            fi
+            sleep 0.5
+          done
+
+          echo "❌ Server failed to start within 15s"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1
+
   e2e:
     needs: check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
       - run: npm ci
+
+      - name: Build
+        run: npm run build
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
@@ -66,12 +104,12 @@ jobs:
         env:
           PORT: '3001'
           GITHUB_CLIENT_ID: test-client-id
-          SESSION_SECRET: test-secret-for-playwright
+          SESSION_SECRET: test-secret-for-playwright-min-32
           NODE_ENV: development
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report/
@@ -80,6 +118,7 @@ jobs:
   commit-lint:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
       - name: Check PR title follows conventional commits
         env:

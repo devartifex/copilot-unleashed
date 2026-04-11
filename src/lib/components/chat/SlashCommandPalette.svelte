@@ -15,8 +15,7 @@
     onDetectIssue: () => void;
     onShowHelp: () => void;
     onOpenSessions?: () => void;
-    onOpenSettings?: (section?: string) => void;
-    onStatus?: () => void;
+    onOpenSettings?: () => void;
   }
 
   let {
@@ -33,7 +32,6 @@
     onShowHelp,
     onOpenSessions,
     onOpenSettings,
-    onStatus,
   }: Props = $props();
 
   interface SlashCommand {
@@ -56,29 +54,26 @@
     }
     if (onOpenModelSheet) {
       cmds.push({ cmd: '/model', desc: 'Switch model', action: () => { onOpenModelSheet(); inputValue = ''; } });
+      cmds.push({ cmd: '/reasoning', desc: 'Set reasoning effort', action: () => { onOpenModelSheet(); inputValue = ''; } });
     }
     if (onCompact) {
       cmds.push({ cmd: '/compact', desc: 'Compact conversation context', action: () => { onCompact(); inputValue = ''; textareaEl?.focus(); } });
     }
+    // Commands that show results in the chat (handled by handleSend)
+    cmds.push({ cmd: '/skills', desc: 'List skills', action: () => { /* sent through chat */ } });
+    cmds.push({ cmd: '/extensions', desc: 'List extensions', action: () => { /* sent through chat */ } });
+    cmds.push({ cmd: '/mcp', desc: 'List MCP servers', action: () => { /* sent through chat */ } });
+    cmds.push({ cmd: '/tools', desc: 'List available tools', action: () => { /* sent through chat */ } });
+    cmds.push({ cmd: '/quota', desc: 'Show usage & quota', action: () => { /* sent through chat */ } });
+    cmds.push({ cmd: '/status', desc: 'Show session status', action: () => { /* sent through chat */ } });
+    cmds.push({ cmd: '/run', desc: 'Run a shell command', action: () => { inputValue = '/run '; textareaEl?.focus(); } });
     cmds.push({ cmd: '/help', desc: 'Show keyboard shortcuts', action: () => { inputValue = ''; onShowHelp(); } });
-    if (onOpenModelSheet) {
-      cmds.push({ cmd: '/reasoning', desc: 'Set reasoning effort', action: () => { onOpenModelSheet(); inputValue = ''; } });
-    }
     if (onOpenSessions) {
       cmds.push({ cmd: '/sessions', desc: 'Browse & resume sessions', action: () => { onOpenSessions(); inputValue = ''; } });
     }
     if (onOpenSettings) {
       cmds.push({ cmd: '/settings', desc: 'Open settings', action: () => { onOpenSettings(); inputValue = ''; } });
-      cmds.push({ cmd: '/skills', desc: 'Manage skills', action: () => { onOpenSettings('skills'); inputValue = ''; } });
-      cmds.push({ cmd: '/extensions', desc: 'Manage extensions', action: () => { onOpenSettings('extensions'); inputValue = ''; } });
-      cmds.push({ cmd: '/mcp', desc: 'Manage MCP servers', action: () => { onOpenSettings('mcp'); inputValue = ''; } });
-      cmds.push({ cmd: '/tools', desc: 'Manage tools', action: () => { onOpenSettings('tools'); inputValue = ''; } });
-      cmds.push({ cmd: '/quota', desc: 'Show usage & quota', action: () => { onOpenSettings('quota'); inputValue = ''; } });
     }
-    if (onStatus) {
-      cmds.push({ cmd: '/status', desc: 'Show session status', action: () => { onStatus(); inputValue = ''; textareaEl?.focus(); } });
-    }
-    cmds.push({ cmd: '/run', desc: 'Run a shell command', action: () => { inputValue = '/run '; textareaEl?.focus(); } });
     cmds.push(
       { cmd: '@', desc: 'Mention a file', action: () => { inputValue = '@'; textareaEl?.focus(); tick().then(() => onDetectMention()); } },
       { cmd: '#', desc: 'Reference an issue or PR', action: () => { inputValue = '#'; textareaEl?.focus(); tick().then(() => onDetectIssue()); } },

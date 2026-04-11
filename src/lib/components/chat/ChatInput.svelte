@@ -24,8 +24,7 @@
     onOpenModelSheet?: () => void;
     onCompact?: () => void;
     onOpenSessions?: () => void;
-    onOpenSettings?: (section?: string) => void;
-    onStatus?: () => void;
+    onOpenSettings?: () => void;
     prompts?: Array<{ name: string; description: string; content: string }>;
   }
 
@@ -51,7 +50,6 @@
     onCompact,
     onOpenSessions,
     onOpenSettings,
-    onStatus,
     prompts = [],
   }: Props = $props();
 
@@ -383,7 +381,6 @@
       {onCompact}
       {onOpenSessions}
       {onOpenSettings}
-      {onStatus}
       onDetectMention={() => mentionComp?.detect()}
       onDetectIssue={() => issueComp?.detect()}
       onShowHelp={() => { showHelp = true; }}

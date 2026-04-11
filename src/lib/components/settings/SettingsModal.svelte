@@ -19,9 +19,8 @@
   import NotificationsPanel from './NotificationsPanel.svelte';
   import CompactionPanel from './CompactionPanel.svelte';
   import ByokPanel from './ByokPanel.svelte';
-  import WorkspacePanel from './WorkspacePanel.svelte';
 
-  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'extensions' | 'quota' | 'notifications' | 'compact' | 'prompts' | 'byok' | 'workspace' | null;
+  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'extensions' | 'quota' | 'notifications' | 'compact' | 'prompts' | 'byok' | null;
 
   interface Props {
     open: boolean;
@@ -36,9 +35,6 @@
     extensions: Array<{ name: string; description?: string; enabled: boolean }>;
     instructions: InstructionInfo[];
     prompts: PromptInfo[];
-    workspaceFiles?: string[];
-    workspaceSelectedFile?: { path: string; content: string } | null;
-    workspaceLoading?: boolean;
     onClose: () => void;
     onSaveInstructions: (instructions: string) => void;
     onToggleTool: (toolName: string, enabled: boolean) => void;
@@ -60,10 +56,6 @@
     notificationsEnabled: boolean;
     onToggleNotifications: (enabled: boolean) => void;
     byokEnabled?: boolean;
-    onListWorkspaceFiles?: () => void;
-    onReadWorkspaceFile?: (path: string) => void;
-    onCreateWorkspaceFile?: (path: string, content: string) => void;
-    onDeselectWorkspaceFile?: () => void;
     initialSection?: string | null;
   }
 
@@ -101,13 +93,6 @@
     notificationsEnabled,
     onToggleNotifications,
     byokEnabled = false,
-    workspaceFiles = [],
-    workspaceSelectedFile = null,
-    workspaceLoading = false,
-    onListWorkspaceFiles = () => {},
-    onReadWorkspaceFile = () => {},
-    onCreateWorkspaceFile = () => {},
-    onDeselectWorkspaceFile,
     initialSection = null,
   }: Props = $props();
 
@@ -166,7 +151,6 @@
     if (section === 'instructions') onFetchInstructions();
     if (section === 'prompts') onFetchPrompts();
     if (section === 'byok') fetchByokProvider();
-    if (section === 'workspace') onListWorkspaceFiles();
   }
 
   async function fetchByokProvider() {
@@ -406,31 +390,6 @@
             {/if}
           </div>
         {/if}
-
-        <!-- Workspace -->
-        <div class="settings-accordion">
-          <button
-            class="settings-accordion-btn"
-            class:open={activeSection === 'workspace'}
-            onclick={() => toggleSection('workspace')}
-          >
-            Workspace
-            <span class="accordion-chevron"><ChevronRight size={16} /></span>
-          </button>
-          {#if activeSection === 'workspace'}
-            <div class="settings-accordion-body">
-              <WorkspacePanel
-                files={workspaceFiles}
-                selectedFile={workspaceSelectedFile}
-                loading={workspaceLoading}
-                onListFiles={onListWorkspaceFiles}
-                onReadFile={onReadWorkspaceFile}
-                onCreateFile={onCreateWorkspaceFile}
-                onDeselectFile={onDeselectWorkspaceFile}
-              />
-            </div>
-          {/if}
-        </div>
 
         <!-- Compaction -->
         <div class="settings-accordion">

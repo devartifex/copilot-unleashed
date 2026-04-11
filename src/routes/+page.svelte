@@ -34,22 +34,6 @@
   let sessionsLoading = $state(false);
   let sessionLoading = $state(true);
 
-  // ── Workspace state ────────────────────────────────────────────────────
-  let workspaceFiles = $state<string[]>([]);
-  let workspaceSelectedFile = $state<{ path: string; content: string } | null>(null);
-  let workspaceLoading = $state(false);
-  let workspaceLoadingTimer: ReturnType<typeof setTimeout> | undefined;
-
-  // Auto-reset workspaceLoading after 10s timeout to prevent stuck state
-  $effect(() => {
-    if (workspaceLoading) {
-      workspaceLoadingTimer = setTimeout(() => { workspaceLoading = false; }, 10_000);
-    } else {
-      clearTimeout(workspaceLoadingTimer);
-    }
-    return () => clearTimeout(workspaceLoadingTimer);
-  });
-
   // Use the confirmed model from the active session; fall back to the user's saved preference
   // so the TopBar/ModelSheet show the correct model immediately before session_created arrives.
   const effectiveModel = $derived(chatStore.currentModel || settings.selectedModel || 'gpt-4.1');
@@ -176,26 +160,6 @@
         // Clear sessions loading state
         if (msg.type === 'sessions') {
           sessionsLoading = false;
-        }
-
-        // Workspace file messages
-        if (msg.type === 'workspace_files_list') {
-          workspaceFiles = msg.files;
-          workspaceSelectedFile = null;
-          workspaceLoading = false;
-        }
-        if (msg.type === 'workspace_file_content') {
-          workspaceSelectedFile = { path: msg.path, content: msg.content };
-          workspaceLoading = false;
-        }
-        if (msg.type === 'workspace_file_created') {
-          // Refresh file list after creation
-          wsStore.send({ type: 'workspace_list_files' });
-        }
-
-        // Reset workspace loading on server error
-        if (msg.type === 'error' && workspaceLoading) {
-          workspaceLoading = false;
         }
       });
 
@@ -566,21 +530,6 @@
       notificationsEnabled={settings.notificationsEnabled}
       onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
       byokEnabled={data.byokEnabled}
-      {workspaceFiles}
-      {workspaceSelectedFile}
-      {workspaceLoading}
-      onListWorkspaceFiles={() => {
-        workspaceLoading = true;
-        wsStore.send({ type: 'workspace_list_files' });
-      }}
-      onReadWorkspaceFile={(path) => {
-        workspaceLoading = true;
-        wsStore.send({ type: 'workspace_read_file', path });
-      }}
-      onCreateWorkspaceFile={(path, content) => {
-        wsStore.send({ type: 'workspace_create_file', path, content });
-      }}
-      onDeselectWorkspaceFile={() => { workspaceSelectedFile = null; }}
     />
 
     <SessionsSheet

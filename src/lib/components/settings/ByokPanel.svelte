@@ -39,16 +39,24 @@
     { value: 'responses', label: 'Responses' },
   ] as const;
 
-  let type = $state(provider?.type ?? 'openai');
-  let baseUrl = $state(provider?.baseUrl ?? '');
+  let type = $state('openai');
+  let baseUrl = $state('');
   let apiKey = $state('');
   let bearerToken = $state('');
-  let wireApi = $state(provider?.wireApi ?? 'completions');
-  let azureApiVersion = $state(provider?.azure?.apiVersion ?? '');
+  let wireApi = $state('completions');
+  let azureApiVersion = $state('');
   let showApiKey = $state(false);
   let showBearerToken = $state(false);
   let saving = $state(false);
   let deleting = $state(false);
+
+  // Sync from provider prop when it changes (e.g. after fetch)
+  $effect(() => {
+    type = provider?.type ?? 'openai';
+    baseUrl = provider?.baseUrl ?? '';
+    wireApi = provider?.wireApi ?? 'completions';
+    azureApiVersion = provider?.azure?.apiVersion ?? '';
+  });
 
   const isConfigured = $derived(provider !== null);
   const showWireApi = $derived(type === 'openai' || type === 'azure');

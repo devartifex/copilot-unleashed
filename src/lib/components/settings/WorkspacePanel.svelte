@@ -33,18 +33,9 @@
     showCreateForm = false;
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey && showCreateForm) {
-      const target = e.target as HTMLElement;
-      if (target.tagName !== 'TEXTAREA') {
-        e.preventDefault();
-        handleCreate();
-      }
-    }
-  }
 </script>
 
-<div class="workspace-panel" onkeydown={handleKeydown}>
+<div class="workspace-panel">
   <div class="workspace-toolbar">
     <button class="workspace-btn" onclick={onListFiles} aria-label="Refresh file list">
       <RefreshCw size={14} />
@@ -61,7 +52,7 @@
   </div>
 
   {#if showCreateForm}
-    <div class="create-form">
+    <form class="create-form" onsubmit={(e) => { e.preventDefault(); handleCreate(); }}>
       <label class="create-label" for="new-file-path">File path</label>
       <input
         id="new-file-path"
@@ -85,7 +76,7 @@
       >
         Create
       </button>
-    </div>
+    </form>
   {/if}
 
   {#if loading}

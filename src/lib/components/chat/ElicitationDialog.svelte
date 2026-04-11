@@ -140,15 +140,17 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_interactive_supports_focus -->
 <div
   class="elicitation-overlay"
   role="dialog"
+  tabindex="-1"
   aria-modal="true"
   aria-label={message ?? 'Provide information'}
   onkeydown={handleKeydown}
 >
-  <div class="elicitation-backdrop" onclick={handleCancel}></div>
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="elicitation-backdrop" role="presentation" onclick={handleCancel}></div>
 
   <div class="elicitation-card" bind:this={dialogEl}>
     {#if elicitationSource}

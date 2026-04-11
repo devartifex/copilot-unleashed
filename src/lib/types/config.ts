@@ -1,4 +1,5 @@
 import type { SessionMode, ReasoningEffort } from './common.js';
+import type { ModelCapabilitiesOverride } from '@github/copilot-sdk';
 
 export interface InfiniteSessionsConfig {
   enabled: boolean;
@@ -6,7 +7,8 @@ export interface InfiniteSessionsConfig {
   bufferThreshold: number;
 }
 
-export type { SystemPromptSection, SectionOverride, SectionOverrideAction, ModelCapabilitiesOverride } from '@github/copilot-sdk';
+export type { SystemPromptSection, SectionOverride, SectionOverrideAction } from '@github/copilot-sdk';
+export type { ModelCapabilitiesOverride } from '@github/copilot-sdk';
 
 export interface SystemPromptSectionInput {
   action: 'replace' | 'remove' | 'append' | 'prepend';

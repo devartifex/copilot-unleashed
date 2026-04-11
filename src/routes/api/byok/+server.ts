@@ -56,11 +56,12 @@ export const PUT: RequestHandler = async ({ locals, request }) => {
       return json({ error: 'baseUrl is required' }, { status: 400 });
     }
 
-    // Validate baseUrl is HTTPS
+    // Validate baseUrl — require HTTPS (allow HTTP only for localhost/127.0.0.1 in dev)
     try {
       const url = new URL(raw.baseUrl as string);
-      if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-        return json({ error: 'baseUrl must use HTTPS or HTTP protocol' }, { status: 400 });
+      const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
+      if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalhost)) {
+        return json({ error: 'baseUrl must use HTTPS (HTTP is only allowed for localhost)' }, { status: 400 });
       }
     } catch {
       return json({ error: 'Invalid baseUrl' }, { status: 400 });

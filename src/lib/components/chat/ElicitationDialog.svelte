@@ -48,13 +48,26 @@
     formValues = initial;
   });
 
+  let previousActiveElement: Element | null = null;
+
   $effect(() => {
     if (dialogEl) {
+      previousActiveElement = document.activeElement;
       dialogEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Focus the first input
+      // Focus the first input or the dialog itself for focus trapping
       const firstInput = dialogEl.querySelector<HTMLElement>('input, select, textarea');
-      firstInput?.focus();
+      if (firstInput) {
+        firstInput.focus();
+      } else {
+        dialogEl.focus();
+      }
     }
+    return () => {
+      // Return focus to previously focused element on close
+      if (previousActiveElement instanceof HTMLElement) {
+        previousActiveElement.focus();
+      }
+    };
   });
 
   function validate(): boolean {
@@ -128,6 +141,23 @@
     if (event.key === 'Escape') {
       event.preventDefault();
       handleCancel();
+      return;
+    }
+    // Focus trap: keep Tab within the dialog card
+    if (event.key === 'Tab' && dialogEl) {
+      const focusable = dialogEl.querySelectorAll<HTMLElement>(
+        'input, select, textarea, button, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
   }
 
@@ -140,7 +170,7 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_interactive_supports_focus -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   class="elicitation-overlay"
   role="dialog"
@@ -184,7 +214,7 @@
             </label>
 
             {#if schema.description}
-              <p class="elicitation-description" id="{fieldId}-desc">{schema.description}</p>
+              <p class="elicitation-description" id={`${fieldId}-desc`}>{schema.description}</p>
             {/if}
 
             {#if schema.enum && schema.enum.length > 0}

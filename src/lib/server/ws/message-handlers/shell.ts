@@ -15,7 +15,7 @@ export async function handleShellExec(msg: any, ctx: MessageContext): Promise<vo
 		return;
 	}
 
-	console.log(`[SHELL] User ${ctx.userLogin} executing: ${command}`);
+	console.log(`[SHELL] User ${ctx.userLogin} executing command (${command.length} chars)`);
 
 	try {
 		const params: { command: string; cwd?: string; timeout?: number } = { command };
@@ -30,9 +30,10 @@ export async function handleShellExec(msg: any, ctx: MessageContext): Promise<vo
 			exitCode: result?.exitCode ?? null,
 			...(result?.pid != null && { pid: result.pid }),
 		});
-	} catch (err: any) {
-		console.error('Shell exec RPC error:', err.message);
-		poolSend(connectionEntry, { type: 'error', message: `Shell exec failed: ${err.message}` });
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : String(err);
+		console.error('Shell exec RPC error:', message);
+		poolSend(connectionEntry, { type: 'error', message: `Shell exec failed: ${message}` });
 	}
 }
 
@@ -54,10 +55,11 @@ export async function handleShellKill(msg: any, ctx: MessageContext): Promise<vo
 		const result = await connectionEntry.session.rpc.shell.kill({ pid });
 		poolSend(connectionEntry, {
 			type: 'shell_kill_result',
-			success: result?.success ?? true,
+			success: result?.success ?? false,
 		});
-	} catch (err: any) {
-		console.error('Shell kill RPC error:', err.message);
-		poolSend(connectionEntry, { type: 'error', message: `Shell kill failed: ${err.message}` });
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : String(err);
+		console.error('Shell kill RPC error:', message);
+		poolSend(connectionEntry, { type: 'error', message: `Shell kill failed: ${message}` });
 	}
 }

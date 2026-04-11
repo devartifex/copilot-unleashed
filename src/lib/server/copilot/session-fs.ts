@@ -8,11 +8,17 @@ import type { CopilotSession } from '@github/copilot-sdk';
  * All path operations are sandboxed — attempts to escape the workspace are rejected.
  */
 export function createSessionFsHandlerFactory(workspaceRoot: string) {
-  return (_session: CopilotSession): SessionFsHandler => {
+  return (session: CopilotSession): SessionFsHandler => {
+    // Scope to per-session directory to prevent cross-session access
+    const sessionDir = join(workspaceRoot, session.sessionId ?? 'default');
+
     function safePath(requestedPath: string): string {
-      const resolved = resolve(workspaceRoot, requestedPath);
-      const rel = relative(workspaceRoot, resolved);
-      if (rel.startsWith('..') || resolve(resolved) !== resolved.replace(/\/$/, '')) {
+      if (requestedPath !== requestedPath.normalize()) {
+        throw new Error(`Path traversal blocked: ${requestedPath}`);
+      }
+      const resolved = resolve(sessionDir, requestedPath);
+      const rel = relative(sessionDir, resolved);
+      if (rel.startsWith('..') || resolve(rel) !== rel) {
         throw new Error(`Path traversal blocked: ${requestedPath}`);
       }
       return resolved;

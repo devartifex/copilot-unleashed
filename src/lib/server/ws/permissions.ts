@@ -109,6 +109,13 @@ function extractPermissionDisplay(request: any): {
 export function makeElicitationHandler(entry: PoolEntry, userLogin?: string) {
   return (context: any) => {
     return new Promise<ElicitationResult>((resolve) => {
+      // Auto-cancel any pending elicitation to prevent deadlocks
+      if (entry.elicitationResolve) {
+        const prev = entry.elicitationResolve;
+        entry.elicitationResolve = null;
+        entry.pendingElicitationPrompt = null;
+        prev({ action: 'cancel' });
+      }
       entry.elicitationResolve = resolve;
       const prompt = {
         type: 'elicitation_requested',

@@ -50,28 +50,25 @@
   let saving = $state(false);
   let deleting = $state(false);
 
-  // Sync from provider prop when it changes (e.g. after fetch)
-  $effect(() => {
-    type = provider?.type ?? 'openai';
-    baseUrl = provider?.baseUrl ?? '';
-    wireApi = provider?.wireApi ?? 'completions';
-    azureApiVersion = provider?.azure?.apiVersion ?? '';
-  });
-
-  const isConfigured = $derived(provider !== null);
-  const showWireApi = $derived(type === 'openai' || type === 'azure');
-  const showAzure = $derived(type === 'azure');
-  const canSave = $derived(baseUrl.trim().length > 0 && !saving);
-
-  // Sync form fields when provider prop changes
+  // Sync form fields from provider prop when it changes (e.g. after fetch)
   $effect(() => {
     if (provider) {
       type = provider.type ?? 'openai';
       baseUrl = provider.baseUrl ?? '';
       wireApi = provider.wireApi ?? 'completions';
       azureApiVersion = provider.azure?.apiVersion ?? '';
+    } else {
+      type = 'openai';
+      baseUrl = '';
+      wireApi = 'completions';
+      azureApiVersion = '';
     }
   });
+
+  const isConfigured = $derived(provider !== null);
+  const showWireApi = $derived(type === 'openai' || type === 'azure');
+  const showAzure = $derived(type === 'azure');
+  const canSave = $derived(baseUrl.trim().length > 0 && !saving);
 
   async function handleSave() {
     if (!canSave) return;

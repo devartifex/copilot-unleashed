@@ -15,9 +15,10 @@ export async function handleWorkspaceListFiles(_msg: any, ctx: MessageContext): 
 			type: 'workspace_files_list',
 			files: result?.files ?? [],
 		});
-	} catch (err: any) {
-		console.error('Workspace listFiles RPC error:', err.message);
-		poolSend(connectionEntry, { type: 'error', message: `Failed to list workspace files: ${err.message}` });
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : String(err);
+		console.error('Workspace listFiles RPC error:', message);
+		poolSend(connectionEntry, { type: 'error', message: 'Failed to list workspace files' });
 	}
 }
 
@@ -42,9 +43,10 @@ export async function handleWorkspaceReadFile(msg: any, ctx: MessageContext): Pr
 			path,
 			content: result?.content ?? '',
 		});
-	} catch (err: any) {
-		console.error('Workspace readFile RPC error:', err.message);
-		poolSend(connectionEntry, { type: 'error', message: `Failed to read file: ${err.message}` });
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : String(err);
+		console.error('Workspace readFile RPC error:', message);
+		poolSend(connectionEntry, { type: 'error', message: 'Failed to read file' });
 	}
 }
 
@@ -72,8 +74,9 @@ export async function handleWorkspaceCreateFile(msg: any, ctx: MessageContext): 
 			type: 'workspace_file_created',
 			path,
 		});
-	} catch (err: any) {
-		console.error('Workspace createFile RPC error:', err.message);
-		poolSend(connectionEntry, { type: 'error', message: `Failed to create file: ${err.message}` });
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : String(err);
+		console.error('Workspace createFile RPC error:', message);
+		poolSend(connectionEntry, { type: 'error', message: 'Failed to create file' });
 	}
 }

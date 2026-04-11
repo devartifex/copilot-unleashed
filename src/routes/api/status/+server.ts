@@ -1,7 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { checkAuth } from '$lib/server/auth/guard';
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ locals }) => {
+  const auth = checkAuth(locals.session);
+  if (!auth.authenticated) {
+    return json({ error: 'Authentication required' }, { status: 401 });
+  }
+
   const mem = process.memoryUsage();
   return json({
     status: 'ok',

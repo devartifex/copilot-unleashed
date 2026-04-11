@@ -65,6 +65,7 @@ export interface PermissionResponseMessage {
 export interface ElicitationResponseMessage {
   type: 'elicitation_response';
   action: 'accept' | 'decline' | 'cancel';
+  elicitationId?: string;
   content?: Record<string, unknown>;
 }
 

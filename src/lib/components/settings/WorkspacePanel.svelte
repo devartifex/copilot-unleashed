@@ -71,7 +71,7 @@
       ></textarea>
       <button
         class="workspace-btn create-submit"
-        onclick={handleCreate}
+        type="submit"
         disabled={!newFilePath.trim()}
       >
         Create
@@ -100,9 +100,9 @@
   {:else if files.length === 0}
     <p class="settings-hint empty-state">No workspace files. Start a session first.</p>
   {:else}
-    <ul class="file-list" role="listbox" aria-label="Workspace files">
+    <ul class="file-list" aria-label="Workspace files">
       {#each sortedFiles as file (file)}
-        <li class="file-item" role="option" aria-selected="false">
+        <li class="file-item">
           <button class="file-button" onclick={() => onReadFile(file)}>
             <FileText size={14} />
             <span class="file-name">{file}</span>

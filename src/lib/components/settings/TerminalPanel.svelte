@@ -14,11 +14,12 @@
   interface Props {
     onExec: (command: string, cwd?: string) => void;
     onKill: (pid: number) => void;
+    onClear?: () => void;
     results: ShellResult[];
     loading?: boolean;
   }
 
-  const { onExec, onKill, results, loading = false }: Props = $props();
+  const { onExec, onKill, onClear, results, loading = false }: Props = $props();
 
   let command = $state('');
   let cwd = $state('');
@@ -44,8 +45,7 @@
   }
 
   function handleClear() {
-    // Emit a synthetic clear — parent zeroes the results array
-    results.length = 0;
+    onClear?.();
   }
 
   function formatTime(ts: number): string {

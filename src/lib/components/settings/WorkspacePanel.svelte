@@ -8,9 +8,10 @@
     onListFiles: () => void;
     onReadFile: (path: string) => void;
     onCreateFile: (path: string, content: string) => void;
+    onDeselectFile?: () => void;
   }
 
-  const { files, selectedFile, loading = false, onListFiles, onReadFile, onCreateFile }: Props = $props();
+  const { files, selectedFile, loading = false, onListFiles, onReadFile, onCreateFile, onDeselectFile }: Props = $props();
 
   let showCreateForm = $state(false);
   let newFilePath = $state('');
@@ -96,7 +97,7 @@
   {:else if selectedFile}
     <div class="file-viewer">
       <div class="file-viewer-header">
-        <button class="workspace-btn" onclick={() => onListFiles()} aria-label="Back to file list">
+        <button class="workspace-btn" onclick={() => onDeselectFile ? onDeselectFile() : onListFiles()} aria-label="Back to file list">
           <ArrowLeft size={14} />
           Back
         </button>

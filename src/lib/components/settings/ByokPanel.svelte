@@ -22,8 +22,8 @@
   interface Props {
     loading?: boolean;
     provider: ProviderInfo | null;
-    onSave: (config: ProviderPayload) => void;
-    onDelete: () => void;
+    onSave: (config: ProviderPayload) => Promise<void> | void;
+    onDelete: () => Promise<void> | void;
   }
 
   const { loading = false, provider, onSave, onDelete }: Props = $props();
@@ -65,35 +65,41 @@
     }
   });
 
-  function handleSave() {
+  async function handleSave() {
     if (!canSave) return;
     saving = true;
-    const config: ProviderPayload = {
-      type,
-      baseUrl: baseUrl.trim(),
-    };
-    if (apiKey.trim()) config.apiKey = apiKey.trim();
-    if (bearerToken.trim()) config.bearerToken = bearerToken.trim();
-    if (showWireApi) config.wireApi = wireApi;
-    if (showAzure && azureApiVersion.trim()) {
-      config.azure = { apiVersion: azureApiVersion.trim() };
+    try {
+      const config: ProviderPayload = {
+        type,
+        baseUrl: baseUrl.trim(),
+      };
+      if (apiKey.trim()) config.apiKey = apiKey.trim();
+      if (bearerToken.trim()) config.bearerToken = bearerToken.trim();
+      if (showWireApi) config.wireApi = wireApi;
+      if (showAzure && azureApiVersion.trim()) {
+        config.azure = { apiVersion: azureApiVersion.trim() };
+      }
+      await onSave(config);
+      apiKey = '';
+      bearerToken = '';
+    } finally {
+      saving = false;
     }
-    onSave(config);
-    apiKey = '';
-    bearerToken = '';
-    saving = false;
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     deleting = true;
-    onDelete();
-    baseUrl = '';
-    apiKey = '';
-    bearerToken = '';
-    azureApiVersion = '';
-    type = 'openai';
-    wireApi = 'completions';
-    deleting = false;
+    try {
+      await onDelete();
+      baseUrl = '';
+      apiKey = '';
+      bearerToken = '';
+      azureApiVersion = '';
+      type = 'openai';
+      wireApi = 'completions';
+    } finally {
+      deleting = false;
+    }
   }
 </script>
 

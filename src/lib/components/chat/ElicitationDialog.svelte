@@ -20,10 +20,10 @@
     };
     mode?: string;
     elicitationSource?: string;
-    onRespond: (response: { action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown> }) => void;
+    onRespond: (response: { action: 'accept' | 'decline' | 'cancel'; elicitationId?: string; content?: Record<string, unknown> }) => void;
   }
 
-  const { message, requestedSchema, elicitationSource, onRespond }: Props = $props();
+  const { elicitationId, message, requestedSchema, mode, elicitationSource, onRespond }: Props = $props();
 
   let formValues = $state<Record<string, unknown>>({});
   let validationErrors = $state<Record<string, string>>({});
@@ -113,15 +113,15 @@
         content[name] = value;
       }
     }
-    onRespond({ action: 'accept', content });
+    onRespond({ action: 'accept', elicitationId, content });
   }
 
   function handleDecline(): void {
-    onRespond({ action: 'decline' });
+    onRespond({ action: 'decline', elicitationId });
   }
 
   function handleCancel(): void {
-    onRespond({ action: 'cancel' });
+    onRespond({ action: 'cancel', elicitationId });
   }
 
   function handleKeydown(event: KeyboardEvent): void {
@@ -156,7 +156,13 @@
     {/if}
 
     {#if message}
-      <p class="elicitation-message">{message}</p>
+      {#if mode === 'url'}
+        <p class="elicitation-message">
+          <a href={message} target="_blank" rel="noopener noreferrer" class="elicitation-link">{message}</a>
+        </p>
+      {:else}
+        <p class="elicitation-message">{message}</p>
+      {/if}
     {/if}
 
     {#if fieldNames.length > 0}
@@ -316,6 +322,12 @@
     font-size: var(--text-sm);
     line-height: var(--leading-normal);
     margin-bottom: var(--sp-4);
+  }
+
+  .elicitation-link {
+    color: var(--accent, #58a6ff);
+    text-decoration: underline;
+    word-break: break-all;
   }
 
   .elicitation-form {

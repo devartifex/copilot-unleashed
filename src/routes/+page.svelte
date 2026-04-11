@@ -35,17 +35,6 @@
   let sessionsLoading = $state(false);
   let sessionLoading = $state(true);
 
-  // ── Terminal state ──────────────────────────────────────────────────────
-  let shellResults = $state<Array<{
-    command: string;
-    stdout: string;
-    stderr: string;
-    exitCode: number | null;
-    pid?: number;
-    timestamp: number;
-  }>>([]);
-  let shellLoading = $state(false);
-
   // ── Workspace state ────────────────────────────────────────────────────
   let workspaceFiles = $state<string[]>([]);
   let workspaceSelectedFile = $state<{ path: string; content: string } | null>(null);
@@ -190,25 +179,6 @@
           sessionsLoading = false;
         }
 
-        // Shell execution results
-        if (msg.type === 'shell_exec_result') {
-          const last = shellResults[shellResults.length - 1];
-          if (last && last.exitCode === null) {
-            // Update the pending entry
-            shellResults[shellResults.length - 1] = {
-              ...last,
-              stdout: msg.stdout,
-              stderr: msg.stderr,
-              exitCode: msg.exitCode,
-              pid: msg.pid ?? last.pid,
-            };
-          }
-          shellLoading = false;
-        }
-        if (msg.type === 'shell_kill_result') {
-          shellLoading = false;
-        }
-
         // Workspace file messages
         if (msg.type === 'workspace_files_list') {
           workspaceFiles = msg.files;
@@ -280,6 +250,19 @@
       }
       chatStore.addUserMessage(content);
       wsStore.send({ type: 'start_fleet', prompt });
+      return;
+    }
+
+    // Handle /run command — send as a prompt instructing the agent to execute the command
+    if (trimmed === '/run' || trimmed.startsWith('/run ')) {
+      const command = trimmed.slice(4).trim();
+      if (!command) {
+        chatStore.addUserMessage(content);
+        chatStore.handleServerMessage({ type: 'error', message: 'Usage: /run <command> — execute a shell command' } as any);
+        return;
+      }
+      chatStore.addUserMessage(content);
+      wsStore.sendMessage(`Run the following shell command and show me the output:\n\`\`\`\n${command}\n\`\`\``, attachments);
       return;
     }
 
@@ -603,17 +586,6 @@
       notificationsEnabled={settings.notificationsEnabled}
       onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
       byokEnabled={data.byokEnabled}
-      {shellResults}
-      {shellLoading}
-      onShellExec={(command, cwd) => {
-        shellLoading = true;
-        shellResults = [...shellResults, { command, stdout: '', stderr: '', exitCode: null, timestamp: Date.now() }];
-        wsStore.send({ type: 'shell_exec', command, ...(cwd ? { cwd } : {}) });
-      }}
-      onShellKill={(pid) => {
-        wsStore.send({ type: 'shell_kill', pid });
-      }}
-      onShellClear={() => { shellResults = []; }}
       {workspaceFiles}
       {workspaceSelectedFile}
       {workspaceLoading}

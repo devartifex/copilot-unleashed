@@ -18,11 +18,10 @@
   import QuotaPanel from './QuotaPanel.svelte';
   import NotificationsPanel from './NotificationsPanel.svelte';
   import CompactionPanel from './CompactionPanel.svelte';
-  import TerminalPanel from './TerminalPanel.svelte';
   import ByokPanel from './ByokPanel.svelte';
   import WorkspacePanel from './WorkspacePanel.svelte';
 
-  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'extensions' | 'quota' | 'notifications' | 'compact' | 'prompts' | 'byok' | 'terminal' | 'workspace' | null;
+  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'extensions' | 'quota' | 'notifications' | 'compact' | 'prompts' | 'byok' | 'workspace' | null;
 
   interface Props {
     open: boolean;
@@ -61,11 +60,6 @@
     notificationsEnabled: boolean;
     onToggleNotifications: (enabled: boolean) => void;
     byokEnabled?: boolean;
-    shellResults: Array<{ command: string; stdout: string; stderr: string; exitCode: number | null; pid?: number; timestamp: number }>;
-    shellLoading?: boolean;
-    onShellExec: (command: string, cwd?: string) => void;
-    onShellKill: (pid: number) => void;
-    onShellClear?: () => void;
     onListWorkspaceFiles?: () => void;
     onReadWorkspaceFile?: (path: string) => void;
     onCreateWorkspaceFile?: (path: string, content: string) => void;
@@ -107,11 +101,6 @@
     notificationsEnabled,
     onToggleNotifications,
     byokEnabled = false,
-    shellResults,
-    shellLoading = false,
-    onShellExec,
-    onShellKill,
-    onShellClear,
     workspaceFiles = [],
     workspaceSelectedFile = null,
     workspaceLoading = false,
@@ -417,29 +406,6 @@
             {/if}
           </div>
         {/if}
-
-        <!-- Terminal -->
-        <div class="settings-accordion">
-          <button
-            class="settings-accordion-btn"
-            class:open={activeSection === 'terminal'}
-            onclick={() => toggleSection('terminal')}
-          >
-            Terminal
-            <span class="accordion-chevron"><ChevronRight size={16} /></span>
-          </button>
-          {#if activeSection === 'terminal'}
-            <div class="settings-accordion-body">
-              <TerminalPanel
-                results={shellResults}
-                loading={shellLoading}
-                onExec={onShellExec}
-                onKill={onShellKill}
-                onClear={onShellClear}
-              />
-            </div>
-          {/if}
-        </div>
 
         <!-- Workspace -->
         <div class="settings-accordion">

@@ -78,6 +78,7 @@
     if (onStatus) {
       cmds.push({ cmd: '/status', desc: 'Show session status', action: () => { onStatus(); inputValue = ''; textareaEl?.focus(); } });
     }
+    cmds.push({ cmd: '/run', desc: 'Run a shell command', action: () => { inputValue = '/run '; textareaEl?.focus(); } });
     cmds.push(
       { cmd: '@', desc: 'Mention a file', action: () => { inputValue = '@'; textareaEl?.focus(); tick().then(() => onDetectMention()); } },
       { cmd: '#', desc: 'Reference an issue or PR', action: () => { inputValue = '#'; textareaEl?.focus(); tick().then(() => onDetectIssue()); } },

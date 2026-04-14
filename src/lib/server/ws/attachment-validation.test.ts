@@ -43,7 +43,7 @@ describe('isValidAttachmentPath', () => {
 
 	it('rejects paths that match the prefix as a substring but are not inside it', () => {
 		// e.g. /tmp/copilot-uploads-evil/file.txt should not match /tmp/copilot-uploads/
-		expect(isValidAttachmentPath(UPLOAD_PREFIX + '-evil/file.txt')).toBe(false);
+		expect(isValidAttachmentPath(join(UPLOAD_PREFIX + '-evil', 'file.txt'))).toBe(false);
 	});
 });
 

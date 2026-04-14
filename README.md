@@ -12,7 +12,7 @@
   <a href="https://github.com/devartifex/copilot-unleashed/releases/latest"><img src="https://img.shields.io/github/v/release/devartifex/copilot-unleashed?label=release&logo=github" alt="Latest Release"></a>
   <a href="https://github.com/devartifex/copilot-unleashed/actions/workflows/ci.yml"><img src="https://github.com/devartifex/copilot-unleashed/workflows/CI/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/copilot--sdk-v0.2.0-8A2BE2?logo=github" alt="Copilot SDK v0.2.0">
+  <img src="https://img.shields.io/badge/copilot--sdk-v0.2.2-8A2BE2?logo=github" alt="Copilot SDK v0.2.2">
   <img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/accessibility-WCAG%202.2%20AA-0057B8?logo=accessibility" alt="WCAG 2.2 AA accessible">
   <a href="https://github.com/devartifex/copilot-unleashed/commits"><img src="https://img.shields.io/github/last-commit/devartifex/copilot-unleashed" alt="Last Commit"></a>
@@ -21,7 +21,7 @@
 
 <p align="center">
   Self-hosted multi-model AI chat built on the official <a href="https://github.com/github/copilot-sdk"><code>@github/copilot-sdk</code></a>.<br>
-  Autopilot agents · live reasoning traces · native GitHub tools · SDK-native customizations for agents, skills, prompts, instructions, and MCP servers.
+  Autopilot agents · live reasoning traces · native GitHub tools · SDK-native customizations for agents, skills, prompts, instructions, and MCP servers · voice input & read aloud.
 </p>
 
 <p align="center">
@@ -38,12 +38,18 @@
 - **Every Copilot model** — Claude Opus 4.6, GPT-5.4, Gemini 3 Pro, Claude Sonnet 4.6, and more — switch mid-conversation, keep full history
 - **Autopilot agents** — plan, code, run tests, and open PRs autonomously with live tool execution
 - **Extended thinking** — live reasoning traces with collapsible "Thinking…" blocks
+- **Voice input** — speech-to-text via Web Speech API; mic button replaces send when input is empty (ChatGPT-style UX) — toggle in Settings
+- **Read aloud** — text-to-speech on any assistant message; markdown-aware sentence chunking with configurable speed — toggle in Settings
 - **SDK-native customizations** — agents, skills, prompts, instructions, and MCP servers — configure in `~/.copilot/`, toggle from the UI ([details ↓](#customizations))
 - **Native GitHub tools** — issues, PRs, code search, repos, Actions — built in via the GitHub MCP server
-- **Image & file attachments** — drop images, code, CSVs, or directories with `@` autocomplete; vision models analyze images inline
+- **Image & file attachments** — drop images, code, CSVs, or directories with `@` autocomplete; paste images from clipboard; vision models analyze images inline
 - **Issue & PR references** — type `#` to search and reference GitHub issues/PRs across all your repos
+- **Slash commands** — type `/` to access actions like `/run` (shell commands), `/settings`, `/sessions`, and `/status` directly from chat
+- **BYOK (Bring Your Own Keys)** — connect your own API keys for additional model providers; keys encrypted at rest with AES-256-GCM (opt-in via `BYOK_ENABLED`)
+- **Elicitation** — interactive permission prompts and user input requests from the SDK, with configurable auto-approve in autopilot mode
 - **Persistent sessions** — resume any conversation on any device; chat state survives browser close via server-side storage with cold resume
-- **CLI ↔ Browser sync** — sessions started in the Copilot CLI appear in the browser and vice versa ([details ↓](#cli--browser-sync))
+- **CLI ↔ Browser sync** — sessions started in the Copilot CLI appear in the browser and vice versa; full conversation history loaded from CLI's `session-store.db` ([details ↓](#cli--browser-sync))
+- **MCP OAuth tokens** — OAuth-authenticated MCP servers auto-inject tokens from the CLI token store with periodic refresh
 - **Push notifications** — Web Push alerts when the browser is closed; full PWA support
 - **Plan & Fleet mode** — editable execution plans with disk sync; multi-agent parallel execution
 - **Quota tracking** — premium request usage, remaining balance, and reset date
@@ -113,6 +119,7 @@ Open [localhost:3000](http://localhost:3000). Log in with GitHub. Done.
 | `PORT` | — | `3000` | HTTP server port |
 | `ALLOWED_GITHUB_USERS` | — | — | Comma-separated GitHub usernames; omit to allow any authenticated user |
 | `BASE_URL` | — | `http://localhost:3000` | Public URL — sets cookie domain and WebSocket origin validation |
+| `BYOK_ENABLED` | — | `false` | Set to `true` to enable Bring Your Own Keys panel in Settings |
 
 <details>
 <summary>All options</summary>
@@ -224,11 +231,13 @@ Device Flow OAuth (same as GitHub CLI). Tokens are server-side only, never sent 
 <summary>Full security details</summary>
 
 - CSP headers, CSRF protection, HSTS, X-Frame-Options DENY
+- Permissions-Policy: microphone scoped to same origin (`self`) — no third-party access
 - Rate limiting: 200 req / 15 min per IP (HTTP) + 30 msg / min per WebSocket
 - Secure cookies: httpOnly, secure (prod), sameSite: lax
 - DOMPurify on all rendered markdown
 - SSRF blocklist for MCP server URLs and OAuth token endpoints (IPv4 + IPv6 internal ranges, HTTPS required)
 - 10,000 char message limit, 10MB upload limit, extension allowlist
+- BYOK keys encrypted at rest with AES-256-GCM
 - Per-tool permission prompts with 30s auto-deny countdown
 - Token revalidation on every WebSocket connect
 - CodeQL scanning + secret scanning via GitHub Advanced Security
@@ -305,7 +314,7 @@ Device Flow OAuth (same as GitHub CLI). Tokens are server-side only, never sent 
 
 ## Built With
 
-SvelteKit 5 · Svelte 5 runes · TypeScript 5.7 · Node.js 24 · [`@github/copilot-sdk`](https://github.com/github/copilot-sdk) v0.2.0 · Vite · `ws` · Vitest · Playwright · Docker · Bicep
+SvelteKit 5 · Svelte 5 runes · TypeScript 5.7 · Node.js 24 · [`@github/copilot-sdk`](https://github.com/github/copilot-sdk) v0.2.2 · Vite · `ws` · Web Speech API · Vitest · Playwright · Docker · Bicep
 
 ## Contributing
 

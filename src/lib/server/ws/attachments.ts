@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { logSecurity } from '../security-log.js';
 import { UPLOAD_DIR_PREFIX } from './constants.js';
 
@@ -12,7 +12,7 @@ export type SdkAttachment =
 /** Validate that an attachment path is an absolute path inside the upload directory (prevents arbitrary file reads). */
 export function isValidAttachmentPath(filePath: string): boolean {
   const resolved = resolve(filePath);
-  return resolved.startsWith(UPLOAD_DIR_PREFIX + '/');
+  return resolved.startsWith(UPLOAD_DIR_PREFIX + sep);
 }
 
 /** Map client-sent attachments to the SDK format, validating paths and filtering invalid entries. */

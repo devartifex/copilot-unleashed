@@ -31,11 +31,15 @@ function getConfig() {
     copilotCwd: process.env.COPILOT_CWD?.trim().replace(/^~/, homedir()) || undefined,
     chatStatePath: env('CHAT_STATE_PATH', env('NODE_ENV', 'development') !== 'production' ? '.chat-state' : '/data/chat-state'),
     pushStorePath: env('PUSH_STORE_PATH', env('NODE_ENV', 'development') !== 'production' ? '.push-subscriptions' : '/data/push-subscriptions'),
+    byokEnabled: process.env.BYOK_ENABLED === 'true',
     vapid: {
       publicKey: process.env.VAPID_PUBLIC_KEY?.trim() || '',
       privateKey: process.env.VAPID_PRIVATE_KEY?.trim() || '',
       subject: env('VAPID_SUBJECT', 'mailto:admin@example.com'),
     },
+    otelEndpoint: process.env.OTEL_ENDPOINT?.trim() || '',
+    otelCaptureContent: process.env.OTEL_CAPTURE_CONTENT === 'true',
+    otelSourceName: env('OTEL_SOURCE_NAME', 'copilot-unleashed'),
   };
 }
 

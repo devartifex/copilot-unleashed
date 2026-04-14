@@ -15,8 +15,10 @@ describe('GET /health', () => {
 
 	it('returns the expected payload', async () => {
 		const response = await GET(createEvent());
+		const body = await response.json();
 
-		expect(await response.json()).toEqual({ status: 'ok' });
+		expect(body.status).toBe('ok');
+		expect(body).toHaveProperty('telemetry');
 	});
 
 	it('includes a status field', async () => {

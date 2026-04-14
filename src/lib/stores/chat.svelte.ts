@@ -14,6 +14,7 @@ import type {
   SessionSummary,
   SessionDetail,
   UserInputState,
+  ElicitationState,
   PermissionRequestState,
   ContextInfo,
   PlanState,
@@ -44,6 +45,7 @@ export interface ChatStore {
   readonly fleetAgents: Array<{ agentId: string; agentType: string; status: 'running' | 'completed' | 'failed'; error?: string }>;
   readonly sessionTitle: string | null;
   readonly pendingUserInput: UserInputState | null;
+  readonly pendingElicitation: ElicitationState | null;
   readonly pendingPermissions: PermissionRequestState[];
 
   // Data lists
@@ -73,12 +75,14 @@ export interface ChatStore {
   handleServerMessage(msg: ServerMessage): void;
   clearMessages(): void;
   addUserMessage(content: string, attachments?: Attachment[]): void;
+  addInfoMessage(content: string): void;
   addQueuedMessage(content: string, attachments?: Attachment[]): void;
   sendQueuedMessage(id: string): { content: string; attachments?: Attachment[] } | null;
   cancelQueuedMessage(id: string): void;
   flushQueue(): { content: string; attachments?: Attachment[] } | null;
   clearPendingPermission(requestId?: string): void;
   clearPendingUserInput(): void;
+  clearPendingElicitation(): void;
 }
 
 let nextId = 0;
@@ -107,6 +111,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   let sessionTitle = $state<string | null>(null);
   let currentSessionId = $state<string | null>(null);
   let pendingUserInput = $state<UserInputState | null>(null);
+  let pendingElicitation = $state<ElicitationState | null>(null);
   let pendingPermissions = $state<PermissionRequestState[]>([]);
   // Tracks if the current turn involved tool execution (tool approval → tool run).
   // Used to force-notify on turn_end even when the tab is visible, because the user
@@ -475,12 +480,12 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         isWaiting = false;
         currentStreamContent = '';
         pendingUserInput = null;
+        pendingElicitation = null;
         pendingPermissions = [];
         addInfoMessage('Response stopped');
         break;
 
       case 'user_input_request':
-      case 'elicitation_requested':
         pendingUserInput = {
           pending: true,
           question: msg.question,
@@ -494,8 +499,39 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         });
         break;
 
+      case 'elicitation_requested':
+        if (msg.requestedSchema && typeof msg.requestedSchema === 'object' && 'properties' in msg.requestedSchema) {
+          pendingElicitation = {
+            elicitationId: msg.elicitationId,
+            message: msg.message,
+            requestedSchema: msg.requestedSchema as ElicitationState['requestedSchema'],
+            mode: msg.mode,
+            elicitationSource: msg.elicitationSource,
+          };
+          notify('Copilot needs information from you', {
+            body: msg.message ?? 'Please fill out the form',
+            tag: 'elicitation',
+            requireInteraction: true,
+          });
+        } else {
+          // Legacy fallback: treat as simple user input
+          pendingUserInput = {
+            pending: true,
+            question: msg.question ?? msg.message ?? '',
+            choices: msg.choices,
+            allowFreeform: msg.allowFreeform ?? true,
+          };
+          notify('Copilot is asking you something', {
+            body: msg.question ?? msg.message,
+            tag: 'user-input',
+            requireInteraction: true,
+          });
+        }
+        break;
+
       case 'elicitation_completed':
         pendingUserInput = null;
+        pendingElicitation = null;
         break;
 
       case 'permission_request':
@@ -806,6 +842,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     sessionTitle = null;
     currentSessionId = null;
     pendingUserInput = null;
+    pendingElicitation = null;
     pendingPermissions = [];
     contextInfo = null;
     sessionDetail = null;
@@ -831,6 +868,10 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
   function clearPendingUserInput(): void {
     pendingUserInput = null;
+  }
+
+  function clearPendingElicitation(): void {
+    pendingElicitation = null;
   }
 
   // ── Queue management ──────────────────────────────────────────────────
@@ -878,6 +919,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     get fleetAgents() { return fleetAgents; },
     get sessionTitle() { return sessionTitle; },
     get pendingUserInput() { return pendingUserInput; },
+    get pendingElicitation() { return pendingElicitation; },
     get pendingPermissions() { return pendingPermissions; },
 
     get models() { return models; },
@@ -900,11 +942,13 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     handleServerMessage,
     clearMessages,
     addUserMessage,
+    addInfoMessage,
     addQueuedMessage,
     sendQueuedMessage,
     cancelQueuedMessage,
     flushQueue,
     clearPendingPermission,
     clearPendingUserInput,
+    clearPendingElicitation,
   };
 }

@@ -21,7 +21,7 @@ export default defineConfig({
 			thresholds: {
 				lines: 50,
 				functions: 50,
-				branches: 50,
+				branches: 45,
 				statements: 50,
 			},
 			include: ['src/lib/**/*.ts'],

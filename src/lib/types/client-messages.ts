@@ -1,6 +1,6 @@
 import type { SessionMode, ReasoningEffort } from './common.js';
 import type { Attachment } from './attachments.js';
-import type { InfiniteSessionsConfig, SystemPromptSectionInput } from './config.js';
+import type { InfiniteSessionsConfig, SystemPromptSectionInput, ModelCapabilitiesOverride } from './config.js';
 
 export type MessageDeliveryMode = 'immediate' | 'enqueue';
 
@@ -13,6 +13,8 @@ export interface NewSessionMessage {
   excludedTools?: string[];
   infiniteSessions?: InfiniteSessionsConfig;
   systemPromptSections?: Record<string, SystemPromptSectionInput>;
+  modelCapabilities?: ModelCapabilitiesOverride;
+  enableConfigDiscovery?: boolean;
 }
 
 export interface SendMessage {
@@ -38,6 +40,7 @@ export interface AbortClientMessage {
 export interface SetModelMessage {
   type: 'set_model';
   model: string;
+  modelCapabilities?: ModelCapabilitiesOverride;
 }
 
 export interface SetReasoningMessage {
@@ -57,6 +60,13 @@ export interface PermissionResponseMessage {
   kind: string;
   toolName: string;
   decision: 'allow' | 'deny' | 'always_allow' | 'always_deny';
+}
+
+export interface ElicitationResponseMessage {
+  type: 'elicitation_response';
+  action: 'accept' | 'decline' | 'cancel';
+  elicitationId?: string;
+  content?: Record<string, unknown>;
 }
 
 export interface ListToolsMessage {
@@ -126,6 +136,17 @@ export interface ClearChatMessage {
   type: 'clear_chat';
 }
 
+export interface GetSessionHistoryMessage {
+  type: 'get_session_history';
+  sessionId?: string;
+}
+
+export interface SessionLogMessage {
+  type: 'session_log';
+  message: string;
+  level?: 'info' | 'warning' | 'error';
+}
+
 export interface ListSkillsRpcMessage {
   type: 'list_skills_rpc';
 }
@@ -163,6 +184,47 @@ export interface UsePromptMessage {
   name: string;
 }
 
+export interface ListExtensionsMessage {
+  type: 'list_extensions';
+}
+
+export interface ToggleExtensionMessage {
+  type: 'toggle_extension';
+  name: string;
+  enabled: boolean;
+}
+
+export interface ReloadExtensionsMessage {
+  type: 'reload_extensions';
+}
+
+export interface ShellExecMessage {
+  type: 'shell_exec';
+  command: string;
+  cwd?: string;
+  timeout?: number;
+}
+
+export interface ShellKillMessage {
+  type: 'shell_kill';
+  pid: number;
+}
+
+export interface WorkspaceListFilesMessage {
+  type: 'workspace_list_files';
+}
+
+export interface WorkspaceReadFileMessage {
+  type: 'workspace_read_file';
+  path: string;
+}
+
+export interface WorkspaceCreateFileMessage {
+  type: 'workspace_create_file';
+  path: string;
+  content: string;
+}
+
 export type ClientMessage =
   | NewSessionMessage
   | SendMessage
@@ -173,6 +235,7 @@ export type ClientMessage =
   | SetReasoningMessage
   | UserInputResponseMessage
   | PermissionResponseMessage
+  | ElicitationResponseMessage
   | ListToolsMessage
   | ListAgentsMessage
   | SelectAgentMessage
@@ -188,6 +251,8 @@ export type ClientMessage =
   | DeletePlanMessage
   | StartFleetMessage
   | ClearChatMessage
+  | GetSessionHistoryMessage
+  | SessionLogMessage
   | ListSkillsRpcMessage
   | ToggleSkillRpcMessage
   | ReloadSkillsMessage
@@ -195,4 +260,12 @@ export type ClientMessage =
   | ToggleMcpRpcMessage
   | ListInstructionsMessage
   | ListPromptsMessage
-  | UsePromptMessage;
+  | UsePromptMessage
+  | ShellExecMessage
+  | ShellKillMessage
+  | WorkspaceListFilesMessage
+  | WorkspaceReadFileMessage
+  | WorkspaceCreateFileMessage
+  | ListExtensionsMessage
+  | ToggleExtensionMessage
+  | ReloadExtensionsMessage;

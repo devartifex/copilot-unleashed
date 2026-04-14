@@ -13,10 +13,14 @@
   import McpServersPanel from './McpServersPanel.svelte';
   import AgentsPanel from './AgentsPanel.svelte';
   import SkillsPanel from './SkillsPanel.svelte';
+  import ExtensionsPanel from './ExtensionsPanel.svelte';
   import PromptsPanel from './PromptsPanel.svelte';
   import QuotaPanel from './QuotaPanel.svelte';
   import NotificationsPanel from './NotificationsPanel.svelte';
   import CompactionPanel from './CompactionPanel.svelte';
+  import ByokPanel from './ByokPanel.svelte';
+
+  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'extensions' | 'quota' | 'notifications' | 'compact' | 'prompts' | 'byok' | null;
 
   interface Props {
     open: boolean;
@@ -28,6 +32,7 @@
     excludedTools: string[];
     discoveredMcpServers: SourcedMcpServerInfo[];
     availableSkills: Array<{ name: string; description?: string; source?: string; enabled?: boolean; license?: string }>;
+    extensions: Array<{ name: string; description?: string; enabled: boolean }>;
     instructions: InstructionInfo[];
     prompts: PromptInfo[];
     onClose: () => void;
@@ -40,13 +45,18 @@
     onFetchAgents: () => void;
     onFetchQuota: () => void;
     onFetchSkills: () => void;
+    onFetchExtensions: () => void;
     onFetchMcpServers: () => void;
     onFetchInstructions: () => void;
     onFetchPrompts: () => void;
     onToggleSkill: (name: string, enabled: boolean) => void;
+    onToggleExtension: (name: string, enabled: boolean) => void;
+    onReloadExtensions: () => void;
     onToggleMcpServer: (name: string, enabled: boolean) => void;
     notificationsEnabled: boolean;
     onToggleNotifications: (enabled: boolean) => void;
+    byokEnabled?: boolean;
+    initialSection?: string | null;
   }
 
   const {
@@ -59,6 +69,7 @@
     excludedTools,
     discoveredMcpServers,
     availableSkills,
+    extensions,
     instructions,
     prompts,
     onClose,
@@ -71,27 +82,41 @@
     onFetchAgents,
     onFetchQuota,
     onFetchSkills,
+    onFetchExtensions,
     onFetchMcpServers,
     onFetchInstructions,
     onFetchPrompts,
     onToggleSkill,
+    onToggleExtension,
+    onReloadExtensions,
     onToggleMcpServer,
     notificationsEnabled,
     onToggleNotifications,
+    byokEnabled = false,
+    initialSection = null,
   }: Props = $props();
 
-  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'quota' | 'notifications' | 'compact' | 'prompts' | null;
-
   let activeSection = $state<AccordionSection>(null);
+
+  // When opened with an initialSection, navigate to it automatically
+  $effect(() => {
+    if (open && initialSection) {
+      toggleSection(initialSection as AccordionSection);
+    }
+  });
   let toolsLoading = $state(false);
   let agentsLoading = $state(false);
   let skillsLoading = $state(false);
+  let extensionsLoading = $state(false);
   let mcpLoading = $state(false);
+  let byokLoading = $state(false);
+  let byokProvider = $state<Record<string, unknown> | null>(null);
 
   // Clear loading when data arrives from the server (props change = server responded)
   $effect(() => { void tools.length; toolsLoading = false; });
   $effect(() => { void agents.length; agentsLoading = false; });
   $effect(() => { void availableSkills.length; skillsLoading = false; });
+  $effect(() => { void extensions.length; extensionsLoading = false; });
   $effect(() => { void discoveredMcpServers.length; mcpLoading = false; });
 
   function toggleSection(section: AccordionSection) {
@@ -114,6 +139,10 @@
       if (availableSkills.length === 0) skillsLoading = true;
       onFetchSkills();
     }
+    if (section === 'extensions') {
+      if (extensions.length === 0) extensionsLoading = true;
+      onFetchExtensions();
+    }
     if (section === 'mcp') {
       if (discoveredMcpServers.length === 0) mcpLoading = true;
       onFetchMcpServers();
@@ -121,6 +150,44 @@
     }
     if (section === 'instructions') onFetchInstructions();
     if (section === 'prompts') onFetchPrompts();
+    if (section === 'byok') fetchByokProvider();
+  }
+
+  async function fetchByokProvider() {
+    byokLoading = true;
+    try {
+      const res = await fetch('/api/byok');
+      if (res.ok) {
+        const data = await res.json();
+        byokProvider = data.provider ?? null;
+      }
+    } catch {
+      // silent — panel will show unconfigured state
+    } finally {
+      byokLoading = false;
+    }
+  }
+
+  async function handleByokSave(config: { type?: string; baseUrl: string; apiKey?: string; bearerToken?: string; wireApi?: string; azure?: { apiVersion?: string } }) {
+    try {
+      const res = await fetch('/api/byok', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: config }),
+      });
+      if (res.ok) await fetchByokProvider();
+    } catch {
+      // silent
+    }
+  }
+
+  async function handleByokDelete() {
+    try {
+      const res = await fetch('/api/byok', { method: 'DELETE' });
+      if (res.ok) byokProvider = null;
+    } catch {
+      // silent
+    }
   }
 
   function handleBackdropClick(e: MouseEvent) {
@@ -232,6 +299,23 @@
           {/if}
         </div>
 
+        <!-- Extensions -->
+        <div class="settings-accordion">
+          <button
+            class="settings-accordion-btn"
+            class:open={activeSection === 'extensions'}
+            onclick={() => toggleSection('extensions')}
+          >
+            Extensions
+            <span class="accordion-chevron"><ChevronRight size={16} /></span>
+          </button>
+          {#if activeSection === 'extensions'}
+            <div class="settings-accordion-body">
+              <ExtensionsPanel {extensions} {onToggleExtension} {onReloadExtensions} loading={extensionsLoading} />
+            </div>
+          {/if}
+        </div>
+
         <!-- Prompts -->
         <div class="settings-accordion">
           <button
@@ -282,6 +366,30 @@
             </div>
           {/if}
         </div>
+
+        <!-- BYOK / Custom Provider -->
+        {#if byokEnabled}
+          <div class="settings-accordion">
+            <button
+              class="settings-accordion-btn"
+              class:open={activeSection === 'byok'}
+              onclick={() => toggleSection('byok')}
+            >
+              BYOK / Custom Provider
+              <span class="accordion-chevron"><ChevronRight size={16} /></span>
+            </button>
+            {#if activeSection === 'byok'}
+              <div class="settings-accordion-body">
+                <ByokPanel
+                  loading={byokLoading}
+                  provider={byokProvider}
+                  onSave={handleByokSave}
+                  onDelete={handleByokDelete}
+                />
+              </div>
+            {/if}
+          </div>
+        {/if}
 
         <!-- Compaction -->
         <div class="settings-accordion">

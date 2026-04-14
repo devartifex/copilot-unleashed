@@ -50,3 +50,25 @@ export async function handlePermissionResponse(msg: any, ctx: MessageContext): P
   }
   permResolve(decision.replace('always_', ''));
 }
+
+export async function handleElicitationResponse(msg: any, ctx: MessageContext): Promise<void> {
+  const { connectionEntry } = ctx;
+
+  if (!connectionEntry.elicitationResolve) {
+    poolSend(connectionEntry, { type: 'error', message: 'No pending elicitation request' });
+    return;
+  }
+
+  const validActions = new Set(['accept', 'decline', 'cancel']);
+  const action = (typeof msg.action === 'string' && validActions.has(msg.action)
+    ? msg.action
+    : 'cancel') as 'accept' | 'decline' | 'cancel';
+
+  const resolve = connectionEntry.elicitationResolve;
+  connectionEntry.elicitationResolve = null;
+  connectionEntry.pendingElicitationPrompt = null;
+  resolve({
+    action,
+    ...(action === 'accept' && msg.content ? { content: msg.content as Record<string, string | number | boolean | string[]> } : {}),
+  });
+}

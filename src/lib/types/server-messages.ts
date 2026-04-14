@@ -281,9 +281,15 @@ export interface InfoMessage {
 
 export interface ElicitationRequestedMessage {
   type: 'elicitation_requested';
-  question: string;
+  elicitationId?: string;
+  message?: string;
+  requestedSchema?: Record<string, unknown>;
+  mode?: string;
+  elicitationSource?: string;
+  /** Legacy fields for backward compat */
+  question?: string;
   choices?: string[];
-  allowFreeform: boolean;
+  allowFreeform?: boolean;
 }
 
 export interface ElicitationCompletedMessage {
@@ -492,6 +498,75 @@ export interface PromptContentMessage {
   content: string;
 }
 
+export interface ExtensionsListMessage {
+  type: 'extensions_list';
+  extensions: {
+    name: string;
+    description?: string;
+    enabled: boolean;
+  }[];
+}
+
+export interface ExtensionToggledMessage {
+  type: 'extension_toggled';
+  name: string;
+  enabled: boolean;
+}
+
+export interface ExtensionsReloadedMessage {
+  type: 'extensions_reloaded';
+}
+
+export interface ShellExecResultMessage {
+  type: 'shell_exec_result';
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  pid?: number;
+}
+
+export interface ShellKillResultMessage {
+  type: 'shell_kill_result';
+  success: boolean;
+}
+
+export interface WorkspaceFilesListMessage {
+  type: 'workspace_files_list';
+  files: string[];
+}
+
+export interface WorkspaceFileContentMessage {
+  type: 'workspace_file_content';
+  path: string;
+  content: string;
+}
+
+export interface WorkspaceFileCreatedMessage {
+  type: 'workspace_file_created';
+  path: string;
+}
+
+// Phase 10: newly wired SDK event messages
+export interface SessionStartedMessage { type: 'session_start'; }
+export interface SessionResumedSdkMessage { type: 'session_resume'; }
+export interface RemoteSteerableChangedMessage { type: 'remote_steerable_changed'; steerable?: boolean; }
+export interface SnapshotRewindMessage { type: 'snapshot_rewind'; }
+export interface SessionHandoffMessage { type: 'session_handoff'; }
+export interface BackgroundTasksChangedMessage { type: 'background_tasks_changed'; agents?: Array<{ agentId: string; agentType: string }>; }
+export interface SkillsLoadedMessage { type: 'skills_loaded'; }
+export interface CustomAgentsUpdatedMessage { type: 'custom_agents_updated'; }
+export interface McpServerStatusChangedMessage { type: 'mcp_server_status_changed'; name: string; status: string; error?: string; }
+export interface ExtensionsLoadedMessage { type: 'extensions_loaded'; }
+export interface AbortSdkMessage { type: 'abort'; }
+export interface McpOauthRequiredMessage { type: 'mcp_oauth_required'; serverName: string; authUrl?: string; }
+export interface McpOauthCompletedMessage { type: 'mcp_oauth_completed'; serverName: string; }
+export interface SamplingRequestedMessage { type: 'sampling_requested'; }
+export interface SamplingCompletedMessage { type: 'sampling_completed'; }
+export interface ExternalToolRequestedMessage { type: 'external_tool_requested'; toolName?: string; }
+export interface ExternalToolCompletedMessage { type: 'external_tool_completed'; toolName?: string; }
+export interface ToolsUpdatedMessage { type: 'tools_updated'; }
+export interface McpServersLoadedMessage { type: 'mcp_servers_loaded'; }
+
 export type ServerMessage =
   | ConnectedMessage
   | ColdResumeMessage
@@ -571,4 +646,31 @@ export type ServerMessage =
   | SessionsChangedMessage
   | InstructionsListMessage
   | PromptsListMessage
-  | PromptContentMessage;
+  | PromptContentMessage
+  | SessionStartedMessage
+  | SessionResumedSdkMessage
+  | RemoteSteerableChangedMessage
+  | SnapshotRewindMessage
+  | SessionHandoffMessage
+  | BackgroundTasksChangedMessage
+  | SkillsLoadedMessage
+  | CustomAgentsUpdatedMessage
+  | McpServerStatusChangedMessage
+  | ExtensionsLoadedMessage
+  | AbortSdkMessage
+  | McpOauthRequiredMessage
+  | McpOauthCompletedMessage
+  | SamplingRequestedMessage
+  | SamplingCompletedMessage
+  | ExternalToolRequestedMessage
+  | ExternalToolCompletedMessage
+  | ToolsUpdatedMessage
+  | McpServersLoadedMessage
+  | ShellExecResultMessage
+  | ShellKillResultMessage
+  | WorkspaceFilesListMessage
+  | WorkspaceFileContentMessage
+  | WorkspaceFileCreatedMessage
+  | ExtensionsListMessage
+  | ExtensionToggledMessage
+  | ExtensionsReloadedMessage;

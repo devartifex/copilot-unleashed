@@ -64,6 +64,8 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
         configDir: resolvedConfigDir,
         mcpServers: mcpServersConfig as any,
         onEvent,
+        ...(msg.modelCapabilities ? { modelCapabilities: msg.modelCapabilities } : {}),
+        ...(msg.enableConfigDiscovery != null ? { enableConfigDiscovery: msg.enableConfigDiscovery } : {}),
         ...(detail?.plan && {
           systemMessage: {
             mode: 'append' as const,

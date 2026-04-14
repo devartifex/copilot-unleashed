@@ -6,6 +6,7 @@
   import EnvInfo from '$lib/components/layout/EnvInfo.svelte';
   import PlanPanel from '$lib/components/plan/PlanPanel.svelte';
   import PermissionPrompt from '$lib/components/auth/PermissionPrompt.svelte';
+  import ElicitationDialog from '$lib/components/chat/ElicitationDialog.svelte';
   import Sidebar from '$lib/components/layout/Sidebar.svelte';
   import SettingsModal from '$lib/components/settings/SettingsModal.svelte';
   import SessionsSheet from '$lib/components/sessions/SessionsSheet.svelte';
@@ -135,6 +136,17 @@
         if (msg.type === 'skills_list') {
           settings.availableSkills = msg.skills;
         }
+        if (msg.type === 'extensions_list') {
+          settings.extensions = msg.extensions;
+        }
+        if (msg.type === 'extension_toggled') {
+          settings.extensions = settings.extensions.map(e =>
+            e.name === msg.name ? { ...e, enabled: msg.enabled } : e
+          );
+        }
+        if (msg.type === 'extensions_reloaded') {
+          wsStore.send({ type: 'list_extensions' });
+        }
         if (msg.type === 'instructions_list') {
           settings.instructions = msg.instructions;
         }
@@ -203,6 +215,20 @@
       wsStore.send({ type: 'start_fleet', prompt });
       return;
     }
+
+    // Handle /run command — send as a prompt instructing the agent to execute the command
+    if (trimmed === '/run' || trimmed.startsWith('/run ')) {
+      const command = trimmed.slice(4).trim();
+      if (!command) {
+        chatStore.addUserMessage(content);
+        chatStore.handleServerMessage({ type: 'error', message: 'Usage: /run <command> — execute a shell command' } as any);
+        return;
+      }
+      chatStore.addUserMessage(content);
+      wsStore.sendMessage(`Run the following shell command and show me the output:\n\`\`\`\n${command}\n\`\`\``, attachments);
+      return;
+    }
+
 
     // Queue during streaming instead of steering immediately
     if (chatStore.isStreaming || chatStore.isWaiting) {
@@ -301,6 +327,11 @@
     wsStore.respondToPermission(requestId, kind, toolName, decision);
     chatStore.clearPendingPermission(requestId);
   }
+
+  function handleElicitationResponse(response: { action: 'accept' | 'decline' | 'cancel'; elicitationId?: string; content?: Record<string, unknown> }): void {
+    wsStore.respondToElicitation(response.action, response.elicitationId, response.content);
+    chatStore.clearPendingElicitation();
+  }
 </script>
 
 <svelte:head>
@@ -372,6 +403,17 @@
 
       {/if}
 
+        {#if chatStore.pendingElicitation}
+          <ElicitationDialog
+            elicitationId={chatStore.pendingElicitation.elicitationId}
+            message={chatStore.pendingElicitation.message}
+            requestedSchema={chatStore.pendingElicitation.requestedSchema}
+            mode={chatStore.pendingElicitation.mode}
+            elicitationSource={chatStore.pendingElicitation.elicitationSource}
+            onRespond={handleElicitationResponse}
+          />
+        {/if}
+
         {#if chatStore.pendingPermissions.length > 0}
           {#each chatStore.pendingPermissions as perm (perm.requestId)}
             <PermissionPrompt
@@ -404,6 +446,11 @@
         onNewChat={handleNewChat}
         onOpenModelSheet={() => { modelSheetOpen = true; }}
         onCompact={() => wsStore.compact()}
+        onOpenSessions={handleOpenSessions}
+        onOpenSettings={() => {
+          sidebarOpen = false;
+          settingsOpen = true;
+        }}
       />
     </div>
     <!-- End .terminal -->
@@ -431,9 +478,10 @@
       excludedTools={settings.excludedTools}
       discoveredMcpServers={settings.discoveredMcpServers}
       availableSkills={settings.availableSkills}
+      extensions={settings.extensions}
       instructions={settings.instructions}
       prompts={settings.prompts}
-      onClose={() => settingsOpen = false}
+      onClose={() => { settingsOpen = false; }}
       onSaveInstructions={(v) => { settings.additionalInstructions = v; }}
       onToggleTool={(name, enabled) => {
         if (enabled) {
@@ -449,6 +497,7 @@
       onFetchAgents={() => wsStore.listAgents()}
       onFetchQuota={() => wsStore.getQuota()}
       onFetchSkills={() => wsStore.send({ type: 'list_skills_rpc' })}
+      onFetchExtensions={() => wsStore.send({ type: 'list_extensions' })}
       onFetchMcpServers={() => {
         wsStore.send({ type: 'list_mcp_rpc' });
         fetch('/api/customizations')
@@ -475,9 +524,12 @@
       onFetchInstructions={() => wsStore.send({ type: 'list_instructions' })}
       onFetchPrompts={() => wsStore.send({ type: 'list_prompts' })}
       onToggleSkill={(name, enabled) => wsStore.send({ type: 'toggle_skill_rpc', name, enabled })}
+      onToggleExtension={(name, enabled) => wsStore.send({ type: 'toggle_extension', name, enabled })}
+      onReloadExtensions={() => wsStore.send({ type: 'reload_extensions' })}
       onToggleMcpServer={(name, enabled) => wsStore.send({ type: 'toggle_mcp_rpc', name, enabled })}
       notificationsEnabled={settings.notificationsEnabled}
       onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
+      byokEnabled={data.byokEnabled}
     />
 
     <SessionsSheet

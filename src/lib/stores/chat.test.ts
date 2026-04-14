@@ -55,6 +55,7 @@ function createWsStoreMock(options: {
     updatePlan: vi.fn(),
     deletePlan: vi.fn(),
     respondToUserInput: vi.fn(),
+    respondToElicitation: vi.fn(),
     respondToPermission: vi.fn(),
   };
 }

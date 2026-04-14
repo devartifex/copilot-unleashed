@@ -14,6 +14,8 @@
     onDetectMention: () => void;
     onDetectIssue: () => void;
     onShowHelp: () => void;
+    onOpenSessions?: () => void;
+    onOpenSettings?: () => void;
   }
 
   let {
@@ -28,6 +30,8 @@
     onDetectMention,
     onDetectIssue,
     onShowHelp,
+    onOpenSessions,
+    onOpenSettings,
   }: Props = $props();
 
   interface SlashCommand {
@@ -50,9 +54,18 @@
     }
     if (onOpenModelSheet) {
       cmds.push({ cmd: '/model', desc: 'Switch model', action: () => { onOpenModelSheet(); inputValue = ''; } });
+      cmds.push({ cmd: '/reasoning', desc: 'Set reasoning effort', action: () => { onOpenModelSheet(); inputValue = ''; } });
     }
     if (onCompact) {
       cmds.push({ cmd: '/compact', desc: 'Compact conversation context', action: () => { onCompact(); inputValue = ''; textareaEl?.focus(); } });
+    }
+    cmds.push({ cmd: '/run', desc: 'Run a shell command', action: () => { inputValue = '/run '; textareaEl?.focus(); } });
+    cmds.push({ cmd: '/help', desc: 'Show keyboard shortcuts', action: () => { inputValue = ''; onShowHelp(); } });
+    if (onOpenSessions) {
+      cmds.push({ cmd: '/sessions', desc: 'Browse & resume sessions', action: () => { onOpenSessions(); inputValue = ''; } });
+    }
+    if (onOpenSettings) {
+      cmds.push({ cmd: '/settings', desc: 'Open settings', action: () => { onOpenSettings(); inputValue = ''; } });
     }
     cmds.push(
       { cmd: '@', desc: 'Mention a file', action: () => { inputValue = '@'; textareaEl?.focus(); tick().then(() => onDetectMention()); } },

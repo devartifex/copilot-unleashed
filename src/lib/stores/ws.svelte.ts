@@ -70,6 +70,7 @@ export interface WsStore {
   updatePlan(content: string): void;
   deletePlan(): void;
   respondToUserInput(answer: string, wasFreeform: boolean): void;
+  respondToElicitation(action: 'accept' | 'decline' | 'cancel', elicitationId?: string, content?: Record<string, unknown>): void;
   respondToPermission(requestId: string, kind: string, toolName: string, decision: 'allow' | 'deny' | 'always_allow' | 'always_deny'): void;
 }
 
@@ -480,6 +481,10 @@ export function createWsStore(): WsStore {
     send({ type: 'user_input_response', answer, wasFreeform });
   }
 
+  function respondToElicitation(action: 'accept' | 'decline' | 'cancel', elicitationId?: string, content?: Record<string, unknown>): void {
+    send({ type: 'elicitation_response', action, ...(elicitationId ? { elicitationId } : {}), ...(content ? { content } : {}) });
+  }
+
   function respondToPermission(requestId: string, kind: string, toolName: string, decision: 'allow' | 'deny' | 'always_allow' | 'always_deny'): void {
     send({ type: 'permission_response', requestId, kind, toolName, decision });
   }
@@ -516,6 +521,7 @@ export function createWsStore(): WsStore {
     updatePlan,
     deletePlan,
     respondToUserInput,
+    respondToElicitation,
     respondToPermission,
   };
 }

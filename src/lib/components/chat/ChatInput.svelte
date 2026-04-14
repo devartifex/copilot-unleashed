@@ -23,6 +23,8 @@
     onNewChat?: () => void;
     onOpenModelSheet?: () => void;
     onCompact?: () => void;
+    onOpenSessions?: () => void;
+    onOpenSettings?: () => void;
     prompts?: Array<{ name: string; description: string; content: string }>;
   }
 
@@ -46,6 +48,8 @@
     onNewChat,
     onOpenModelSheet,
     onCompact,
+    onOpenSessions,
+    onOpenSettings,
     prompts = [],
   }: Props = $props();
 
@@ -375,6 +379,8 @@
       {onNewChat}
       {onOpenModelSheet}
       {onCompact}
+      {onOpenSessions}
+      {onOpenSettings}
       onDetectMention={() => mentionComp?.detect()}
       onDetectIssue={() => issueComp?.detect()}
       onShowHelp={() => { showHelp = true; }}

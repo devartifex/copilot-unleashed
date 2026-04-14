@@ -38,6 +38,7 @@ export interface SettingsStore {
   selectedMode: SessionMode;
   discoveredMcpServers: SourcedMcpServerInfo[];
   availableSkills: SourcedSkillInfo[];
+  extensions: Array<{ name: string; description?: string; enabled: boolean }>;
   instructions: InstructionInfo[];
   prompts: PromptInfo[];
   infiniteSessions: InfiniteSessionsConfig;
@@ -57,6 +58,7 @@ export function createSettingsStore(): SettingsStore {
   let selectedMode = $state<SessionMode>(DEFAULT_SETTINGS.mode);
   let availableSkills = $state<SourcedSkillInfo[]>([]);
   let discoveredMcpServers = $state<SourcedMcpServerInfo[]>([]);
+  let extensions = $state<Array<{ name: string; description?: string; enabled: boolean }>>([]);
   let instructions = $state<InstructionInfo[]>([]);
   let prompts = $state<PromptInfo[]>([]);
   let infiniteSessions = $state<InfiniteSessionsConfig>({ ...DEFAULT_INFINITE_SESSIONS });
@@ -216,6 +218,9 @@ export function createSettingsStore(): SettingsStore {
 
     get availableSkills() { return availableSkills; },
     set availableSkills(v: SourcedSkillInfo[]) { availableSkills = v; },
+
+    get extensions() { return extensions; },
+    set extensions(v: Array<{ name: string; description?: string; enabled: boolean }>) { extensions = v; },
 
     get discoveredMcpServers() { return discoveredMcpServers; },
     set discoveredMcpServers(v: SourcedMcpServerInfo[]) { discoveredMcpServers = v; },

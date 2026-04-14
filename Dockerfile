@@ -12,8 +12,9 @@ RUN npm run build \
  && if [ -f bundled-session-store.db ]; then cp bundled-session-store.db /tmp/copilot-config/session-store.db; fi
 
 FROM node:24-slim
-RUN npm install -g npm@latest \
- && apt-get update \
+
+# Stable infra layer — cached independently of source code changes
+RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl gnupg git \
  && install -m 0755 -d /etc/apt/keyrings \
  && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
@@ -22,9 +23,23 @@ RUN npm install -g npm@latest \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends docker-ce-cli \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && npm install -g @github/copilot \
+ && mkdir -p /home/node/.copilot/session-state /data/sessions /data/settings /data/chat-state /data/push-subscriptions /data/copilot-home \
+ && chown -R node:node /home/node /data
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOME=/home/node
+ENV COPILOT_CONFIG_DIR=/home/node/.copilot
+
 WORKDIR /app
 
+# start.sh changes rarely — keep it above volatile app layers
+COPY --chown=node:node scripts/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# App artifacts — rebuild only when source or deps change
 COPY --from=builder /app/node_modules node_modules/
 COPY --from=builder /app/build build/
 COPY --from=builder /app/dist dist/
@@ -38,19 +53,8 @@ COPY --from=builder /app/.github/prompts/ .github/prompts/
 COPY --from=builder /app/.github/agents/ .github/agents/
 COPY --from=builder /app/.github/skills/ .github/skills/
 
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOME=/home/node
-
-RUN npm install -g @github/copilot
-RUN mkdir -p /home/node/.copilot/session-state /data/sessions /data/settings /data/chat-state /data/push-subscriptions /data/copilot-home && chown -R node:node /home/node /data
-
 # Copy bundled CLI session data if it was prepared with scripts/bundle-sessions.mjs
 COPY --from=builder --chown=node:node /tmp/copilot-config/ /home/node/.copilot/
-ENV COPILOT_CONFIG_DIR=/home/node/.copilot
-
-COPY --chown=node:node scripts/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
 
 EXPOSE 3000
 USER node

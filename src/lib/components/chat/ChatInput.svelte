@@ -80,7 +80,7 @@
   let promptComp: PromptAutocomplete;
   let slashComp: SlashCommandPalette;
   let attachComp: AttachmentManager;
-  let voiceComp: VoiceInput;
+  let voiceComp = $state<VoiceInput>();
 
   // Voice input: interim text shown while user is speaking
   let voiceInterim = $state('');

@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { tick, untrack } from 'svelte';
   import type { Snippet } from 'svelte';
   import type { ChatStore } from '$lib/stores/chat.svelte.js';
   import { renderMarkdown, highlightCodeBlocks, addCopyButtons } from '$lib/utils/markdown.js';
-  import { Sparkles } from 'lucide-svelte';
+  import { Sparkles, ArrowDown } from 'lucide-svelte';
   import Spinner from '$lib/components/shared/Spinner.svelte';
   import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
   import ReasoningBlock from '$lib/components/chat/ReasoningBlock.svelte';
@@ -19,6 +20,7 @@
 
   let messagesEl: HTMLDivElement | undefined = $state();
   let streamContentEl: HTMLDivElement | undefined = $state();
+  let stickToBottom = $state(true);
 
   const streamHtml = $derived(
     chatStore.currentStreamContent
@@ -33,6 +35,8 @@
     !chatStore.currentReasoningContent,
   );
 
+  const showScrollButton = $derived(!stickToBottom);
+
   function isNearBottom(): boolean {
     const el = messagesEl;
     if (!el) return true;
@@ -43,18 +47,32 @@
   function scrollToBottom() {
     const el = messagesEl;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
   }
+
+  function handleScroll() {
+    stickToBottom = isNearBottom();
+  }
+
+  function handleScrollToBottomClick() {
+    stickToBottom = true;
+    scrollToBottom();
+  }
+
+  // Re-engage auto-scroll when user sends a new message
+  $effect(() => {
+    if (chatStore.isWaiting) {
+      stickToBottom = true;
+    }
+  });
 
   // Auto-scroll when new messages arrive or stream content updates
   $effect(() => {
-    // Track reactive dependencies
     chatStore.messages.length;
     chatStore.currentStreamContent;
 
-    if (isNearBottom()) {
-      // Use tick-like delay to scroll after DOM update
-      requestAnimationFrame(() => scrollToBottom());
+    if (untrack(() => stickToBottom)) {
+      tick().then(() => scrollToBottom());
     }
   });
 
@@ -67,10 +85,11 @@
   });
 </script>
 
-<div class="messages" bind:this={messagesEl}>
-  {@render children?.()}
+<div class="messages-container">
+  <div class="messages" bind:this={messagesEl} onscroll={handleScroll}>
+    {@render children?.()}
 
-  {#each chatStore.messages as msg (msg.id)}
+    {#each chatStore.messages as msg (msg.id)}
       <ChatMessage message={msg} {username} {onSendQueued} {onCancelQueued} />
     {/each}
 
@@ -97,9 +116,28 @@
         </div>
       </div>
     {/if}
+  </div>
+
+  {#if showScrollButton}
+    <button
+      class="scroll-to-bottom"
+      onclick={handleScrollToBottomClick}
+      aria-label="Scroll to bottom"
+    >
+      <ArrowDown size={18} />
+    </button>
+  {/if}
 </div>
 
 <style>
+  .messages-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
   .messages {
     flex: 1;
     overflow-y: auto;
@@ -107,7 +145,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    scroll-behavior: smooth;
     padding: var(--sp-2) 0;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
@@ -237,5 +274,38 @@
   .waiting-label {
     color: var(--fg-muted);
     font-size: 0.82em;
+  }
+
+  /* ── scroll-to-bottom button ─────────────────────────────────────────── */
+  .scroll-to-bottom {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-overlay);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--fg-dim);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0.85;
+    transition: opacity 0.2s ease, background 0.2s ease;
+    z-index: 10;
+    backdrop-filter: blur(8px);
+    animation: fade-in-up 0.2s ease;
+  }
+
+  .scroll-to-bottom:hover {
+    opacity: 1;
+    background: var(--bg-surface, var(--bg-overlay));
+  }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to { opacity: 0.85; transform: translateX(-50%) translateY(0); }
   }
 </style>

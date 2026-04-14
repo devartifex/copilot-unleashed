@@ -55,6 +55,12 @@
     onToggleMcpServer: (name: string, enabled: boolean) => void;
     notificationsEnabled: boolean;
     onToggleNotifications: (enabled: boolean) => void;
+    voiceInputEnabled: boolean;
+    onToggleVoiceInput: (enabled: boolean) => void;
+    ttsEnabled: boolean;
+    onToggleTts: (enabled: boolean) => void;
+    ttsRate: number;
+    onSetTtsRate: (rate: number) => void;
     byokEnabled?: boolean;
     initialSection?: string | null;
   }
@@ -92,6 +98,12 @@
     onToggleMcpServer,
     notificationsEnabled,
     onToggleNotifications,
+    voiceInputEnabled,
+    onToggleVoiceInput,
+    ttsEnabled,
+    onToggleTts,
+    ttsRate,
+    onSetTtsRate,
     byokEnabled = false,
     initialSection = null,
   }: Props = $props();
@@ -367,6 +379,45 @@
           {/if}
         </div>
 
+        <!-- Voice Input -->
+        <div class="settings-accordion">
+          <div class="settings-toggle-row">
+            <span class="settings-toggle-label">Voice Input</span>
+            <button
+              class="settings-toggle-btn"
+              class:active={voiceInputEnabled}
+              onclick={() => onToggleVoiceInput(!voiceInputEnabled)}
+              aria-label={voiceInputEnabled ? 'Disable voice input' : 'Enable voice input'}
+              aria-pressed={voiceInputEnabled}
+            >{voiceInputEnabled ? 'On' : 'Off'}</button>
+          </div>
+          <div class="settings-toggle-row">
+            <span class="settings-toggle-label">Read Aloud</span>
+            <button
+              class="settings-toggle-btn"
+              class:active={ttsEnabled}
+              onclick={() => onToggleTts(!ttsEnabled)}
+              aria-label={ttsEnabled ? 'Disable read aloud' : 'Enable read aloud'}
+              aria-pressed={ttsEnabled}
+            >{ttsEnabled ? 'On' : 'Off'}</button>
+          </div>
+          {#if ttsEnabled}
+            <div class="settings-toggle-row">
+              <label class="settings-toggle-label" for="tts-rate">Speed: {ttsRate.toFixed(1)}×</label>
+              <input
+                id="tts-rate"
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value={ttsRate}
+                oninput={(e) => onSetTtsRate(Number((e.target as HTMLInputElement).value))}
+                class="rate-slider"
+              />
+            </div>
+          {/if}
+        </div>
+
         <!-- BYOK / Custom Provider -->
         {#if byokEnabled}
           <div class="settings-accordion">
@@ -538,5 +589,46 @@
     .settings-accordion-body {
       max-height: none;
     }
+  }
+
+  /* ── Toggle row (inline on/off) ────────────────────────────────── */
+  .settings-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .settings-toggle-label {
+    font-size: 0.9em;
+    color: var(--fg);
+  }
+
+  .settings-toggle-btn {
+    background: var(--border);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--fg-dim);
+    font-size: 0.8em;
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-height: 28px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .settings-toggle-btn.active {
+    background: var(--green, #22c55e);
+    color: #fff;
+  }
+
+  .settings-toggle-btn:hover {
+    opacity: 0.85;
+  }
+
+  .rate-slider {
+    width: 100px;
+    accent-color: var(--purple);
+    cursor: pointer;
   }
 </style>

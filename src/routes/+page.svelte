@@ -15,6 +15,7 @@
   import { createWsStore } from '$lib/stores/ws.svelte.js';
   import { createChatStore } from '$lib/stores/chat.svelte.js';
   import { createSettingsStore } from '$lib/stores/settings.svelte.js';
+  import { createTtsStore } from '$lib/stores/tts.svelte.js';
   import type { Attachment, SessionMode, ReasoningEffort } from '$lib/types/index.js';
   import { normalizeCustomizationSource, mergeMcpServers } from '$lib/utils/customization-helpers.js';
 
@@ -24,6 +25,7 @@
   const wsStore = createWsStore();
   const chatStore = createChatStore(wsStore);
   const settings = createSettingsStore();
+  const ttsStore = createTtsStore();
 
   // ── UI state ───────────────────────────────────────────────────────────
   let sidebarOpen = $state(false);
@@ -71,6 +73,7 @@
     if (data.authenticated) {
       console.log(`[PAGE] authenticated=true, loading settings & connecting WS`);
       settings.load();
+      ttsStore.rate = settings.ttsRate;
       settings.syncFromServer();
       settings.fetchSkills();
       settings.fetchCustomizations();
@@ -386,7 +389,7 @@
           />
         {/if}
 
-        <MessageList {chatStore} username={data.user?.login} onSendQueued={handleSendQueued} onCancelQueued={handleCancelQueued}>
+        <MessageList {chatStore} tts={settings.ttsEnabled ? ttsStore : undefined} username={data.user?.login} onSendQueued={handleSendQueued} onCancelQueued={handleCancelQueued}>
           {#if chatStore.messages.length === 0}
             <Banner username={data.user?.login} />
           {/if}
@@ -435,6 +438,7 @@
         supportsVision={supportsVision}
         pendingUserInput={chatStore.pendingUserInput}
         prompts={settings.prompts}
+        voiceInputEnabled={settings.voiceInputEnabled}
         onSend={handleSend}
         onAbort={() => wsStore.abort()}
         onSetMode={handleSetMode}
@@ -529,6 +533,12 @@
       onToggleMcpServer={(name, enabled) => wsStore.send({ type: 'toggle_mcp_rpc', name, enabled })}
       notificationsEnabled={settings.notificationsEnabled}
       onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
+      voiceInputEnabled={settings.voiceInputEnabled}
+      onToggleVoiceInput={(v) => { settings.voiceInputEnabled = v; }}
+      ttsEnabled={settings.ttsEnabled}
+      onToggleTts={(v) => { settings.ttsEnabled = v; }}
+      ttsRate={settings.ttsRate}
+      onSetTtsRate={(v) => { settings.ttsRate = v; ttsStore.rate = v; }}
       byokEnabled={data.byokEnabled}
     />
 

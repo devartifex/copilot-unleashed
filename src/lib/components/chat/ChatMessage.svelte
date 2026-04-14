@@ -1,20 +1,23 @@
 <script lang="ts">
   import type { Attachment, ChatMessage } from '$lib/types/index.js';
+  import type { TtsStore } from '$lib/stores/tts.svelte.js';
   import { renderMarkdown, highlightCodeBlocks, addCopyButtons } from '$lib/utils/markdown.js';
   import { Sparkles, Zap, AlertTriangle, Check, XCircle, ArrowRight, FileText } from 'lucide-svelte';
   import Spinner from '$lib/components/shared/Spinner.svelte';
   import FleetProgress from './FleetProgress.svelte';
   import ToolCall from '$lib/components/chat/ToolCall.svelte';
   import ReasoningBlock from '$lib/components/chat/ReasoningBlock.svelte';
+  import MessageActions from '$lib/components/chat/MessageActions.svelte';
 
   interface Props {
     message: ChatMessage;
     username?: string;
+    tts?: TtsStore;
     onSendQueued?: (id: string) => void;
     onCancelQueued?: (id: string) => void;
   }
 
-  const { message, username, onSendQueued, onCancelQueued }: Props = $props();
+  const { message, username, tts, onSendQueued, onCancelQueued }: Props = $props();
 
   let contentEl: HTMLDivElement | undefined = $state();
 
@@ -158,6 +161,9 @@
     <div class="content" bind:this={contentEl}>
       {@html renderedHtml}
     </div>
+    {#if tts}
+      <MessageActions messageId={message.id} content={message.content} {tts} />
+    {/if}
   </div>
 
 {:else if message.role === 'info'}

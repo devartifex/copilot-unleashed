@@ -26,6 +26,8 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   infiniteSessions: { ...DEFAULT_INFINITE_SESSIONS },
   notificationsEnabled: false,
   voiceInputEnabled: true,
+  ttsEnabled: true,
+  ttsRate: 1.0,
 };
 
 const VALID_MODES = new Set<SessionMode>(['interactive', 'plan', 'autopilot']);
@@ -45,6 +47,8 @@ export interface SettingsStore {
   infiniteSessions: InfiniteSessionsConfig;
   notificationsEnabled: boolean;
   voiceInputEnabled: boolean;
+  ttsEnabled: boolean;
+  ttsRate: number;
   load(): void;
   save(): void;
   syncFromServer(): Promise<void>;
@@ -66,6 +70,8 @@ export function createSettingsStore(): SettingsStore {
   let infiniteSessions = $state<InfiniteSessionsConfig>({ ...DEFAULT_INFINITE_SESSIONS });
   let notificationsEnabled = $state(DEFAULT_SETTINGS.notificationsEnabled ?? false);
   let voiceInputEnabled = $state(DEFAULT_SETTINGS.voiceInputEnabled ?? true);
+  let ttsEnabled = $state(DEFAULT_SETTINGS.ttsEnabled ?? true);
+  let ttsRate = $state(DEFAULT_SETTINGS.ttsRate ?? 1.0);
 
   function load(): void {
     if (typeof localStorage === 'undefined') return;
@@ -89,6 +95,8 @@ export function createSettingsStore(): SettingsStore {
       infiniteSessions,
       notificationsEnabled,
       voiceInputEnabled,
+      ttsEnabled,
+      ttsRate,
     };
   }
 
@@ -125,6 +133,12 @@ export function createSettingsStore(): SettingsStore {
     }
     if (typeof parsed.voiceInputEnabled === 'boolean') {
       voiceInputEnabled = parsed.voiceInputEnabled;
+    }
+    if (typeof parsed.ttsEnabled === 'boolean') {
+      ttsEnabled = parsed.ttsEnabled;
+    }
+    if (typeof parsed.ttsRate === 'number') {
+      ttsRate = Math.max(0.5, Math.min(2, parsed.ttsRate));
     }
   }
 
@@ -257,6 +271,12 @@ export function createSettingsStore(): SettingsStore {
 
     get voiceInputEnabled() { return voiceInputEnabled; },
     set voiceInputEnabled(v: boolean) { voiceInputEnabled = v; save(); },
+
+    get ttsEnabled() { return ttsEnabled; },
+    set ttsEnabled(v: boolean) { ttsEnabled = v; save(); },
+
+    get ttsRate() { return ttsRate; },
+    set ttsRate(v: number) { ttsRate = Math.max(0.5, Math.min(2, v)); save(); },
 
     load,
     save,

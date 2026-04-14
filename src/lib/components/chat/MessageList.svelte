@@ -2,6 +2,7 @@
   import { tick, untrack } from 'svelte';
   import type { Snippet } from 'svelte';
   import type { ChatStore } from '$lib/stores/chat.svelte.js';
+  import type { TtsStore } from '$lib/stores/tts.svelte.js';
   import { renderMarkdown, highlightCodeBlocks, addCopyButtons } from '$lib/utils/markdown.js';
   import { Sparkles, ArrowDown } from 'lucide-svelte';
   import Spinner from '$lib/components/shared/Spinner.svelte';
@@ -11,12 +12,13 @@
   interface Props {
     chatStore: ChatStore;
     username?: string;
+    tts?: TtsStore;
     onSendQueued?: (id: string) => void;
     onCancelQueued?: (id: string) => void;
     children?: Snippet;
   }
 
-  const { chatStore, username, onSendQueued, onCancelQueued, children }: Props = $props();
+  const { chatStore, username, tts, onSendQueued, onCancelQueued, children }: Props = $props();
 
   let messagesEl: HTMLDivElement | undefined = $state();
   let streamContentEl: HTMLDivElement | undefined = $state();
@@ -90,7 +92,7 @@
     {@render children?.()}
 
     {#each chatStore.messages as msg (msg.id)}
-      <ChatMessage message={msg} {username} {onSendQueued} {onCancelQueued} />
+      <ChatMessage message={msg} {username} {tts} {onSendQueued} {onCancelQueued} />
     {/each}
 
     {#if hasReasoningContent}

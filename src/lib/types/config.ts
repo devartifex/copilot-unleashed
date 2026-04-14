@@ -38,6 +38,10 @@ export interface PersistedSettings {
   notificationsEnabled?: boolean;
   /** User preference for voice input — show/hide the microphone button. */
   voiceInputEnabled?: boolean;
+  /** User preference for text-to-speech — show/hide the read aloud button. */
+  ttsEnabled?: boolean;
+  /** TTS speech rate (0.5 to 2.0). */
+  ttsRate?: number;
 }
 
 export interface CustomAgentDefinition {

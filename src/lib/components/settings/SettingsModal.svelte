@@ -57,6 +57,10 @@
     onToggleNotifications: (enabled: boolean) => void;
     voiceInputEnabled: boolean;
     onToggleVoiceInput: (enabled: boolean) => void;
+    ttsEnabled: boolean;
+    onToggleTts: (enabled: boolean) => void;
+    ttsRate: number;
+    onSetTtsRate: (rate: number) => void;
     byokEnabled?: boolean;
     initialSection?: string | null;
   }
@@ -96,6 +100,10 @@
     onToggleNotifications,
     voiceInputEnabled,
     onToggleVoiceInput,
+    ttsEnabled,
+    onToggleTts,
+    ttsRate,
+    onSetTtsRate,
     byokEnabled = false,
     initialSection = null,
   }: Props = $props();
@@ -383,6 +391,31 @@
               aria-pressed={voiceInputEnabled}
             >{voiceInputEnabled ? 'On' : 'Off'}</button>
           </div>
+          <div class="settings-toggle-row">
+            <span class="settings-toggle-label">Read Aloud</span>
+            <button
+              class="settings-toggle-btn"
+              class:active={ttsEnabled}
+              onclick={() => onToggleTts(!ttsEnabled)}
+              aria-label={ttsEnabled ? 'Disable read aloud' : 'Enable read aloud'}
+              aria-pressed={ttsEnabled}
+            >{ttsEnabled ? 'On' : 'Off'}</button>
+          </div>
+          {#if ttsEnabled}
+            <div class="settings-toggle-row">
+              <label class="settings-toggle-label" for="tts-rate">Speed: {ttsRate.toFixed(1)}×</label>
+              <input
+                id="tts-rate"
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value={ttsRate}
+                oninput={(e) => onSetTtsRate(Number((e.target as HTMLInputElement).value))}
+                class="rate-slider"
+              />
+            </div>
+          {/if}
         </div>
 
         <!-- BYOK / Custom Provider -->
@@ -591,5 +624,11 @@
 
   .settings-toggle-btn:hover {
     opacity: 0.85;
+  }
+
+  .rate-slider {
+    width: 100px;
+    accent-color: var(--purple);
+    cursor: pointer;
   }
 </style>

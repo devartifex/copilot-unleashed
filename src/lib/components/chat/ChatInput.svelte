@@ -6,6 +6,7 @@
   import SlashCommandPalette from '$lib/components/chat/SlashCommandPalette.svelte';
   import AttachmentManager from '$lib/components/chat/AttachmentManager.svelte';
   import KeyboardShortcutsHelp from '$lib/components/chat/KeyboardShortcutsHelp.svelte';
+  import VoiceInput from '$lib/components/chat/VoiceInput.svelte';
 
   interface Props {
     connectionState: ConnectionState;
@@ -26,6 +27,7 @@
     onOpenSessions?: () => void;
     onOpenSettings?: () => void;
     prompts?: Array<{ name: string; description: string; content: string }>;
+    voiceInputEnabled?: boolean;
   }
 
   const MAX_LENGTH = 10_000;
@@ -51,6 +53,7 @@
     onOpenSessions,
     onOpenSettings,
     prompts = [],
+    voiceInputEnabled = true,
   }: Props = $props();
 
   const modes: { value: SessionMode; label: string }[] = [
@@ -77,6 +80,21 @@
   let promptComp: PromptAutocomplete;
   let slashComp: SlashCommandPalette;
   let attachComp: AttachmentManager;
+
+  // Voice input: interim text shown while user is speaking
+  let voiceInterim = $state('');
+
+  function handleVoiceTranscript(text: string) {
+    voiceInterim = '';
+    const separator = inputValue.length > 0 && !inputValue.endsWith(' ') ? ' ' : '';
+    inputValue += separator + text;
+    requestAnimationFrame(autoResize);
+    textareaEl?.focus();
+  }
+
+  function handleVoiceInterim(text: string) {
+    voiceInterim = text;
+  }
 
   const isDisabled = $derived(
     !pendingUserInput && (connectionState !== 'connected' || !sessionReady || isUploading),
@@ -369,6 +387,10 @@
       onpaste={handlePaste}
     ></textarea>
 
+    {#if voiceInterim}
+      <div class="voice-interim" role="status" aria-live="polite">{voiceInterim}</div>
+    {/if}
+
     <SlashCommandPalette
       bind:this={slashComp}
       bind:inputValue
@@ -466,6 +488,14 @@
         </div>
 
         {/if}
+
+          {#if voiceInputEnabled}
+            <VoiceInput
+              onTranscript={handleVoiceTranscript}
+              onInterim={handleVoiceInterim}
+              disabled={!pendingUserInput && isDisabled}
+            />
+          {/if}
 
         <div class="mode-selector">
           {#each modes as m (m.value)}
@@ -828,5 +858,21 @@
 
   .stop-btn:active {
     opacity: 0.8;
+  }
+
+  /* ── Voice interim preview ──────────────────────────────────────── */
+  .voice-interim {
+    padding: 0 var(--sp-4) var(--sp-1);
+    color: var(--fg-dim);
+    font-size: 0.82em;
+    font-style: italic;
+    line-height: 1.4;
+    opacity: 0.7;
+    animation: voiceInterimPulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes voiceInterimPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
   }
 </style>

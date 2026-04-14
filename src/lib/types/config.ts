@@ -36,6 +36,8 @@ export interface PersistedSettings {
   infiniteSessions?: InfiniteSessionsConfig;
   /** User preference for push notifications — persisted so it survives redeploys. */
   notificationsEnabled?: boolean;
+  /** User preference for voice input — show/hide the microphone button. */
+  voiceInputEnabled?: boolean;
 }
 
 export interface CustomAgentDefinition {

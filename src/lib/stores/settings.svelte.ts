@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   excludedTools: [],
   infiniteSessions: { ...DEFAULT_INFINITE_SESSIONS },
   notificationsEnabled: false,
+  voiceInputEnabled: true,
 };
 
 const VALID_MODES = new Set<SessionMode>(['interactive', 'plan', 'autopilot']);
@@ -43,6 +44,7 @@ export interface SettingsStore {
   prompts: PromptInfo[];
   infiniteSessions: InfiniteSessionsConfig;
   notificationsEnabled: boolean;
+  voiceInputEnabled: boolean;
   load(): void;
   save(): void;
   syncFromServer(): Promise<void>;
@@ -63,6 +65,7 @@ export function createSettingsStore(): SettingsStore {
   let prompts = $state<PromptInfo[]>([]);
   let infiniteSessions = $state<InfiniteSessionsConfig>({ ...DEFAULT_INFINITE_SESSIONS });
   let notificationsEnabled = $state(DEFAULT_SETTINGS.notificationsEnabled ?? false);
+  let voiceInputEnabled = $state(DEFAULT_SETTINGS.voiceInputEnabled ?? true);
 
   function load(): void {
     if (typeof localStorage === 'undefined') return;
@@ -85,6 +88,7 @@ export function createSettingsStore(): SettingsStore {
       excludedTools,
       infiniteSessions,
       notificationsEnabled,
+      voiceInputEnabled,
     };
   }
 
@@ -118,6 +122,9 @@ export function createSettingsStore(): SettingsStore {
     }
     if (typeof parsed.notificationsEnabled === 'boolean') {
       notificationsEnabled = parsed.notificationsEnabled;
+    }
+    if (typeof parsed.voiceInputEnabled === 'boolean') {
+      voiceInputEnabled = parsed.voiceInputEnabled;
     }
   }
 
@@ -247,6 +254,9 @@ export function createSettingsStore(): SettingsStore {
 
     get notificationsEnabled() { return notificationsEnabled; },
     set notificationsEnabled(v: boolean) { notificationsEnabled = v; save(); },
+
+    get voiceInputEnabled() { return voiceInputEnabled; },
+    set voiceInputEnabled(v: boolean) { voiceInputEnabled = v; save(); },
 
     load,
     save,

@@ -435,6 +435,7 @@
         supportsVision={supportsVision}
         pendingUserInput={chatStore.pendingUserInput}
         prompts={settings.prompts}
+        voiceInputEnabled={settings.voiceInputEnabled}
         onSend={handleSend}
         onAbort={() => wsStore.abort()}
         onSetMode={handleSetMode}
@@ -529,6 +530,8 @@
       onToggleMcpServer={(name, enabled) => wsStore.send({ type: 'toggle_mcp_rpc', name, enabled })}
       notificationsEnabled={settings.notificationsEnabled}
       onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
+      voiceInputEnabled={settings.voiceInputEnabled}
+      onToggleVoiceInput={(v) => { settings.voiceInputEnabled = v; }}
       byokEnabled={data.byokEnabled}
     />
 

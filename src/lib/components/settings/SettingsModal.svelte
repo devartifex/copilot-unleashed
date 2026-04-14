@@ -55,6 +55,8 @@
     onToggleMcpServer: (name: string, enabled: boolean) => void;
     notificationsEnabled: boolean;
     onToggleNotifications: (enabled: boolean) => void;
+    voiceInputEnabled: boolean;
+    onToggleVoiceInput: (enabled: boolean) => void;
     byokEnabled?: boolean;
     initialSection?: string | null;
   }
@@ -92,6 +94,8 @@
     onToggleMcpServer,
     notificationsEnabled,
     onToggleNotifications,
+    voiceInputEnabled,
+    onToggleVoiceInput,
     byokEnabled = false,
     initialSection = null,
   }: Props = $props();
@@ -367,6 +371,20 @@
           {/if}
         </div>
 
+        <!-- Voice Input -->
+        <div class="settings-accordion">
+          <div class="settings-toggle-row">
+            <span class="settings-toggle-label">Voice Input</span>
+            <button
+              class="settings-toggle-btn"
+              class:active={voiceInputEnabled}
+              onclick={() => onToggleVoiceInput(!voiceInputEnabled)}
+              aria-label={voiceInputEnabled ? 'Disable voice input' : 'Enable voice input'}
+              aria-pressed={voiceInputEnabled}
+            >{voiceInputEnabled ? 'On' : 'Off'}</button>
+          </div>
+        </div>
+
         <!-- BYOK / Custom Provider -->
         {#if byokEnabled}
           <div class="settings-accordion">
@@ -538,5 +556,40 @@
     .settings-accordion-body {
       max-height: none;
     }
+  }
+
+  /* ── Toggle row (inline on/off) ────────────────────────────────── */
+  .settings-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .settings-toggle-label {
+    font-size: 0.9em;
+    color: var(--fg);
+  }
+
+  .settings-toggle-btn {
+    background: var(--border);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--fg-dim);
+    font-size: 0.8em;
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-height: 28px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .settings-toggle-btn.active {
+    background: var(--green, #22c55e);
+    color: #fff;
+  }
+
+  .settings-toggle-btn:hover {
+    opacity: 0.85;
   }
 </style>

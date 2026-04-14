@@ -20,7 +20,7 @@
     "test:unit:coverage": "vitest run --coverage",
     "clean": "rm -rf build dist .svelte-kit",
     "postinstall": "node scripts/patch-sdk.mjs",
-    "prepare": "husky"
+    "prepare": "git rev-parse --git-dir > /dev/null 2>&1 && husky || true"
   },
   "keywords": [
     "copilot",
@@ -64,7 +64,6 @@
     "@playwright/test": "^1.59.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@testing-library/jest-dom": "^6.9.1",
-    "@types/dompurify": "^3.2.0",
     "@types/express-session": "^1.18.0",
     "@types/node": "^25.6.0",
     "@types/session-file-store": "^1.2.6",

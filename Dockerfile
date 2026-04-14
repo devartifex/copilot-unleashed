@@ -1,4 +1,5 @@
 FROM node:24-slim AS builder
+RUN npm install -g npm@latest
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY scripts/ scripts/
@@ -11,7 +12,8 @@ RUN npm run build \
  && if [ -f bundled-session-store.db ]; then cp bundled-session-store.db /tmp/copilot-config/session-store.db; fi
 
 FROM node:24-slim
-RUN apt-get update \
+RUN npm install -g npm@latest \
+ && apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl gnupg git \
  && install -m 0755 -d /etc/apt/keyrings \
  && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \

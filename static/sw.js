@@ -1,8 +1,11 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'copilot-unleashed-v2';
+const CACHE_NAME = 'copilot-unleashed-v3';
+// NOTE: Do NOT precache '/' — the root is auth-aware (login vs chat screen) and
+// caching it can pin an unauthenticated response for an authenticated user (or
+// vice versa). Navigation uses network-first below; only truly static assets
+// are precached here.
 const PRECACHE_URLS = [
-  '/',
   '/favicon.png',
   '/manifest.json',
 ];

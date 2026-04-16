@@ -32,8 +32,8 @@ jobs:
       - run: npm ci
 
       - name: Security audit
-        run: npm audit --audit-level=high
-        continue-on-error: true
+        # Fail CI on moderate+ advisories — no continue-on-error
+        run: npm audit --audit-level=moderate
 
       - name: Build server (required for svelte-check)
         run: npm run build:server

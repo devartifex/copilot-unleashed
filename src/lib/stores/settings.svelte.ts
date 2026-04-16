@@ -73,8 +73,15 @@ export function createSettingsStore(): SettingsStore {
   let ttsEnabled = $state(DEFAULT_SETTINGS.ttsEnabled ?? true);
   let ttsRate = $state(DEFAULT_SETTINGS.ttsRate ?? 1.0);
 
+  // Detect a usable browser localStorage. Node 25+ exposes a built-in
+  // `localStorage` global as a stub when `--localstorage-file` is not set;
+  // the stub lacks `.getItem`/`.setItem` so `typeof localStorage === 'undefined'`
+  // is no longer a reliable SSR guard — check `window` instead.
+  const hasLocalStorage = (): boolean =>
+    typeof window !== 'undefined' && typeof window.localStorage?.getItem === 'function';
+
   function load(): void {
-    if (typeof localStorage === 'undefined') return;
+    if (!hasLocalStorage()) return;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
@@ -143,7 +150,10 @@ export function createSettingsStore(): SettingsStore {
   }
 
   function save(): void {
-    if (typeof localStorage === 'undefined') return;
+    if (!hasLocalStorage()) {
+      syncToServer();
+      return;
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(getCurrentData()));
     } catch {
@@ -173,7 +183,7 @@ export function createSettingsStore(): SettingsStore {
       if (body.settings) {
         applySettings(body.settings);
         // Update localStorage with server data
-        if (typeof localStorage !== 'undefined') {
+        if (hasLocalStorage()) {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(getCurrentData()));
         }
       } else {

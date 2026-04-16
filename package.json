@@ -41,7 +41,7 @@
     "@github/copilot-sdk": "^0.2.2",
     "@sveltejs/adapter-node": "^5.5.4",
     "@sveltejs/kit": "^2.57.1",
-    "dompurify": "^3.3.3",
+    "dompurify": "^3.4.0",
     "express-session": "^1.18.0",
     "highlight.js": "^11.11.1",
     "lucide-svelte": "^1.0.1",

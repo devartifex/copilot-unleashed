@@ -152,6 +152,9 @@ describe('createSettingsStore', () => {
           excludedTools: [],
           infiniteSessions: { enabled: true, backgroundThreshold: 0.80, bufferThreshold: 0.95 },
           notificationsEnabled: false,
+          voiceInputEnabled: true,
+          ttsEnabled: true,
+          ttsRate: 1,
         },
       }),
     });

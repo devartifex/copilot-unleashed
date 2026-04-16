@@ -227,6 +227,9 @@ Browser ──WebSocket──▶ SvelteKit + server.js ──JSON-RPC──▶ C
 
 Device Flow OAuth (same as GitHub CLI). Tokens are server-side only, never sent to the browser. Sessions are encrypted, rate-limited, and validated against GitHub's API on every WebSocket connect.
 
+> [!IMPORTANT]
+> **Self-hosters:** by default any GitHub user who completes device flow can sign in. Set `ALLOWED_GITHUB_USERS=your-login[,another-login]` to restrict access to a named allowlist. This is the single most important hardening step for a publicly-reachable deployment.
+
 <details>
 <summary>Full security details</summary>
 

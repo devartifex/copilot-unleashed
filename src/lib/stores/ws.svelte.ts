@@ -26,7 +26,13 @@ const HEARTBEAT_TIMEOUT = 5_000;
 // enabled, but that only causes collisions when the SAME browser is used on both
 // devices. Different browsers (e.g. Edge on desktop, Safari PWA on iOS) have
 // independent localStorage and are unaffected.
-const TAB_ID = typeof localStorage !== 'undefined'
+// Node 25+ exposes a stub `localStorage` global without `--localstorage-file`,
+// so `typeof localStorage !== 'undefined'` is no longer a valid SSR guard.
+// Check `window.localStorage` with a real method instead.
+const hasBrowserLocalStorage =
+  typeof window !== 'undefined' && typeof window.localStorage?.getItem === 'function';
+
+const TAB_ID = hasBrowserLocalStorage
   ? localStorage.getItem('copilot-tab-id') ?? (() => {
       const id = crypto.randomUUID();
       localStorage.setItem('copilot-tab-id', id);

@@ -194,45 +194,24 @@ describe('handle', () => {
 		});
 	});
 
-	describe('content security policy', () => {
-		it('adds the Content-Security-Policy header in production', async () => {
+	describe('security headers (hook-emitted)', () => {
+		// CSP (including nonces) is emitted by SvelteKit via svelte.config.js → kit.csp,
+		// not by the hook. The hook only emits HSTS + always-on headers.
+		it('adds HSTS in production', async () => {
 			setProductionEnv();
 			const handle = await loadHandle();
 
 			const response = await handle({ event: createEvent(), resolve: createResolve() });
 
-			expect(response.headers.has('Content-Security-Policy')).toBe(true);
+			expect(response.headers.get('Strict-Transport-Security')).toBe('max-age=31536000; includeSubDomains');
 		});
 
-		it('allows self for default-src and unsafe-inline for style-src', async () => {
-			setProductionEnv();
-			const handle = await loadHandle();
-
-			const response = await handle({ event: createEvent(), resolve: createResolve() });
-			const csp = response.headers.get('Content-Security-Policy');
-
-			expect(csp).toContain("default-src 'self'");
-			expect(csp).toContain("style-src 'self' 'unsafe-inline'");
-		});
-
-		it('allows websocket connections and GitHub avatars in production CSP', async () => {
-			setProductionEnv();
-			const handle = await loadHandle();
-
-			const response = await handle({ event: createEvent(), resolve: createResolve() });
-			const csp = response.headers.get('Content-Security-Policy');
-
-			expect(csp).toContain("connect-src 'self' ws: wss:");
-			expect(csp).toContain("img-src 'self' data: blob: https://avatars.githubusercontent.com");
-		});
-
-		it('skips strict CSP in development while still applying always-on security headers', async () => {
+		it('skips HSTS in development while still applying always-on security headers', async () => {
 			setEnv('NODE_ENV', 'development');
 			const handle = await loadHandle();
 
 			const response = await handle({ event: createEvent(), resolve: createResolve() });
 
-			expect(response.headers.get('Content-Security-Policy')).toBeNull();
 			expect(response.headers.get('Strict-Transport-Security')).toBeNull();
 			expect(response.headers.get('X-Frame-Options')).toBe('DENY');
 			expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
@@ -364,7 +343,6 @@ describe('handle', () => {
 			expect(response.status).toBe(429);
 			expect(await response.text()).toBe('Too Many Requests');
 			expect(response.headers.get('Retry-After')).toBe('900');
-			expect(response.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
 		});
 
 		it('tracks different IP addresses independently', async () => {

@@ -5,16 +5,17 @@ import { checkAuth, revalidateTokenIfStale } from '$lib/server/auth/guard.js';
 import { unsealAuth, parseCookieValue, AUTH_COOKIE_NAME } from '$lib/server/auth/auth-cookie.js';
 import { config } from '$lib/server/config.js';
 import { initServerSideEffects } from '$lib/server/init.js';
+import { debug } from '$lib/server/logger.js';
 
 initServerSideEffects();
 
 // Extract express-session from the bridge and attach to event.locals
 const sessionHandle: Handle = async ({ event, resolve }) => {
 	const sessionId = event.request.headers.get('x-session-id');
-	console.log(`[HOOKS] ${event.request.method} ${event.url.pathname} sessionId=${sessionId ?? 'NONE'}`);
+	debug(`[HOOKS] ${event.request.method} ${event.url.pathname} sessionId=${sessionId ?? 'NONE'}`);
 	if (sessionId) {
 		const session = getSessionById(sessionId) ?? null;
-		console.log(`[HOOKS] session resolved: hasSession=${!!session} hasToken=${!!session?.githubToken} user=${session?.githubUser?.login ?? 'none'}`);
+		debug(`[HOOKS] session resolved: hasSession=${!!session} hasToken=${!!session?.githubToken} user=${session?.githubUser?.login ?? 'none'}`);
 
 		// Restore auth from encrypted cookie when session file was lost (e.g. deploy wipe)
 		if (session && !session.githubToken) {
@@ -26,14 +27,14 @@ const sessionHandle: Handle = async ({ event, resolve }) => {
 					session.githubUser = data.githubUser;
 					session.githubAuthTime = data.githubAuthTime;
 					session.save(() => {});
-					console.log(`[HOOKS] Restored auth from cookie for user=${data.githubUser.login}`);
+					debug(`[HOOKS] Restored auth from cookie for user=${data.githubUser.login}`);
 				}
 			}
 		}
 
 		event.locals.session = session;
 	} else {
-		console.log(`[HOOKS] NO x-session-id header — session will be null`);
+		debug(`[HOOKS] NO x-session-id header — session will be null`);
 		event.locals.session = null;
 	}
 	return resolve(event);
@@ -44,23 +45,9 @@ const securityHeaders: Handle = async ({ event, resolve }) => {
 
   const isDev = process.env.NODE_ENV !== 'production';
 
-  // Skip strict CSP in dev mode — Vite HMR uses blob: workers and eval
+  // CSP (including nonces) is emitted by SvelteKit via svelte.config.js → kit.csp.
+  // HSTS is emitted here because it's not a CSP directive.
   if (!isDev) {
-    response.headers.set('Content-Security-Policy', [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "connect-src 'self' ws: wss: https://*.push.services.mozilla.com https://*.push.apple.com https://fcm.googleapis.com https://*.notify.windows.com",
-      "worker-src 'self' blob:",
-      "img-src 'self' data: blob: https://avatars.githubusercontent.com",
-      "font-src 'self'",
-      "frame-ancestors 'none'",
-      "form-action 'self'",
-      "base-uri 'self'",
-      "manifest-src 'self'",
-      "object-src 'none'",
-    ].join('; '));
-
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
 

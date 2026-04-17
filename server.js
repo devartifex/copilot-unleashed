@@ -21,6 +21,15 @@ if (!process.env.ORIGIN) {
 if (!process.env.BODY_SIZE_LIMIT) {
   process.env.BODY_SIZE_LIMIT = String(50 * 1024 * 1024);
 }
+
+// Trust reverse-proxy headers (X-Forwarded-For, X-Forwarded-Proto) when TRUST_PROXY=1.
+// Required when Tailscale Serve (or any reverse proxy) sits in front of the app.
+// Set automatically by docker-compose.remote.yml for the remote-access profile.
+if (process.env.TRUST_PROXY === '1') {
+  process.env.ADDRESS_HEADER = 'X-Forwarded-For';
+  process.env.XFF_DEPTH = process.env.XFF_DEPTH || '1';
+}
+
 const { handler } = await import('./build/handler.js');
 
 const sessionStorePath = config.sessionStorePath;

@@ -27,5 +27,56 @@ services:
       - "991"
     restart: unless-stopped
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # Remote-access profile: Tailscale sidecar
+  #
+  # Enables secure smartphone access from anywhere without port-forwarding.
+  # Tailscale handles WireGuard encryption, TLS termination, and Let's Encrypt
+  # certificate provisioning automatically — no extra proxy container needed.
+  #
+  # Quick start:
+  #   docker compose -f docker-compose.yml -f docker-compose.remote.yml \
+  #     --profile remote up -d --build
+  #
+  # Prerequisites (one-time setup):
+  #   1. Create a reusable Tailscale auth key:
+  #        https://login.tailscale.com/admin/settings/keys
+  #   2. Enable MagicDNS + HTTPS certificates in your tailnet:
+  #        https://login.tailscale.com/admin/dns
+  #   3. Set TS_AUTHKEY, TS_HOSTNAME, and TS_DOMAIN in your .env file
+  #   4. Set BASE_URL=https://<TS_DOMAIN> in your .env file
+  #
+  # See docs/REMOTE-ACCESS.md for the full step-by-step guide.
+  # ──────────────────────────────────────────────────────────────────────────
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    profiles: [remote]
+    hostname: ${TS_HOSTNAME:-copilot-unleashed}
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY:?Set TS_AUTHKEY in .env (see docs/REMOTE-ACCESS.md)}
+      - TS_HOSTNAME=${TS_HOSTNAME:-copilot-unleashed}
+      # Full Tailscale FQDN for this device, e.g. copilot-unleashed.tail1234.ts.net
+      # Find yours at https://login.tailscale.com/admin/machines after first start
+      # Leave empty on first start (bootstrap); set before enabling HTTPS serving
+      - TS_DOMAIN=${TS_DOMAIN:-}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+    volumes:
+      - tailscale-data:/var/lib/tailscale
+      - ./scripts/tailscale-entrypoint.sh:/entrypoint.sh:ro
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "tailscale", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
 volumes:
   copilot-data:
+  tailscale-data:

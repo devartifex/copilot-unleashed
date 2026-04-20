@@ -64,7 +64,7 @@
     "@playwright/test": "^1.59.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@testing-library/jest-dom": "^6.9.1",
-    "@types/express-session": "^1.18.0",
+    "@types/express-session": "^1.19.0",
     "@types/node": "^25.6.0",
     "@types/session-file-store": "^1.2.6",
     "@types/web-push": "^3.6.4",
@@ -75,7 +75,7 @@
     "lint-staged": "^16.4.0",
     "sharp": "^0.34.5",
     "svelte-check": "^4.4.6",
-    "typescript": "^6.0.2",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.3"
   }
 }

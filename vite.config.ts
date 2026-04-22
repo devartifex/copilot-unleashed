@@ -44,7 +44,7 @@ function webSocketDevPlugin() {
 				});
 			});
 
-			setupWebSocket(server.httpServer, sessionMiddleware);
+			setupWebSocket(server.httpServer as any, sessionMiddleware);
 			console.log('  ✓ WebSocket server attached to Vite dev server');
 		},
 	};

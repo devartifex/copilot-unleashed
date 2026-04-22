@@ -5,6 +5,9 @@ import { setupWebSocket } from './dist/ws/handler.js';
 import { registerSession, deleteSessionById } from './dist/session-store.js';
 import { config } from './dist/config.js';
 
+// Load .env file for local development (dotenv is a devDependency)
+try { const { config: dotenvConfig } = await import('dotenv'); dotenvConfig(); } catch {};
+
 const FileStore = FileStoreFactory(session);
 const isDev = config.isDev;
 const port = config.port;

@@ -89,6 +89,7 @@ export async function createAuthenticatedPage(
   const context = await browser.newContext({
     viewport,
     baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL ?? 'http://localhost:3001',
+    serviceWorkers: 'block',
   });
   const page = await context.newPage();
 

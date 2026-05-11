@@ -1,4 +1,4 @@
-FROM node:24-slim AS builder
+FROM node:26-slim AS builder
 RUN npm install -g npm@latest
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -11,7 +11,7 @@ RUN npm run build \
  && if [ -d bundled-sessions ]; then cp -a bundled-sessions/. /tmp/copilot-config/session-state/; fi \
  && if [ -f bundled-session-store.db ]; then cp bundled-session-store.db /tmp/copilot-config/session-store.db; fi
 
-FROM node:24-slim
+FROM node:26-slim
 
 # Stable infra layer — cached independently of source code changes
 RUN apt-get update \

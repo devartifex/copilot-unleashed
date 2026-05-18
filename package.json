@@ -40,14 +40,14 @@
   "dependencies": {
     "@github/copilot-sdk": "^0.2.2",
     "@sveltejs/adapter-node": "^5.5.4",
-    "@sveltejs/kit": "^2.57.1",
+    "@sveltejs/kit": "^2.60.1",
     "dompurify": "^3.4.0",
     "express-session": "^1.18.0",
     "highlight.js": "^11.11.1",
     "lucide-svelte": "^1.0.1",
     "marked": "^18.0.2",
     "session-file-store": "^1.5.0",
-    "svelte": "^5.55.4",
+    "svelte": "^5.55.8",
     "vite": "^8.0.8",
     "web-push": "^3.6.7",
     "ws": "^8.18.0"
@@ -62,7 +62,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@types/express-session": "^1.19.0",
     "@types/node": "^25.6.0",
@@ -75,7 +75,7 @@
     "jsdom": "^29.0.2",
     "lint-staged": "^16.4.0",
     "sharp": "^0.34.5",
-    "svelte-check": "^4.4.6",
+    "svelte-check": "^4.4.8",
     "typescript": "^6.0.3",
     "vitest": "^4.1.3"
   }

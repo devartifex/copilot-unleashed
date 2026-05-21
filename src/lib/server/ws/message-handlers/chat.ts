@@ -1,4 +1,4 @@
-import { poolSend } from '../session-pool.js';
+import { poolSend, sessionPool } from '../session-pool.js';
 import { MAX_MESSAGE_LENGTH } from '../constants.js';
 import { mapAttachmentsToSdk } from '../attachments.js';
 import { resolveFileMentions } from '../file-mentions.js';
@@ -29,6 +29,21 @@ export async function handleChat(msg: any, ctx: MessageContext): Promise<void> {
   const { prompt, fileAttachments: mentionAttachments } = await resolveFileMentions(content);
   const allAttachments = [...uploadAttachments, ...mentionAttachments];
 
+  const currentSdkSessionId = connectionEntry.sdkSessionId;
+  const hasActivePeer = [...sessionPool.entries()].some(([poolKey, peerEntry]) => {
+    if (!poolKey.startsWith(`${ctx.userLogin}:`)) return false;
+    if (peerEntry === connectionEntry) return false;
+    if (!peerEntry.isProcessing) return false;
+    if (!currentSdkSessionId || !peerEntry.sdkSessionId) return false;
+    return peerEntry.sdkSessionId === currentSdkSessionId;
+  });
+  if (hasActivePeer) {
+    poolSend(connectionEntry, {
+      type: 'session_taken',
+      message: 'Another device is currently generating a response for this conversation.',
+    });
+  }
+
   connectionEntry.isProcessing = true;
 
   // Persist user message before sending to SDK (fire-and-forget)
@@ -37,6 +52,13 @@ export async function handleChat(msg: any, ctx: MessageContext): Promise<void> {
     content,
     timestamp: Date.now(),
     ...(allAttachments.length ? { attachmentCount: allAttachments.length } : {}),
+  }).catch(() => {});
+  chatStateStore.setPrimarySession(ctx.userLogin, {
+    tabId: rawTabId(ctx),
+    sdkSessionId: connectionEntry.sdkSessionId,
+    model: connectionEntry.model ?? 'gpt-4.1',
+    mode: connectionEntry.mode ?? 'interactive',
+    updatedAt: Date.now(),
   }).catch(() => {});
 
   const sendMode = msg.mode === 'immediate' || msg.mode === 'enqueue' ? msg.mode : undefined;

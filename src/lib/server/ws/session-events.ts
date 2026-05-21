@@ -89,6 +89,13 @@ export function wireSessionEvents(
         content: pendingAssistantContent,
         timestamp: Date.now(),
       }).catch(() => {});
+      chatStateStore.setPrimarySession(userLogin, {
+        tabId,
+        sdkSessionId: sessionId ?? entry.sdkSessionId,
+        model: entry.model ?? 'gpt-4.1',
+        mode: entry.mode ?? 'interactive',
+        updatedAt: Date.now(),
+      }).catch(() => {});
     }
 
     // Push notification when client is unreachable (WS closed or app backgrounded)
@@ -116,6 +123,7 @@ export function wireSessionEvents(
     poolSend(entry, { type: 'tool_progress', toolCallId: event.data.toolCallId, message: event.data.message });
   });
   session.on('session.mode_changed', (event: any) => {
+    entry.mode = event.data.newMode ?? entry.mode;
     poolSend(entry, { type: 'mode_changed', mode: event.data.newMode });
   });
   session.on('session.error', (event: any) => {
@@ -228,6 +236,7 @@ export function wireSessionEvents(
     poolSend(entry, { type: 'subagent_deselected', agentName: event.data?.agentName });
   });
   session.on('session.model_change', (event: any) => {
+    entry.model = event.data?.model || event.data?.newModel || entry.model;
     poolSend(entry, { type: 'model_changed', model: event.data?.model || event.data?.newModel, source: 'sdk' });
   });
   session.on('elicitation.requested', (event: any) => {

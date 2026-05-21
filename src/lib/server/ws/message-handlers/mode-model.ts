@@ -26,6 +26,7 @@ export async function handleSetMode(msg: any, ctx: MessageContext): Promise<void
     } else {
       connectionEntry.session.registerPermissionHandler(makePermissionHandler(connectionEntry, ctx.userLogin));
     }
+    connectionEntry.mode = mode;
 
     // Note: mode_changed is sent by the SDK event handler (session.mode_changed)
   } catch (err: any) {
@@ -83,6 +84,7 @@ export async function handleSetModel(msg: any, ctx: MessageContext): Promise<voi
       ...(connectionEntry.reasoningEffort ? { reasoningEffort: connectionEntry.reasoningEffort } : {}),
       ...(msg.modelCapabilities ? { modelCapabilities: msg.modelCapabilities } : {}),
     });
+    connectionEntry.model = newModel;
     // Note: model_changed is sent by the SDK event handler (session.model_change)
   } catch (err: any) {
     console.error('Model change error:', err.message);

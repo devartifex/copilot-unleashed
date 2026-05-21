@@ -167,6 +167,13 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }).catch(() => {});
+    chatStateStore.setPrimarySession(ctx.userLogin, {
+      tabId: rawTabId(ctx),
+      sdkSessionId: connectionEntry.session?.sessionId ?? null,
+      model: msg.model ?? 'gpt-4.1',
+      mode: msg.mode ?? 'interactive',
+      updatedAt: Date.now(),
+    }).catch(() => {});
   } catch (err: any) {
     console.error('Session creation error:', err.message);
     poolSend(connectionEntry, {

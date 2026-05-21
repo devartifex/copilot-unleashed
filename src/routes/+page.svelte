@@ -2,6 +2,7 @@
   import DeviceFlowLogin from '$lib/components/auth/DeviceFlowLogin.svelte';
   import MessageList from '$lib/components/chat/MessageList.svelte';
   import ChatInput from '$lib/components/chat/ChatInput.svelte';
+  import ContinueSessionBanner from '$lib/components/chat/ContinueSessionBanner.svelte';
   import Banner from '$lib/components/layout/Banner.svelte';
   import EnvInfo from '$lib/components/layout/EnvInfo.svelte';
   import PlanPanel from '$lib/components/plan/PlanPanel.svelte';
@@ -35,6 +36,10 @@
   let modelSheetOpen = $state(false);
   let sessionsLoading = $state(false);
   let sessionLoading = $state(true);
+  let pendingNewSessionTimer: ReturnType<typeof setTimeout> | null = null;
+  const hasBrowserLocalStorage =
+    typeof window !== 'undefined' && typeof window.localStorage?.getItem === 'function';
+  const DEVICE_CHAT_ACTIVITY_KEY = 'copilot-has-chatted';
 
   // Use the confirmed model from the active session; fall back to the user's saved preference
   // so the TopBar/ModelSheet show the correct model immediately before session_created arrives.
@@ -92,15 +97,27 @@
             console.log('[PAGE] connected with sdkSessionId, resuming', msg.sdkSessionId);
             wsStore.resumeSession(msg.sdkSessionId);
           } else {
-            // No previous session — show new chat immediately
+            // No previous session for this tab — create one unless a primary session is offered.
             sessionLoading = false;
-            console.log('[PAGE] connected without sdkSessionId, creating new session');
-            requestNewSession();
+            clearPendingNewSessionTimer();
+            pendingNewSessionTimer = setTimeout(() => {
+              if (!chatStore.primarySessionAvailable && !wsStore.sessionReady) {
+                console.log('[PAGE] connected without sdkSessionId, creating new session');
+                requestNewSession();
+              }
+              pendingNewSessionTimer = null;
+            }, 150);
           }
+        }
+
+        if (msg.type === 'primary_session_available' && msg.sdkSessionId && !hasDeviceChatted()) {
+          clearPendingNewSessionTimer();
+          handleContinuePrimarySession(msg.sdkSessionId);
         }
 
         // Session fully loaded — clear loading state
         if (msg.type === 'cold_resume' || msg.type === 'session_created' || msg.type === 'session_resumed' || msg.type === 'session_reconnected') {
+          clearPendingNewSessionTimer();
           sessionLoading = false;
         }
 
@@ -168,6 +185,7 @@
 
       return () => {
         console.log('[PAGE] effect cleanup: unsubscribing and disconnecting WS');
+        clearPendingNewSessionTimer();
         unsub();
         wsStore.disconnect();
       };
@@ -203,6 +221,23 @@
     });
   }
 
+  function markDeviceAsChatted(): void {
+    if (hasBrowserLocalStorage) {
+      localStorage.setItem(DEVICE_CHAT_ACTIVITY_KEY, '1');
+    }
+  }
+
+  function hasDeviceChatted(): boolean {
+    return hasBrowserLocalStorage && localStorage.getItem(DEVICE_CHAT_ACTIVITY_KEY) === '1';
+  }
+
+  function clearPendingNewSessionTimer(): void {
+    if (pendingNewSessionTimer) {
+      clearTimeout(pendingNewSessionTimer);
+      pendingNewSessionTimer = null;
+    }
+  }
+
   function handleSend(content: string, attachments?: Attachment[]): void {
     const trimmed = content.trim();
 
@@ -215,6 +250,7 @@
         return;
       }
       chatStore.addUserMessage(content);
+      markDeviceAsChatted();
       wsStore.send({ type: 'start_fleet', prompt });
       return;
     }
@@ -228,6 +264,7 @@
         return;
       }
       chatStore.addUserMessage(content);
+      markDeviceAsChatted();
       wsStore.sendMessage(`Run the following shell command and show me the output:\n\`\`\`\n${command}\n\`\`\``, attachments);
       return;
     }
@@ -240,6 +277,7 @@
     }
 
     chatStore.addUserMessage(content, attachments);
+    markDeviceAsChatted();
     wsStore.sendMessage(content, attachments);
   }
 
@@ -313,6 +351,14 @@
     sessionsOpen = false;
   }
 
+  function handleContinuePrimarySession(sessionId: string | null): void {
+    if (!sessionId) return;
+    clearPendingNewSessionTimer();
+    chatStore.clearMessages();
+    chatStore.dismissPrimarySession();
+    wsStore.resumeSession(sessionId);
+  }
+
   function handleOpenSettings(): void {
     sidebarOpen = false;
     settingsOpen = true;
@@ -381,6 +427,19 @@
           {/each}
         </div>
       {:else}
+        {#if chatStore.primarySessionAvailable && chatStore.messages.length === 0}
+          <ContinueSessionBanner
+            updatedAt={chatStore.primarySessionAvailable.updatedAt}
+            model={chatStore.primarySessionAvailable.model}
+            onContinue={() => handleContinuePrimarySession(chatStore.primarySessionAvailable?.sdkSessionId ?? null)}
+            onDismiss={() => chatStore.dismissPrimarySession()}
+          />
+        {/if}
+
+        {#if chatStore.sessionTakenNotice}
+          <div class="session-taken-notice" role="status" aria-live="polite">{chatStore.sessionTakenNotice}</div>
+        {/if}
+
         {#if chatStore.plan.exists}
           <PlanPanel
             plan={chatStore.plan}
@@ -445,6 +504,7 @@
         onUserInputResponse={handleUserInputResponse}
         onFleet={(prompt) => {
           chatStore.addUserMessage(`/fleet ${prompt}`);
+          markDeviceAsChatted();
           wsStore.send({ type: 'start_fleet', prompt });
         }}
         onNewChat={handleNewChat}
@@ -600,6 +660,16 @@
     padding: var(--sp-3) var(--sp-4);
     min-height: 0;
     overflow: hidden;
+  }
+
+  .session-taken-notice {
+    margin-bottom: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(210, 168, 255, 0.45);
+    background: rgba(210, 168, 255, 0.09);
+    color: var(--fg-muted);
+    font-size: 0.84rem;
   }
 
   @media (min-width: 600px) {

@@ -44,3 +44,12 @@ export interface PlanState {
   content: string;
   path?: string;
 }
+
+export interface PrimarySessionAvailableState {
+  tabId: string;
+  sdkSessionId: string | null;
+  model: string;
+  mode: string;
+  updatedAt: number;
+  messages: Array<Record<string, unknown>>;
+}

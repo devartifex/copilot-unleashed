@@ -21,6 +21,7 @@ import type {
   QuotaSnapshots,
   QuotaSnapshot,
   SessionUsageTotals,
+  PrimarySessionAvailableState,
 } from '$lib/types/index.js';
 import { pickPrimaryQuota } from '$lib/types/index.js';
 import type { WsStore } from '$lib/stores/ws.svelte.js';
@@ -47,6 +48,8 @@ export interface ChatStore {
   readonly pendingUserInput: UserInputState | null;
   readonly pendingElicitation: ElicitationState | null;
   readonly pendingPermissions: PermissionRequestState[];
+  readonly primarySessionAvailable: PrimarySessionAvailableState | null;
+  readonly sessionTakenNotice: string | null;
 
   // Data lists
   readonly models: Map<string, ModelInfo>;
@@ -83,6 +86,7 @@ export interface ChatStore {
   clearPendingPermission(requestId?: string): void;
   clearPendingUserInput(): void;
   clearPendingElicitation(): void;
+  dismissPrimarySession(): void;
 }
 
 let nextId = 0;
@@ -113,6 +117,9 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   let pendingUserInput = $state<UserInputState | null>(null);
   let pendingElicitation = $state<ElicitationState | null>(null);
   let pendingPermissions = $state<PermissionRequestState[]>([]);
+  let primarySessionAvailable = $state<PrimarySessionAvailableState | null>(null);
+  let sessionTakenNotice = $state<string | null>(null);
+  let sessionTakenTimer: ReturnType<typeof setTimeout> | null = null;
   // Tracks if the current turn involved tool execution (tool approval → tool run).
   // Used to force-notify on turn_end even when the tab is visible, because the user
   // had to briefly return to approve the tool and may have switched away again.
@@ -208,6 +215,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'cold_resume': {
+        primarySessionAvailable = null;
         // Restore persisted chat history from server-side storage
         if (Array.isArray(msg.messages) && msg.messages.length > 0) {
           const restored: ChatMessage[] = msg.messages
@@ -246,6 +254,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
       }
 
       case 'session_created':
+        primarySessionAvailable = null;
         currentModel = msg.model;
         if (msg.sessionId) currentSessionId = msg.sessionId;
         plan = { exists: false, content: '' };
@@ -254,6 +263,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'session_reconnected':
+        primarySessionAvailable = null;
         if (msg.hasSession) {
           addInfoMessage('Session reconnected');
         }
@@ -584,11 +594,34 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         break;
 
       case 'session_resumed':
+        primarySessionAvailable = null;
         currentSessionId = msg.sessionId;
         addInfoMessage(`Session resumed: ${msg.sessionId}`);
         notify('Session restored — ready to continue', {
           tag: 'session-resumed',
         });
+        break;
+
+      case 'primary_session_available':
+        primarySessionAvailable = {
+          tabId: msg.tabId,
+          sdkSessionId: msg.sdkSessionId,
+          model: msg.model,
+          mode: msg.mode,
+          updatedAt: msg.updatedAt,
+          messages: msg.messages,
+        };
+        break;
+
+      case 'session_taken':
+        sessionTakenNotice = msg.message;
+        if (sessionTakenTimer) {
+          clearTimeout(sessionTakenTimer);
+        }
+        sessionTakenTimer = setTimeout(() => {
+          sessionTakenNotice = null;
+          sessionTakenTimer = null;
+        }, 3000);
         break;
 
       case 'session_deleted':
@@ -844,6 +877,12 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     pendingUserInput = null;
     pendingElicitation = null;
     pendingPermissions = [];
+    primarySessionAvailable = null;
+    sessionTakenNotice = null;
+    if (sessionTakenTimer) {
+      clearTimeout(sessionTakenTimer);
+      sessionTakenTimer = null;
+    }
     contextInfo = null;
     sessionDetail = null;
     baselineUsedRequests = null;
@@ -872,6 +911,10 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
   function clearPendingElicitation(): void {
     pendingElicitation = null;
+  }
+
+  function dismissPrimarySession(): void {
+    primarySessionAvailable = null;
   }
 
   // ── Queue management ──────────────────────────────────────────────────
@@ -921,6 +964,8 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     get pendingUserInput() { return pendingUserInput; },
     get pendingElicitation() { return pendingElicitation; },
     get pendingPermissions() { return pendingPermissions; },
+    get primarySessionAvailable() { return primarySessionAvailable; },
+    get sessionTakenNotice() { return sessionTakenNotice; },
 
     get models() { return models; },
     get tools() { return tools; },
@@ -950,5 +995,6 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     clearPendingPermission,
     clearPendingUserInput,
     clearPendingElicitation,
+    dismissPrimarySession,
   };
 }

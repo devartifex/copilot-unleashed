@@ -8,6 +8,7 @@ const TAB_ID_PATTERN = /^[a-z0-9_-]{1,64}$/i;
 // Control message types that should be prioritized in the buffer (never evicted before data messages)
 const CONTROL_MESSAGE_TYPES = new Set([
   'connected', 'cold_resume', 'session_created', 'session_resumed', 'session_reconnected',
+  'primary_session_available', 'session_taken',
   'turn_start', 'turn_end', 'error', 'warning',
   'session_shutdown', 'mode_changed', 'model_changed', 'title_changed',
   'permission_request', 'user_input_request',

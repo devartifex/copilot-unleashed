@@ -151,6 +151,8 @@ export interface MockWsOptions {
   autoCreateSession?: boolean;
   /** Whether to auto-respond to list_models */
   autoListModels?: boolean;
+  /** Additional server messages to send immediately after connection */
+  onConnectMessages?: Record<string, unknown>[];
 }
 
 /**
@@ -164,11 +166,15 @@ export async function mockWebSocket(page: Page, options: MockWsOptions = {}) {
     defaultModel = 'gpt-4.1',
     autoCreateSession = true,
     autoListModels = true,
+    onConnectMessages = [],
   } = options;
 
   await page.context().routeWebSocket('**/ws**', (ws) => {
     setTimeout(() => {
       ws.send(JSON.stringify({ type: 'connected', user: MOCK_USER.login }));
+      onConnectMessages.forEach((message, index) => {
+        setTimeout(() => ws.send(JSON.stringify(message)), 10 + index * 10);
+      });
     }, 10);
 
     ws.onMessage((data) => {

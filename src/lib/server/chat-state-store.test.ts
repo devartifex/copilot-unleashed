@@ -254,4 +254,28 @@ describe('ChatStateStore', () => {
 			spy.mockRestore();
 		});
 	});
+
+	describe('primary session metadata', () => {
+		it('saves and loads the primary session file', async () => {
+			const store = createChatStateStore(tempDir);
+			const session = {
+				tabId: 'tab-2',
+				sdkSessionId: 'sdk-abc',
+				model: 'gpt-4.1',
+				mode: 'interactive',
+				updatedAt: Date.now()
+			};
+
+			await store.setPrimarySession('user-1', session);
+			const loaded = await store.getPrimarySession('user-1');
+
+			expect(loaded).toEqual(session);
+		});
+
+		it('returns null when no primary session exists', async () => {
+			const store = createChatStateStore(tempDir);
+			const loaded = await store.getPrimarySession('missing-user');
+			expect(loaded).toBeNull();
+		});
+	});
 });

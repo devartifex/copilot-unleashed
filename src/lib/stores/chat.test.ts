@@ -270,6 +270,42 @@ describe('createChatStore', () => {
     });
   });
 
+  it('stores and dismisses primary session availability and session-taken indicator', () => {
+    vi.useFakeTimers();
+    const store = createChatStore(createWsStoreMock());
+
+    dispatch(store, {
+      type: 'primary_session_available',
+      tabId: 'tab-desktop',
+      sdkSessionId: 'session-123',
+      model: 'gpt-4.1',
+      mode: 'interactive',
+      updatedAt: 1234,
+      messages: [{ type: 'user', content: 'hello' }],
+    });
+    expect(store.primarySessionAvailable).toEqual({
+      tabId: 'tab-desktop',
+      sdkSessionId: 'session-123',
+      model: 'gpt-4.1',
+      mode: 'interactive',
+      updatedAt: 1234,
+      messages: [{ type: 'user', content: 'hello' }],
+    });
+
+    dispatch(store, {
+      type: 'session_taken',
+      message: 'Another device is currently generating a response.',
+    });
+    expect(store.sessionTakenNotice).toContain('Another device');
+    vi.advanceTimersByTime(3000);
+    expect(store.sessionTakenNotice).toBeNull();
+
+    store.dismissPrimarySession();
+    expect(store.primarySessionAvailable).toBeNull();
+
+    vi.useRealTimers();
+  });
+
   it('records usage, quota, context, plan, compaction, and reasoning-effort updates', () => {
     const store = createChatStore(createWsStoreMock());
     const initialQuota: QuotaSnapshots = {

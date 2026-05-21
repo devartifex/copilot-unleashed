@@ -15,6 +15,14 @@ export interface PersistedChatState {
 	updatedAt: number;
 }
 
+export interface PrimarySessionState {
+	tabId: string;
+	sdkSessionId: string | null;
+	model: string;
+	mode: string;
+	updatedAt: number;
+}
+
 export interface ChatStateStore {
 	save(userId: string, tabId: string, state: PersistedChatState): Promise<void>;
 	load(userId: string, tabId: string): Promise<PersistedChatState | null>;
@@ -25,6 +33,8 @@ export interface ChatStateStore {
 		tabId: string,
 		updates: Partial<Pick<PersistedChatState, 'sdkSessionId' | 'model' | 'mode'>>
 	): Promise<void>;
+	setPrimarySession(userId: string, session: PrimarySessionState): Promise<void>;
+	getPrimarySession(userId: string): Promise<PrimarySessionState | null>;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -36,6 +46,10 @@ const CONTROL_MESSAGE_TYPES = new Set(['session_created', 'session_resumed', 'er
 
 function statePath(basePath: string, userId: string, tabId: string): string {
 	return join(basePath, userId, `${tabId}.json`);
+}
+
+function primarySessionPath(basePath: string, userId: string): string {
+	return join(basePath, userId, 'primary-session.json');
 }
 
 function isEnoent(err: unknown): boolean {
@@ -135,11 +149,35 @@ export function createChatStateStore(basePath: string): ChatStateStore {
 		}
 	}
 
+	async function setPrimarySession(userId: string, session: PrimarySessionState): Promise<void> {
+		try {
+			const filePath = primarySessionPath(basePath, userId);
+			await atomicWrite(filePath, JSON.stringify(session));
+		} catch (err) {
+			console.error(`[chat-state-store] setPrimarySession failed for ${userId}:`, err);
+		}
+	}
+
+	async function getPrimarySession(userId: string): Promise<PrimarySessionState | null> {
+		try {
+			const filePath = primarySessionPath(basePath, userId);
+			const content = await readFile(filePath, 'utf-8');
+			return JSON.parse(content) as PrimarySessionState;
+		} catch (err) {
+			if (!isEnoent(err)) {
+				console.error(`[chat-state-store] getPrimarySession failed for ${userId}:`, err);
+			}
+			return null;
+		}
+	}
+
 	return {
 		save,
 		load,
 		delete: del,
 		appendMessage,
-		updateMetadata
+		updateMetadata,
+		setPrimarySession,
+		getPrimarySession
 	};
 }

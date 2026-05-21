@@ -39,6 +39,67 @@ test.describe('Chat messaging', () => {
     });
   });
 
+  test('shows continue-session banner when a primary session is available on a known device', async ({ browser }) => {
+    await withAuthenticatedChat(
+      browser,
+      {
+        autoCreateSession: false,
+        onConnectMessages: [{
+          type: 'primary_session_available',
+          tabId: 'tab-mobile',
+          sdkSessionId: 'session-primary-1',
+          model: 'gpt-4.1',
+          mode: 'interactive',
+          updatedAt: Date.now(),
+          messages: [{ type: 'user', content: 'Hi from desktop' }],
+        }],
+        onMessage: (msg, ws) => {
+          if (msg.type === 'resume_session' && typeof msg.sessionId === 'string') {
+            ws.send(JSON.stringify({ type: 'session_resumed', sessionId: msg.sessionId }));
+          }
+        },
+      },
+      async (page) => {
+        await page.evaluate(() => localStorage.setItem('copilot-has-chatted', '1'));
+        await page.reload();
+
+        await expect(page.getByRole('region', { name: 'Continue previous conversation' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
+      },
+    );
+  });
+
+  test('auto-resumes primary session on a fresh device', async ({ browser }) => {
+    const outboundMessages: Array<Record<string, unknown>> = [];
+
+    await withAuthenticatedChat(
+      browser,
+      {
+        autoCreateSession: false,
+        onConnectMessages: [{
+          type: 'primary_session_available',
+          tabId: 'tab-desktop',
+          sdkSessionId: 'session-primary-2',
+          model: 'gpt-4.1',
+          mode: 'interactive',
+          updatedAt: Date.now(),
+          messages: [{ type: 'assistant', content: 'Welcome back' }],
+        }],
+        onMessage: (msg, ws) => {
+          outboundMessages.push(msg);
+          if (msg.type === 'resume_session' && typeof msg.sessionId === 'string') {
+            ws.send(JSON.stringify({ type: 'session_resumed', sessionId: msg.sessionId }));
+          }
+        },
+      },
+      async (_page) => {
+        await expect.poll(
+          () => outboundMessages.some((message) => message.type === 'resume_session' && message.sessionId === 'session-primary-2'),
+        ).toBe(true);
+      },
+    );
+  });
+
   test('sends a message and receives a response', async ({ browser }) => {
     await withAuthenticatedChat(
       browser,

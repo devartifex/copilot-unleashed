@@ -19,6 +19,8 @@ import type { SessionMiddleware, MessageContext } from './types.js';
 
 export { cleanupAllSessions, cleanupUserSessions } from './session-pool.js';
 
+const PRIMARY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 export function setupWebSocket(
   server: Server,
   sessionMiddleware: SessionMiddleware
@@ -207,6 +209,30 @@ export function setupWebSocket(
           mode: persistedState!.mode,
           sdkSessionId: persistedState!.sdkSessionId,
         });
+      } else {
+        try {
+          const primarySession = await chatStateStore.getPrimarySession(userLogin);
+          const isRecentPrimarySession = !!(
+            primarySession &&
+            Date.now() - primarySession.updatedAt < PRIMARY_SESSION_MAX_AGE_MS
+          );
+          if (isRecentPrimarySession) {
+            const primaryState = await chatStateStore.load(userLogin, primarySession.tabId);
+            if (primaryState && primaryState.messages.length > 0) {
+              poolSend(entry, {
+                type: 'primary_session_available',
+                tabId: primarySession.tabId,
+                sdkSessionId: primarySession.sdkSessionId,
+                model: primarySession.model,
+                mode: primarySession.mode,
+                updatedAt: primarySession.updatedAt,
+                messages: primaryState.messages,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('[WS-SERVER] Primary session lookup failed:', err);
+        }
       }
     }
 

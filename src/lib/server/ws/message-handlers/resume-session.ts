@@ -168,6 +168,17 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
       console.warn(`[RESUME] Failed to load session history: ${histErr.message}`);
     }
 
+    connectionEntry.sdkSessionId = sessionId;
+    connectionEntry.mode = resumedMode;
+    connectionEntry.model = msg.model || connectionEntry.model || 'gpt-4.1';
+    chatStateStore.setPrimarySession(ctx.userLogin, {
+      tabId: rawTabId(ctx),
+      sdkSessionId: sessionId,
+      model: connectionEntry.model ?? 'gpt-4.1',
+      mode: resumedMode,
+      updatedAt: Date.now(),
+    }).catch(() => {});
+
     poolSend(connectionEntry, { type: 'session_resumed', sessionId });
   } catch (err: any) {
     console.error('Resume session error:', err.message);

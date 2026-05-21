@@ -34,6 +34,21 @@ export interface SessionReconnectedMessage {
   isProcessing?: boolean;
 }
 
+export interface PrimarySessionAvailableMessage {
+  type: 'primary_session_available';
+  tabId: string;
+  sdkSessionId: string | null;
+  model: string;
+  mode: string;
+  updatedAt: number;
+  messages: Array<Record<string, unknown>>;
+}
+
+export interface SessionTakenMessage {
+  type: 'session_taken';
+  message: string;
+}
+
 export interface TurnStartMessage {
   type: 'turn_start';
 }
@@ -572,6 +587,8 @@ export type ServerMessage =
   | ColdResumeMessage
   | SessionCreatedMessage
   | SessionReconnectedMessage
+  | PrimarySessionAvailableMessage
+  | SessionTakenMessage
   | TurnStartMessage
   | DeltaMessage
   | TurnEndMessage

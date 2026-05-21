@@ -40,6 +40,7 @@
   const hasBrowserLocalStorage =
     typeof window !== 'undefined' && typeof window.localStorage?.getItem === 'function';
   const DEVICE_CHAT_ACTIVITY_KEY = 'copilot-has-chatted';
+  const PRIMARY_SESSION_WAIT_MS = 150;
 
   // Use the confirmed model from the active session; fall back to the user's saved preference
   // so the TopBar/ModelSheet show the correct model immediately before session_created arrives.
@@ -100,13 +101,15 @@
             // No previous session for this tab — create one unless a primary session is offered.
             sessionLoading = false;
             clearPendingNewSessionTimer();
-            pendingNewSessionTimer = setTimeout(() => {
+            const timer = setTimeout(() => {
+              if (pendingNewSessionTimer !== timer) return;
               if (!chatStore.primarySessionAvailable && !wsStore.sessionReady) {
                 console.log('[PAGE] connected without sdkSessionId, creating new session');
                 requestNewSession();
               }
               pendingNewSessionTimer = null;
-            }, 150);
+            }, PRIMARY_SESSION_WAIT_MS);
+            pendingNewSessionTimer = timer;
           }
         }
 

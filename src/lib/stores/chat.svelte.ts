@@ -27,6 +27,8 @@ import { pickPrimaryQuota } from '$lib/types/index.js';
 import type { WsStore } from '$lib/stores/ws.svelte.js';
 import { notify } from '$lib/utils/notifications.js';
 
+const SESSION_TAKEN_NOTICE_DURATION_MS = 3000;
+
 export interface ChatStore {
   // Message state
   readonly messages: ChatMessage[];
@@ -621,7 +623,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         sessionTakenTimer = setTimeout(() => {
           sessionTakenNotice = null;
           sessionTakenTimer = null;
-        }, 3000);
+        }, SESSION_TAKEN_NOTICE_DURATION_MS);
         break;
 
       case 'session_deleted':

@@ -94,7 +94,7 @@ test.describe('Chat messaging', () => {
       },
       async (_page) => {
         await expect.poll(
-          () => outboundMessages.some((message) => message.type === 'resume_session' && message.sessionId === 'session-primary-2'),
+          () => outboundMessages.some((outboundMsg) => outboundMsg.type === 'resume_session' && outboundMsg.sessionId === 'session-primary-2'),
         ).toBe(true);
       },
     );

@@ -49,7 +49,7 @@ function statePath(basePath: string, userId: string, tabId: string): string {
 }
 
 function primarySessionPath(basePath: string, userId: string): string {
-	return join(basePath, userId, 'primary-session.json');
+	return join(basePath, userId, 'primary-session-metadata.json');
 }
 
 function isEnoent(err: unknown): boolean {

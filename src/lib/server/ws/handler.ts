@@ -11,15 +11,13 @@ import {
   sessionPool, createPoolEntry, destroyPoolEntry, poolSend,
   isValidTabId, countUserSessions, evictOldestUserSession,
 } from './session-pool.js';
-import { VALID_MESSAGE_TYPES, HEARTBEAT_INTERVAL, MAX_MISSED_PINGS, RATE_LIMITED_TYPES, WS_RATE_LIMIT_MAX, WS_RATE_LIMIT_WINDOW_MS } from './constants.js';
+import { VALID_MESSAGE_TYPES, HEARTBEAT_INTERVAL, MAX_MISSED_PINGS, PRIMARY_SESSION_MAX_AGE_MS, RATE_LIMITED_TYPES, WS_RATE_LIMIT_MAX, WS_RATE_LIMIT_WINDOW_MS } from './constants.js';
 import { messageHandlers } from './message-handlers/index.js';
 import { chatStateStore } from '../chat-state-singleton.js';
 import { debug } from '../logger.js';
 import type { SessionMiddleware, MessageContext } from './types.js';
 
 export { cleanupAllSessions, cleanupUserSessions } from './session-pool.js';
-
-const PRIMARY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export function setupWebSocket(
   server: Server,

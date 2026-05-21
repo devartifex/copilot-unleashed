@@ -30,13 +30,18 @@ export async function handleChat(msg: any, ctx: MessageContext): Promise<void> {
   const allAttachments = [...uploadAttachments, ...mentionAttachments];
 
   const currentSdkSessionId = connectionEntry.sdkSessionId;
-  const hasActivePeer = [...sessionPool.entries()].some(([poolKey, peerEntry]) => {
-    if (!poolKey.startsWith(`${ctx.userLogin}:`)) return false;
-    if (peerEntry === connectionEntry) return false;
-    if (!peerEntry.isProcessing) return false;
-    if (!currentSdkSessionId || !peerEntry.sdkSessionId) return false;
-    return peerEntry.sdkSessionId === currentSdkSessionId;
-  });
+  let hasActivePeer = false;
+  if (currentSdkSessionId) {
+    for (const [poolKey, peerEntry] of sessionPool) {
+      if (!poolKey.startsWith(`${ctx.userLogin}:`)) continue;
+      if (peerEntry === connectionEntry) continue;
+      if (!peerEntry.isProcessing) continue;
+      if (peerEntry.sdkSessionId === currentSdkSessionId) {
+        hasActivePeer = true;
+        break;
+      }
+    }
+  }
   if (hasActivePeer) {
     poolSend(connectionEntry, {
       type: 'session_taken',

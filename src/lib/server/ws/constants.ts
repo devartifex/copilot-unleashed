@@ -30,6 +30,7 @@ export const HEARTBEAT_INTERVAL = 30_000;
 // connection, while still detecting truly dead sockets promptly.
 export const MAX_MISSED_PINGS = 3;
 export const UPLOAD_DIR_PREFIX = join(tmpdir(), 'copilot-uploads');
+export const PRIMARY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export const RATE_LIMITED_TYPES = new Set(['message', 'new_session', 'resume_session', 'compact', 'start_fleet']);
 export const WS_RATE_LIMIT_MAX = 30;

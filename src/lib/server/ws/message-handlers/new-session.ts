@@ -53,7 +53,9 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
     const permissionMode = msg.mode === 'autopilot' ? 'approve_all' as const : 'prompt' as const;
 
     const VALID_REMOTE_MODES = new Set(['off', 'export', 'on']);
-    const remoteSession = typeof msg.remoteSession === 'string' && VALID_REMOTE_MODES.has(msg.remoteSession)
+    const remoteSession = config.enableRemoteSessions
+      && typeof msg.remoteSession === 'string'
+      && VALID_REMOTE_MODES.has(msg.remoteSession)
       ? (msg.remoteSession as 'off' | 'export' | 'on')
       : undefined;
 

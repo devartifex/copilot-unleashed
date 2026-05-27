@@ -9,6 +9,10 @@ vi.mock('$lib/server/copilot/client', () => ({
   createCopilotClient: vi.fn(),
 }));
 
+vi.mock('$lib/server/config.js', () => ({
+  config: { copilotConfigDir: '/tmp/test-copilot' },
+}));
+
 import { GET } from './+server';
 import { checkAuth } from '$lib/server/auth/guard';
 import { createCopilotClient } from '$lib/server/copilot/client';
@@ -70,6 +74,13 @@ describe('GET /api/sessions/last', () => {
       sessionId: 'sess-1',
       metadata: { id: 'sess-1', title: 'demo' },
     });
+  });
+
+  it('passes copilotConfigDir to the SDK client factory', async () => {
+    getLastSessionId.mockResolvedValue('sess-1');
+    getSessionMetadata.mockResolvedValue({ id: 'sess-1' });
+    await GET(createEvent({ githubToken: 'tok' }));
+    expect(createCopilotClient).toHaveBeenCalledWith('tok', '/tmp/test-copilot');
   });
 
   it('returns 500 on unexpected SDK errors', async () => {

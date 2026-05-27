@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { checkAuth } from '$lib/server/auth/guard';
 import { createCopilotClient } from '$lib/server/copilot/client';
+import { config } from '$lib/server/config.js';
 
 /**
  * GET /api/sessions/last — returns metadata for the most recent local session
@@ -13,7 +14,7 @@ export const GET: RequestHandler = async ({ locals }) => {
     return json({ error: auth.error }, { status: 401 });
   }
 
-  const client = createCopilotClient(locals.session!.githubToken!);
+  const client = createCopilotClient(locals.session!.githubToken!, config.copilotConfigDir);
   try {
     const lastId = await client.getLastSessionId();
     if (!lastId) {

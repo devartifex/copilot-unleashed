@@ -343,7 +343,7 @@ async function loadConfiguredMcpServers(configDir?: string): Promise<Record<stri
           command: server.command,
           args: Array.isArray(server.args) ? server.args.filter((arg): arg is string => typeof arg === 'string') : [],
           ...(normalizeStringRecord(server.env) ? { env: normalizeStringRecord(server.env) } : {}),
-          ...(typeof server.cwd === 'string' ? { cwd: server.cwd } : {}),
+          ...(typeof server.cwd === 'string' ? { workingDirectory: server.cwd } : {}),
           tools: Array.isArray(server.tools) && server.tools.length > 0 ? server.tools : ['*'],
           ...(typeof server.timeout === 'number' && server.timeout > 0 ? { timeout: server.timeout } : {}),
         };

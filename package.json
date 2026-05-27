@@ -38,19 +38,19 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@github/copilot-sdk": "^0.2.2",
+    "@github/copilot-sdk": "1.0.0-beta.8",
     "@sveltejs/adapter-node": "^5.5.4",
-    "@sveltejs/kit": "^2.57.1",
-    "dompurify": "^3.4.0",
+    "@sveltejs/kit": "^2.61.1",
+    "dompurify": "^3.4.7",
     "express-session": "^1.18.0",
     "highlight.js": "^11.11.1",
     "lucide-svelte": "^1.0.1",
-    "marked": "^18.0.2",
+    "marked": "^18.0.4",
     "session-file-store": "^1.5.0",
-    "svelte": "^5.55.4",
-    "vite": "^8.0.8",
+    "svelte": "^5.55.9",
+    "vite": "^8.0.14",
     "web-push": "^3.6.7",
-    "ws": "^8.18.0"
+    "ws": "^8.21.0"
   },
   "lint-staged": {
     "*.{ts,svelte}": [
@@ -61,21 +61,21 @@
     "cookie": "^0.7.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
-    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@playwright/test": "^1.60.0",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@types/express-session": "^1.19.0",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.7.0",
     "@types/session-file-store": "^1.2.6",
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.5.13",
-    "@vitest/coverage-v8": "^4.1.5",
+    "@vitest/coverage-v8": "^4.1.6",
     "dotenv": "^17.4.2",
     "husky": "^9.1.7",
-    "jsdom": "^29.0.2",
-    "lint-staged": "^16.4.0",
+    "jsdom": "^29.1.1",
+    "lint-staged": "^17.0.4",
     "sharp": "^0.34.5",
-    "svelte-check": "^4.4.6",
+    "svelte-check": "^4.4.8",
     "typescript": "^6.0.3",
     "vitest": "^4.1.3"
   }

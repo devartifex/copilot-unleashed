@@ -6,7 +6,7 @@ export async function handleGetQuota(msg: any, ctx: MessageContext): Promise<voi
   const { connectionEntry } = ctx;
 
   try {
-    const result = await connectionEntry.client.rpc.account.getQuota();
+    const result = await connectionEntry.client.rpc.account.getQuota({});
     poolSend(connectionEntry, {
       type: 'quota',
       quotaSnapshots: normalizeQuotaSnapshots(result.quotaSnapshots),

@@ -1,5 +1,5 @@
 import { createCopilotSession } from '../../copilot/session.js';
-import type { SystemPromptSection, SectionOverride } from '@github/copilot-sdk';
+import type { SystemMessageSection, SectionOverride } from '@github/copilot-sdk';
 import { getSkillDirectories } from '../../skills/scanner.js';
 import { config } from '../../config.js';
 import { poolSend } from '../session-pool.js';
@@ -52,6 +52,11 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
 
     const permissionMode = msg.mode === 'autopilot' ? 'approve_all' as const : 'prompt' as const;
 
+    const VALID_REMOTE_MODES = new Set(['off', 'export', 'on']);
+    const remoteSession = typeof msg.remoteSession === 'string' && VALID_REMOTE_MODES.has(msg.remoteSession)
+      ? (msg.remoteSession as 'off' | 'export' | 'on')
+      : undefined;
+
     const disabledSkills = Array.isArray(msg.disabledSkills)
       ? msg.disabledSkills.filter((s: unknown) => typeof s === 'string')
       : undefined;
@@ -85,14 +90,14 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
     ]);
     const validActions = new Set<string>(['replace', 'remove', 'append', 'prepend']);
 
-    let systemPromptSections: Partial<Record<SystemPromptSection, SectionOverride>> | undefined;
+    let systemPromptSections: Partial<Record<SystemMessageSection, SectionOverride>> | undefined;
     if (msg.systemPromptSections && typeof msg.systemPromptSections === 'object') {
       systemPromptSections = {};
       for (const [name, override] of Object.entries(msg.systemPromptSections as Record<string, unknown>)) {
         if (!validSections.has(name)) continue;
         const o = override as Record<string, unknown>;
         if (!o || typeof o !== 'object' || !validActions.has(o.action as string)) continue;
-        systemPromptSections[name as SystemPromptSection] = {
+        systemPromptSections[name as SystemMessageSection] = {
           action: o.action as SectionOverride['action'],
           ...(typeof o.content === 'string' ? { content: o.content.slice(0, 5000) } : {}),
         };
@@ -131,6 +136,7 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       ...(msg.modelCapabilities ? { modelCapabilities: msg.modelCapabilities } : {}),
       ...(msg.enableConfigDiscovery != null ? { enableConfigDiscovery: msg.enableConfigDiscovery } : {}),
       ...(provider ? { provider } : {}),
+      ...(remoteSession ? { remoteSession } : {}),
       onHookEvent: (message) => poolSend(connectionEntry, message),
     });
 

@@ -7,7 +7,7 @@ export interface InfiniteSessionsConfig {
   bufferThreshold: number;
 }
 
-export type { SystemPromptSection, SectionOverride, SectionOverrideAction } from '@github/copilot-sdk';
+export type { SystemMessageSection, SectionOverride, SectionOverrideAction } from '@github/copilot-sdk';
 export type { ModelCapabilitiesOverride } from '@github/copilot-sdk';
 
 export interface SystemPromptSectionInput {
@@ -42,6 +42,14 @@ export interface PersistedSettings {
   ttsEnabled?: boolean;
   /** TTS speech rate (0.5 to 2.0). */
   ttsRate?: number;
+  /**
+   * Per-user default for cloud/remote session publishing.
+   * - "off": local-only (default), no remote visibility.
+   * - "export": stream events to GitHub for monitor-only view on github.com/Mobile.
+   * - "on": full remote monitor + steer via github.com/Mobile.
+   * The active client only honors this when ENABLE_REMOTE_SESSIONS is enabled server-side.
+   */
+  remoteSession?: 'off' | 'export' | 'on';
 }
 
 export interface CustomAgentDefinition {

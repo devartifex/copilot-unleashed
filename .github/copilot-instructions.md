@@ -179,6 +179,7 @@ src/
 | `VAPID_PRIVATE_KEY` | No | — | VAPID private key for web push |
 | `VAPID_SUBJECT` | No | — | VAPID subject (mailto: or https: URL) |
 | `PUSH_STORE_PATH` | No | ./data/push-subscriptions | Directory for push subscription storage |
+| `ENABLE_REMOTE_SESSIONS` | No | true | Enable cloud/remote session publishing on the SDK client. Sessions still need per-session `remoteSession: "export"|"on"` opt-in. Set to `false` to hard-disable. |
 
 ## Build & Run
 

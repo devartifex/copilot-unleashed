@@ -97,7 +97,21 @@ export async function destroyPoolEntry(entry: PoolEntry): Promise<void> {
   entry.pendingUserInputPrompt = null;
   entry.pendingPermissionPrompts.clear();
   entry.permissionPreferences.clear();
-  try { await entry.client.stop(); } catch { /* ignore */ }
+  // Graceful stop with 5s timeout fallback to forceStop().
+  // Prevents hung CLI subprocesses if `stop()` blocks (seen in long-running deployments).
+  try {
+    const stopPromise = entry.client.stop();
+    const timeoutPromise = new Promise<'timeout'>((resolve) =>
+      setTimeout(() => resolve('timeout'), 5000),
+    );
+    const result = await Promise.race([stopPromise.then(() => 'ok' as const), timeoutPromise]);
+    if (result === 'timeout') {
+      const maybeForceStop = (entry.client as { forceStop?: () => Promise<void> }).forceStop;
+      if (typeof maybeForceStop === 'function') {
+        try { await maybeForceStop.call(entry.client); } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore */ }
 }
 
 /** True when the client WS is closed or hasn't sent a ping recently (e.g. iOS backgrounded). */

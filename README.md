@@ -12,7 +12,7 @@
   <a href="https://github.com/devartifex/copilot-unleashed/releases/latest"><img src="https://img.shields.io/github/v/release/devartifex/copilot-unleashed?label=release&logo=github" alt="Latest Release"></a>
   <a href="https://github.com/devartifex/copilot-unleashed/actions/workflows/ci.yml"><img src="https://github.com/devartifex/copilot-unleashed/workflows/CI/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/copilot--sdk-v0.2.2-8A2BE2?logo=github" alt="Copilot SDK v0.2.2">
+  <img src="https://img.shields.io/badge/copilot--sdk-v1.0.0--beta.8-8A2BE2?logo=github" alt="Copilot SDK v1.0.0-beta.8">
   <img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/accessibility-WCAG%202.2%20AA-0057B8?logo=accessibility" alt="WCAG 2.2 AA accessible">
   <a href="https://github.com/devartifex/copilot-unleashed/commits"><img src="https://img.shields.io/github/last-commit/devartifex/copilot-unleashed" alt="Last Commit"></a>
@@ -37,6 +37,8 @@
 
 - **Every Copilot model** — Claude Opus 4.6, GPT-5.4, Gemini 3 Pro, Claude Sonnet 4.6, and more — switch mid-conversation, keep full history
 - **Autopilot agents** — plan, code, run tests, and open PRs autonomously with live tool execution
+- **Remote session publishing** — opt sessions into being visible on github.com / Mobile via `remoteSession: "export" | "on"` (powered by SDK 1.0.0-beta.8); the browser app stays the steering surface, GitHub gets monitor visibility. Server-side toggle: `ENABLE_REMOTE_SESSIONS` (default on); per-session opt-in still required.
+- **Resume last session** — `GET /api/sessions/last` returns metadata for the user's most recent local session for one-tap continue-on-any-device flows
 - **Extended thinking** — live reasoning traces with collapsible "Thinking…" blocks
 - **Voice input** — speech-to-text via Web Speech API; mic button replaces send when input is empty (ChatGPT-style UX) — toggle in Settings
 - **Read aloud** — text-to-speech on any assistant message; markdown-aware sentence chunking with configurable speed — toggle in Settings
@@ -138,6 +140,7 @@ Open [localhost:3000](http://localhost:3000). Log in with GitHub. Done.
 | `VAPID_PRIVATE_KEY` | — | Push notifications (base64url) |
 | `VAPID_SUBJECT` | — | Push subject (`mailto:` or `https:`) |
 | `PUSH_STORE_PATH` | `/data/push-subscriptions` | Push subscription storage |
+| `ENABLE_REMOTE_SESSIONS` | `true` | Allow sessions to opt into cloud publishing (`remoteSession: "export"\|"on"`). Set to `false` to hard-disable. |
 
 </details>
 
@@ -205,6 +208,20 @@ azd up                    # auto-runs via predeploy hook
 The Sessions panel auto-refreshes every 30 seconds. Use `COPILOT_CONFIG_DIR` to customize the session-state path.
 
 </details>
+
+### Remote session publishing (SDK 1.0.0-beta.8)
+
+A chat can opt into being **published** to github.com / Copilot Mobile by passing one of these values when the session is created:
+
+| Mode | Effect |
+|---|---|
+| `"off"` *(default)* | Local only. Nothing leaves the server. |
+| `"export"` | Read-only mirror — session events stream to GitHub so it shows up on github.com/copilot and Mobile in monitor mode. |
+| `"on"` | Full remote-steerable — the session is steerable from github.com / Mobile as well as from this app. |
+
+This is sent over WebSocket as `{ type: "new_session", remoteSession: "on", ... }` and threaded through to the SDK's `sessionConfig.remoteSession`. The server-wide kill switch is `ENABLE_REMOTE_SESSIONS=false`.
+
+> **What's not in this release:** the app does **not** include an in-app browser for *other* remote sessions (the ones running elsewhere on your account) and does **not** let you steer arbitrary remote sessions from this UI — the SDK exposes no public REST endpoint for listing them, and the github.com remote-sessions view talks to an internal API that requires a Copilot bearer integrators can't currently mint. To view all your remote sessions, use github.com or the Copilot Mobile app. PRs welcome once the SDK surfaces a public list API.
 
 ---
 
@@ -317,7 +334,7 @@ Device Flow OAuth (same as GitHub CLI). Tokens are server-side only, never sent 
 
 ## Built With
 
-SvelteKit 5 · Svelte 5 runes · TypeScript 5.7 · Node.js 24 · [`@github/copilot-sdk`](https://github.com/github/copilot-sdk) v0.2.2 · Vite · `ws` · Web Speech API · Vitest · Playwright · Docker · Bicep
+SvelteKit 5 · Svelte 5 runes · TypeScript 5.7 · Node.js 24 · [`@github/copilot-sdk`](https://github.com/github/copilot-sdk) v1.0.0-beta.8 · Vite · `ws` · Web Speech API · Vitest · Playwright · Docker · Bicep
 
 ## Contributing
 

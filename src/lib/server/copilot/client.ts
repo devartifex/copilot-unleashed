@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { CopilotClient } from '@github/copilot-sdk';
+import { CopilotClient, RuntimeConnection } from '@github/copilot-sdk';
 import type { TelemetryConfig } from '@github/copilot-sdk';
 import { config } from '../config.js';
 
@@ -13,20 +13,14 @@ function buildTelemetryConfig(): TelemetryConfig | undefined {
 }
 
 export function createCopilotClient(githubToken: string, configDir?: string): CopilotClient {
-  const clientEnv: Record<string, string | undefined> = { ...process.env, GH_TOKEN: githubToken };
-
-  // When configDir is set, pass COPILOT_HOME to the CLI subprocess so it
-  // reads and writes session state from the same directory as the CLI.
-  if (configDir) {
-    clientEnv.COPILOT_HOME = configDir;
-  }
-
   const telemetry = buildTelemetryConfig();
 
   return new CopilotClient({
-    githubToken,
-    env: clientEnv,
-    cwd: config.copilotCwd || homedir(),
+    connection: RuntimeConnection.forStdio(),
+    gitHubToken: githubToken,
+    workingDirectory: config.copilotCwd || homedir(),
+    ...(configDir && { baseDirectory: configDir }),
     ...(telemetry && { telemetry }),
+    enableRemoteSessions: config.enableRemoteSessions,
   });
 }

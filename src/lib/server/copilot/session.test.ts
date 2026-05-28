@@ -437,6 +437,36 @@ describe('createCopilotSession', () => {
     expect(config.hooks).toBeUndefined();
   });
 
+  it('threads remoteSession=on into the SDK session config', async () => {
+    const client = createClientMock();
+
+    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
+      remoteSession: 'on',
+    });
+
+    expect(getSessionConfig(client).remoteSession).toBe('on');
+  });
+
+  it('threads remoteSession=export into the SDK session config', async () => {
+    const client = createClientMock();
+
+    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
+      remoteSession: 'export',
+    });
+
+    expect(getSessionConfig(client).remoteSession).toBe('export');
+  });
+
+  it('omits remoteSession when set to "off" (local-only)', async () => {
+    const client = createClientMock();
+
+    await createCopilotSession(client as unknown as Parameters<typeof createCopilotSession>[0], 'gh-token', {
+      remoteSession: 'off',
+    });
+
+    expect(getSessionConfig(client).remoteSession).toBeUndefined();
+  });
+
 });
 
 describe('buildSessionHooks', () => {
@@ -445,7 +475,7 @@ describe('buildSessionHooks', () => {
     const hooks = buildSessionHooks(callback);
 
     hooks!.onPreToolUse!(
-      { toolName: 'bash', toolArgs: { command: 'ls' }, timestamp: 1, cwd: '/tmp' },
+      { toolName: 'bash', toolArgs: { command: 'ls' }, timestamp: new Date(1), sessionId: 's1', workingDirectory: '/tmp' },
       { sessionId: 's1' },
     );
 
@@ -461,7 +491,7 @@ describe('buildSessionHooks', () => {
     const hooks = buildSessionHooks(callback);
 
     hooks!.onPostToolUse!(
-      { toolName: 'read', toolArgs: { path: '/file' }, toolResult: { content: 'ok' } as any, timestamp: 1, cwd: '/tmp' },
+      { toolName: 'read', toolArgs: { path: '/file' }, toolResult: { content: 'ok' } as any, timestamp: new Date(1), sessionId: 's1', workingDirectory: '/tmp' },
       { sessionId: 's1' },
     );
 
@@ -477,7 +507,7 @@ describe('buildSessionHooks', () => {
     const hooks = buildSessionHooks(callback);
 
     hooks!.onSessionStart!(
-      { source: 'new', timestamp: 1, cwd: '/tmp' },
+      { source: 'new', timestamp: new Date(1), sessionId: 's1', workingDirectory: '/tmp' },
       { sessionId: 's1' },
     );
 
@@ -492,7 +522,7 @@ describe('buildSessionHooks', () => {
     const hooks = buildSessionHooks(callback);
 
     hooks!.onSessionEnd!(
-      { reason: 'complete', timestamp: 1, cwd: '/tmp' },
+      { reason: 'complete', timestamp: new Date(1), sessionId: 's1', workingDirectory: '/tmp' },
       { sessionId: 's1' },
     );
 
@@ -507,7 +537,7 @@ describe('buildSessionHooks', () => {
     const hooks = buildSessionHooks(callback);
 
     hooks!.onErrorOccurred!(
-      { error: 'timeout', errorContext: 'tool_execution', recoverable: true, timestamp: 1, cwd: '/tmp' },
+      { error: 'timeout', errorContext: 'tool_execution', recoverable: true, timestamp: new Date(1), sessionId: 's1', workingDirectory: '/tmp' },
       { sessionId: 's1' },
     );
 

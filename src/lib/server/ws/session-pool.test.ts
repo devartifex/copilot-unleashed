@@ -169,6 +169,40 @@ describe('destroyPoolEntry', () => {
 
     await expect(destroyPoolEntry(entry)).resolves.toBeUndefined();
   });
+
+  it('falls back to forceStop when stop() does not resolve within 5s', async () => {
+    vi.useFakeTimers();
+    const client = createClientMock() as ClientMock & { forceStop: ReturnType<typeof vi.fn> };
+    let resolveStop: (() => void) | null = null;
+    client.stop.mockImplementation(
+      () => new Promise<void>((res) => {
+        resolveStop = res;
+      }),
+    );
+    client.forceStop = vi.fn(async () => undefined);
+
+    const entry = createPoolEntry(client as never, createWsMock() as never);
+    const destroyPromise = destroyPoolEntry(entry);
+
+    // Advance past the 5s timeout window so the fallback fires.
+    await vi.advanceTimersByTimeAsync(5001);
+    await destroyPromise;
+
+    expect(client.forceStop).toHaveBeenCalledTimes(1);
+    // Cleanup the still-pending stop() to avoid leaks across tests.
+    (resolveStop as (() => void) | null)?.();
+  });
+
+  it('does not call forceStop when stop() resolves quickly', async () => {
+    const client = createClientMock() as ClientMock & { forceStop: ReturnType<typeof vi.fn> };
+    client.forceStop = vi.fn(async () => undefined);
+
+    const entry = createPoolEntry(client as never, createWsMock() as never);
+    await destroyPoolEntry(entry);
+
+    expect(client.stop).toHaveBeenCalledTimes(1);
+    expect(client.forceStop).not.toHaveBeenCalled();
+  });
 });
 
 describe('session pool cleanup', () => {

@@ -40,6 +40,7 @@ function getConfig() {
     otelEndpoint: process.env.OTEL_ENDPOINT?.trim() || '',
     otelCaptureContent: process.env.OTEL_CAPTURE_CONTENT === 'true',
     otelSourceName: env('OTEL_SOURCE_NAME', 'copilot-unleashed'),
+    enableRemoteSessions: process.env.ENABLE_REMOTE_SESSIONS?.trim().toLowerCase() !== 'false',
   };
 }
 

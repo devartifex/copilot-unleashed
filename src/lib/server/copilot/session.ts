@@ -3,12 +3,11 @@ import { join } from 'node:path';
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { CopilotClient } from '@github/copilot-sdk';
-import type { SessionConfig, SystemPromptSection, SectionOverride, MCPServerConfig, ModelCapabilitiesOverride } from '@github/copilot-sdk';
+import type { SessionConfig, SystemMessageSection, SectionOverride, MCPServerConfig, ModelCapabilitiesOverride, RemoteSessionMode } from '@github/copilot-sdk';
 
 export type HookEventCallback = (message: Record<string, unknown>) => void;
 import { isIP } from 'node:net';
 import { config } from '../config.js';
-import { createSessionFsHandlerFactory } from './session-fs.js';
 
 type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 
@@ -41,11 +40,12 @@ export interface CreateSessionOptions {
   agent?: string;
   onEvent?: (event: any) => void;
   onHookEvent?: HookEventCallback;
-  systemPromptSections?: Partial<Record<SystemPromptSection, SectionOverride>>;
+  systemPromptSections?: Partial<Record<SystemMessageSection, SectionOverride>>;
   modelCapabilities?: ModelCapabilitiesOverride;
   enableConfigDiscovery?: boolean;
   provider?: SessionConfig['provider'];
   onElicitationRequest?: SessionConfig['onElicitationRequest'];
+  remoteSession?: RemoteSessionMode;
 }
 
 function isPrivateIpv4(hostname: string): boolean {
@@ -343,7 +343,7 @@ async function loadConfiguredMcpServers(configDir?: string): Promise<Record<stri
           command: server.command,
           args: Array.isArray(server.args) ? server.args.filter((arg): arg is string => typeof arg === 'string') : [],
           ...(normalizeStringRecord(server.env) ? { env: normalizeStringRecord(server.env) } : {}),
-          ...(typeof server.cwd === 'string' ? { cwd: server.cwd } : {}),
+          ...(typeof server.cwd === 'string' ? { workingDirectory: server.cwd } : {}),
           tools: Array.isArray(server.tools) && server.tools.length > 0 ? server.tools : ['*'],
           ...(typeof server.timeout === 'number' && server.timeout > 0 ? { timeout: server.timeout } : {}),
         };
@@ -456,7 +456,7 @@ export async function createCopilotSession(
   }
 
   if (options.systemPromptSections && Object.keys(options.systemPromptSections).length > 0) {
-    const sections: Partial<Record<SystemPromptSection, SectionOverride>> = { ...options.systemPromptSections };
+    const sections: Partial<Record<SystemMessageSection, SectionOverride>> = { ...options.systemPromptSections };
     if (options.customInstructions && !sections.custom_instructions) {
       sections.custom_instructions = { action: 'append', content: options.customInstructions };
     }
@@ -525,11 +525,13 @@ export async function createCopilotSession(
     sessionConfig.provider = options.provider;
   }
 
-  // Provide a sandboxed filesystem handler so the SDK can manage session workspace files
-  if (config.copilotConfigDir) {
-    const workspaceRoot = join(config.copilotConfigDir, 'session-state');
-    sessionConfig.createSessionFsHandler = createSessionFsHandlerFactory(workspaceRoot);
+  if (options.remoteSession && options.remoteSession !== 'off') {
+    sessionConfig.remoteSession = options.remoteSession;
   }
+
+  // The SDK 1.0.0-beta runtime writes session state directly to
+  // `<baseDirectory>/session-state/` (set via CopilotClient `baseDirectory`),
+  // so an explicit per-session FS provider is no longer required.
 
   return client.createSession(sessionConfig);
 }

@@ -1,7 +1,13 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-import { MOCK_USER } from './helpers';
+import { MOCK_USER, openSidebar } from './helpers';
+
+// The service worker's `controllerchange` handler triggers `window.location.reload()`,
+// and on reload the SW serves precached HTML without the test's auth patch — flipping
+// the page back to the login screen. Block service workers so the mocked authenticated
+// state persists (mirrors `createAuthenticatedPage` in helpers.ts).
+test.use({ serviceWorkers: 'block' });
 
 const DEFAULT_DEVICE_FLOW = {
   user_code: 'ABCD-1234',
@@ -17,21 +23,25 @@ const AUTHORIZED_USER = {
 
 function buildLayoutData(authenticated: boolean) {
   if (authenticated) {
+    // Layout node (index 0) must explicitly carry authenticated=true via devalue so
+    // that invalidateAll() after the device-flow reload upgrades a previously
+    // unauthenticated page. `byokEnabled` mirrors the current +layout.server shape.
     return {
       type: 'data',
       nodes: [
         {
           type: 'data',
           data: [
-            { authenticated: 1, user: 2 },
+            { authenticated: 1, user: 2, byokEnabled: 5 },
             true,
             { login: 3, name: 4 },
             MOCK_USER.login,
             MOCK_USER.name,
+            false,
           ],
           uses: {},
         },
-        { type: 'skip' },
+        null,
       ],
     };
   }
@@ -41,10 +51,10 @@ function buildLayoutData(authenticated: boolean) {
     nodes: [
       {
         type: 'data',
-        data: [{ authenticated: 1, user: 2 }, false, null],
+        data: [{ authenticated: 1, user: 2, byokEnabled: 3 }, false, null, false],
         uses: {},
       },
-      { type: 'skip' },
+      null,
     ],
   };
 }
@@ -113,8 +123,8 @@ async function mockAuthReloadState(
 
     if (authState.authenticated) {
       html = html.replace(
-        /data:\{authenticated:false,user:null\}/g,
-        `data:{authenticated:true,user:{login:"${MOCK_USER.login}",name:"${MOCK_USER.name}"}}`,
+        /authenticated:false,user:null/g,
+        `authenticated:true,user:{login:"${MOCK_USER.login}",name:"${MOCK_USER.name}"}`,
       );
     }
 
@@ -174,7 +184,7 @@ test.describe('Device flow authentication', () => {
     await expect(page.locator('.login-status')).toContainText('Waiting for authorization');
 
     await expect(page.locator('.terminal')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.hamburger-btn')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('button.model-pill')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.login-screen')).toBeHidden();
   });
 
@@ -298,7 +308,7 @@ test.describe('Authenticated session actions', () => {
     await page.goto('/');
     await expect(page.locator('.terminal')).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button.hamburger-btn').click();
+    await openSidebar(page);
     const signOutButton = page.locator('button.sidebar-action.sidebar-action-danger');
     await expect(signOutButton).toBeVisible();
 

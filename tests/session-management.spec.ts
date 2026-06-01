@@ -3,6 +3,7 @@ import {
   createAuthenticatedPage,
   mockWebSocket,
   goToChat,
+  openSidebar,
   MOCK_SESSIONS,
 } from './helpers';
 
@@ -120,9 +121,7 @@ async function createSessionManagementPage(
 }
 
 async function openSessionsSheet(page: Page) {
-  await page.click('button.hamburger-btn');
-  await expect(page.locator('.sidebar-overlay')).toBeVisible();
-  await expect(page.locator('.sidebar-panel')).toBeVisible();
+  await openSidebar(page);
 
   await page.click('button.sidebar-action:has-text("Sessions")');
   await expect(page.locator('.sheet-overlay')).toBeVisible();

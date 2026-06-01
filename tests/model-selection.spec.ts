@@ -56,7 +56,7 @@ test.describe('Model selection', () => {
     const { page, context } = await openAuthenticatedChat(browser);
 
     try {
-      await expect(page.locator('.conn-dot')).toHaveClass(/dot-connected/);
+      await expect(page.locator('.input-area textarea')).toBeEnabled();
       await expect(page.locator('.model-name')).toHaveText('gpt-4.1');
     } finally {
       await context.close();
@@ -150,14 +150,10 @@ test.describe('Model selection', () => {
   });
 
   test('reasoning effort toggle works for reasoning models', async ({ browser }) => {
-    const { page, context, sentMessages } = await openAuthenticatedChat(browser, {
+    const { page, context } = await openAuthenticatedChat(browser, {
       onMessage(msg, ws) {
         if (msg.type === 'set_model' && msg.model === 'o3') {
           ws.send(JSON.stringify({ type: 'model_changed', model: 'o3' }));
-        }
-
-        if (msg.type === 'new_session' && msg.model === 'o3' && msg.reasoningEffort === 'high') {
-          ws.send(JSON.stringify({ type: 'session_created', model: 'o3' }));
         }
       },
     });
@@ -178,13 +174,9 @@ test.describe('Model selection', () => {
 
       await highButton.click();
 
-      await expectSentMessage(
-        sentMessages,
-        (msg) =>
-          (msg.type === 'new_session' && msg.model === 'o3' && msg.reasoningEffort === 'high') ||
-          (msg.type === 'set_reasoning' && msg.effort === 'high') ||
-          (msg.type === 'set_reasoning_effort' && msg.effort === 'high'),
-      );
+      // Changing reasoning effort is now a client-side preference applied to the
+      // next new session (it intentionally does NOT restart the current session,
+      // which would wipe chat history), so no WS message is emitted on click.
       await expect(highButton).toHaveClass(/active/);
       await expect(mediumButton).not.toHaveClass(/active/);
     } finally {

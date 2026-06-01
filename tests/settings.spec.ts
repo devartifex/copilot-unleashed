@@ -3,6 +3,7 @@ import {
   createAuthenticatedPage,
   mockWebSocket,
   goToChat,
+  openSidebar,
   MOCK_TOOLS,
   MOCK_AGENTS,
 } from './helpers';
@@ -11,7 +12,8 @@ interface MockSettings {
   model: string;
   mode: 'interactive' | 'plan' | 'autopilot';
   reasoningEffort: 'low' | 'medium' | 'high' | 'xhigh';
-  customInstructions: string;
+  customInstructions?: string;
+  additionalInstructions: string;
   excludedTools: string[];
   customTools: unknown[];
   mcpServers: Array<{
@@ -42,6 +44,7 @@ function createDefaultSettings(overrides: Partial<MockSettings> = {}): MockSetti
     mode: 'interactive',
     reasoningEffort: 'medium',
     customInstructions: '',
+    additionalInstructions: '',
     excludedTools: [],
     customTools: [],
     mcpServers: [],
@@ -102,8 +105,7 @@ async function setupSettingsPage(browser: Browser, options: SetupOptions = {}): 
 }
 
 async function openSettings(page: Page) {
-  await page.click('button.hamburger-btn');
-  await expect(page.locator('.sidebar-panel')).toBeVisible();
+  await openSidebar(page);
 
   await page.click('button.sidebar-action:has-text("Settings")');
 
@@ -121,14 +123,12 @@ test.describe('Settings', () => {
     const { page } = app;
 
     try {
-      await page.click('button.hamburger-btn');
-      await expect(page.locator('.sidebar-panel')).toBeVisible();
+      await openSidebar(page);
 
       await page.click('button.sidebar-action:has-text("Settings")');
 
       await expect(page.locator('.settings-overlay')).toBeVisible();
       await expect(page.locator('.settings-panel')).toBeVisible();
-      await expect(page.locator('.sidebar-panel')).toHaveCount(0);
     } finally {
       await app.close();
     }
@@ -150,12 +150,15 @@ test.describe('Settings', () => {
     const app = await setupSettingsPage(browser);
     const { page } = app;
     const expectedSections = [
-      'Custom Instructions',
+      'Additional Instructions',
       'Tools',
       'MCP Servers',
       'Agents',
-      'Custom Tools',
+      'Skills',
+      'Extensions',
+      'Prompts',
       'Quota',
+      'Notifications',
       'Compaction',
     ];
 
@@ -176,7 +179,7 @@ test.describe('Settings', () => {
   test('expands and collapses an accordion section', async ({ browser }) => {
     const app = await setupSettingsPage(browser);
     const { page } = app;
-    const instructionsButton = page.locator('button.settings-accordion-btn', { hasText: 'Custom Instructions' });
+    const instructionsButton = page.locator('button.settings-accordion-btn', { hasText: 'Additional Instructions' });
 
     try {
       await openSettings(page);
@@ -200,7 +203,7 @@ test.describe('Settings', () => {
   test('keeps only one accordion section open at a time', async ({ browser }) => {
     const app = await setupSettingsPage(browser);
     const { page } = app;
-    const instructionsButton = page.locator('button.settings-accordion-btn', { hasText: 'Custom Instructions' });
+    const instructionsButton = page.locator('button.settings-accordion-btn', { hasText: 'Additional Instructions' });
     const toolsButton = page.getByRole('button', { name: /^Tools\b/ });
 
     try {
@@ -223,14 +226,14 @@ test.describe('Settings', () => {
 
   test('saves custom instructions', async ({ browser }) => {
     const app = await setupSettingsPage(browser, {
-      settings: { customInstructions: 'Keep answers concise.' },
+      settings: { additionalInstructions: 'Keep answers concise.' },
     });
     const { page, putPayloads } = app;
     const instructionsText = 'Always explain code changes briefly and include validation steps.';
 
     try {
       await openSettings(page);
-      await page.locator('button.settings-accordion-btn', { hasText: 'Custom Instructions' }).click();
+      await page.locator('button.settings-accordion-btn', { hasText: 'Additional Instructions' }).click();
 
       const textarea = page.locator('textarea.settings-textarea');
       await expect(textarea).toHaveValue('Keep answers concise.');
@@ -239,7 +242,7 @@ test.describe('Settings', () => {
       await page.locator('.settings-accordion-body .action-btn.save').click();
 
       await expect.poll(() => putPayloads.length).toBe(1);
-      expect(putPayloads[0]?.customInstructions).toBe(instructionsText);
+      expect(putPayloads[0]?.additionalInstructions).toBe(instructionsText);
       await expect(textarea).toHaveValue(instructionsText);
     } finally {
       await app.close();

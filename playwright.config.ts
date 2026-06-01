@@ -34,6 +34,8 @@ export default defineConfig({
       GITHUB_CLIENT_ID: 'test-client-id',
       SESSION_SECRET: 'test-secret-for-playwright',
       NODE_ENV: 'development',
+      // E2E suite issues far more than the production limit from a single IP — disable it.
+      RATE_LIMIT_MAX: '0',
     },
   },
 });

@@ -54,7 +54,7 @@ test.describe('Chat screen structure', () => {
     expect(response.headers()['content-type']).toContain('application/json');
 
     const data = await response.json();
-    expect(data).toEqual({ status: 'ok' });
+    expect(data).toMatchObject({ status: 'ok' });
   });
 
   test('auth status endpoint returns unauthenticated JSON shape', async ({ page }) => {

@@ -132,6 +132,7 @@ Open [localhost:3000](http://localhost:3000). Log in with GitHub. Done.
 | `TOKEN_MAX_AGE_MS` | `86400000` | Force re-auth interval (24h) |
 | `SESSION_POOL_TTL_MS` | `300000` | Session TTL when disconnected (5 min) |
 | `MAX_SESSIONS_PER_USER` | `5` | Max concurrent tabs/devices |
+| `RATE_LIMIT_MAX` | `200` | Max requests per IP per 15 min; `0` disables (used by E2E tests) |
 | `COPILOT_CONFIG_DIR` | `~/.copilot` | Share with CLI for bidirectional sync |
 | `SESSION_STORE_PATH` | `/data/sessions` | Persistent session directory |
 | `SETTINGS_STORE_PATH` | `/data/settings` | Per-user settings directory |

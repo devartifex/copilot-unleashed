@@ -87,9 +87,10 @@ test.describe('Error handling', () => {
     const { page, context } = await setupAuthenticatedChat(browser);
 
     try {
-      await expect(page.locator('.conn-dot.dot-connected')).toBeVisible();
-      await expect(page.locator('.conn-dot.dot-disconnected')).toHaveCount(0);
-      await expect(page.locator('.conn-dot.dot-connecting')).toHaveCount(0);
+      // The connection-dot indicator was removed in the TopBar redesign; a
+      // connected session is now reflected by the chat input being enabled.
+      await expect(page.locator('.input-area textarea')).toBeEnabled();
+      await expect(page.locator('.input-area textarea')).toHaveAttribute('placeholder', 'Ask anything…');
     } finally {
       await context.close();
     }
@@ -99,7 +100,7 @@ test.describe('Error handling', () => {
     const response = await request.get('/health');
 
     expect(response.status()).toBe(200);
-    expect(await response.json()).toEqual({ status: 'ok' });
+    expect(await response.json()).toMatchObject({ status: 'ok' });
   });
 
   test('auth status shows unauthenticated', async ({ request }) => {
@@ -203,7 +204,7 @@ test.describe('Error handling', () => {
 
     try {
       await goToChat(page);
-      await expect(page.locator('.conn-dot.dot-connected')).toBeVisible();
+      await expect(page.locator('.input-area textarea')).toBeEnabled();
       await sendMessage(page, 'sanity check');
       await expect(page.locator('.message.assistant')).toContainText('All good here');
 

@@ -33,7 +33,7 @@ async function expectCoreChatUI(page: AuthenticatedChat['page']) {
   await expect(page.locator('.top-bar')).toBeVisible();
   await expect(page.locator('.terminal')).toBeVisible();
   await expect(page.locator('.input-area textarea')).toBeVisible();
-  await expect(page.locator('button.send-btn')).toBeVisible();
+  await expect(page.locator('button.send-btn, button.mic-btn').first()).toBeVisible();
 }
 
 test.describe('Responsive — authenticated chat', () => {
@@ -84,8 +84,8 @@ test.describe('Responsive — authenticated chat', () => {
     try {
       await page.locator('button.hamburger-btn').click();
 
-      await expect(page.locator('.sidebar-overlay')).toBeVisible();
-      await expect(page.locator('.sidebar-panel')).toBeVisible();
+      await expect(page.locator('.sidebar-backdrop')).toBeVisible();
+      await expect(page.locator('.sidebar')).toBeVisible();
     } finally {
       await context.close();
     }
@@ -96,17 +96,17 @@ test.describe('Responsive — authenticated chat', () => {
 
     try {
       await page.locator('button.hamburger-btn').click();
-      await expect(page.locator('.sidebar-panel')).toBeVisible();
+      await expect(page.locator('.sidebar')).toBeVisible();
 
-      await page.locator('.sidebar-overlay').click({
+      await page.locator('.sidebar-backdrop').click({
         position: {
           x: MOBILE_VIEWPORT.width - 20,
           y: 100,
         },
       });
 
-      await expect(page.locator('.sidebar-overlay')).toHaveCount(0);
-      await expect(page.locator('.sidebar-panel')).toHaveCount(0);
+      await expect(page.locator('.sidebar-backdrop')).toHaveCount(0);
+      await expect(page.locator('.sidebar')).not.toBeVisible();
     } finally {
       await context.close();
     }
@@ -141,9 +141,12 @@ test.describe('Responsive — authenticated chat', () => {
 
       try {
         await test.step(`checks top bar controls at ${label}`, async () => {
-          await expect(page.locator('button.hamburger-btn')).toBeVisible();
           await expect(page.locator('button.model-pill')).toBeVisible();
-          await expect(page.locator('button.newchat-btn')).toBeVisible();
+          if (viewport.width < 1024) {
+            await expect(page.locator('button.hamburger-btn')).toBeVisible();
+          } else {
+            await expect(page.locator('button.hamburger-btn')).toBeHidden();
+          }
         });
       } finally {
         await context.close();

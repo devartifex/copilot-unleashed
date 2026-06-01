@@ -35,7 +35,7 @@ test.describe('Chat messaging', () => {
   test('shows the banner before the first message', async ({ browser }) => {
     await withAuthenticatedChat(browser, {}, async (page) => {
       await expect(page.locator('.banner-box')).toBeVisible();
-      await expect(page.locator('button.send-btn')).toBeVisible();
+      await expect(page.locator('button.send-btn, button.mic-btn').first()).toBeVisible();
     });
   });
 
@@ -166,9 +166,9 @@ test.describe('Chat messaging', () => {
             seq
               .send({ type: 'turn_start' }, 20)
               .send({ type: 'delta', content: 'Usage details coming up.' }, 100)
+              .send({ type: 'usage', inputTokens: 12, outputTokens: 8 }, 50)
               .send({ type: 'turn_end' }, 120)
-              .send({ type: 'done' }, 50)
-              .send({ type: 'usage', inputTokens: 12, outputTokens: 8 }, 50);
+              .send({ type: 'done' }, 50);
           }
         },
       },

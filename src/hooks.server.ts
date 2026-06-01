@@ -92,7 +92,10 @@ const csrfProtection: Handle = async ({ event, resolve }) => {
 // Rate limiting with periodic cleanup to prevent unbounded Map growth
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000;
-const RATE_LIMIT_MAX = 200;
+// Configurable via RATE_LIMIT_MAX. A value <= 0 disables rate limiting entirely
+// (used by the E2E test harness, which issues far more than 200 requests per run from one IP).
+const RATE_LIMIT_MAX = config.rateLimitMax;
+const RATE_LIMIT_ENABLED = RATE_LIMIT_MAX > 0;
 
 // Purge expired entries every 15 minutes
 setInterval(() => {
@@ -103,6 +106,10 @@ setInterval(() => {
 }, RATE_LIMIT_WINDOW);
 
 const rateLimit: Handle = async ({ event, resolve }) => {
+  if (!RATE_LIMIT_ENABLED) {
+    return resolve(event);
+  }
+
   const ip = event.getClientAddress();
   const now = Date.now();
 

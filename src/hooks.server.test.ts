@@ -69,6 +69,7 @@ vi.mock('$lib/server/config.js', () => ({
 	config: {
 		sessionSecret: 'test-secret',
 		tokenMaxAge: 7 * 24 * 60 * 60 * 1000,
+		rateLimitMax: 200,
 	},
 }));
 

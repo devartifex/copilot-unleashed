@@ -25,6 +25,7 @@ function getConfig() {
       ? process.env.ALLOWED_GITHUB_USERS.split(',').map((u: string) => u.trim().toLowerCase())
       : [],
     tokenMaxAge: parseInt(env('TOKEN_MAX_AGE_MS', String(7 * 24 * 60 * 60 * 1000))),
+    rateLimitMax: parseInt(env('RATE_LIMIT_MAX', '200')),
     sessionPoolTtl: parseInt(env('SESSION_POOL_TTL_MS', String(5 * 60 * 1000))),
     maxSessionsPerUser: parseInt(env('MAX_SESSIONS_PER_USER', '5')),
     copilotConfigDir: process.env.COPILOT_CONFIG_DIR?.trim().replace(/^~/, homedir()) || undefined,

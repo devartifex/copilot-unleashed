@@ -7,7 +7,7 @@
  * - MOCK_MODELS, MOCK_USER — shared test data
  */
 
-import type { Browser, Page, BrowserContext } from '@playwright/test';
+import { expect, type Browser, type Page, type BrowserContext } from '@playwright/test';
 
 // ── Shared test data ──────────────────────────────────────────────────────────
 
@@ -28,8 +28,8 @@ export const MOCK_TOOLS = [
 ];
 
 export const MOCK_AGENTS = [
-  { slug: 'copilot', name: 'Copilot', description: 'Default assistant', current: true },
-  { slug: 'reviewer', name: 'Code Reviewer', description: 'Reviews code changes', current: false },
+  { name: 'Copilot', description: 'Default assistant', source: 'builtin', isSelected: true },
+  { name: 'Code Reviewer', description: 'Reviews code changes', source: 'user', isSelected: false },
 ];
 
 export const MOCK_SESSIONS = [
@@ -214,6 +214,20 @@ export async function goToChat(page: Page) {
 export async function sendMessage(page: Page, text: string) {
   await page.fill('textarea', text);
   await page.keyboard.press('Enter');
+}
+
+/**
+ * Opens the sidebar so its actions (Sessions, Settings, Sign Out) are clickable.
+ *
+ * On mobile widths the sidebar is hidden behind a hamburger toggle; on desktop
+ * (>=1024px) it is persistent and always visible. This helper handles both cases.
+ */
+export async function openSidebar(page: Page) {
+  const hamburger = page.locator('button.hamburger-btn');
+  if (await hamburger.isVisible().catch(() => false)) {
+    await hamburger.click();
+  }
+  await expect(page.locator('.sidebar')).toBeVisible();
 }
 
 /**

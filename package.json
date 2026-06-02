@@ -69,13 +69,13 @@
     "@types/session-file-store": "^1.2.6",
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.5.13",
-    "@vitest/coverage-v8": "^4.1.6",
+    "@vitest/coverage-v8": "^4.1.8",
     "dotenv": "^17.4.2",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
-    "lint-staged": "^17.0.4",
+    "lint-staged": "^17.0.7",
     "sharp": "^0.34.5",
-    "svelte-check": "^4.4.8",
+    "svelte-check": "^4.5.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.3"
   }

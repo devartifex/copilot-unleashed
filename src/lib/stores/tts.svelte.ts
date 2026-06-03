@@ -1,15 +1,8 @@
 const SUPPORTED = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
-/** Remove all HTML tags, repeating until no tags remain (prevents incomplete sanitization). */
+/** Remove angle brackets so HTML tags cannot be formed. */
 function stripHtmlTags(text: string): string {
-  const tagPattern = /<[^>]*>/g;
-  let previous = text;
-  let result = text.replace(tagPattern, '');
-  while (result !== previous) {
-    previous = result;
-    result = result.replace(tagPattern, '');
-  }
-  return result;
+  return text.replace(/[<>]/g, '');
 }
 
 /** Strip markdown/HTML to plain text suitable for speech synthesis. */

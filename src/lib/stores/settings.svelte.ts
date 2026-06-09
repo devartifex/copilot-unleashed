@@ -28,7 +28,10 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   voiceInputEnabled: true,
   ttsEnabled: true,
   ttsRate: 1.0,
+  remoteSession: 'off',
 };
+
+const VALID_REMOTE_SESSION = new Set<NonNullable<PersistedSettings['remoteSession']>>(['off', 'export', 'on']);
 
 const VALID_MODES = new Set<SessionMode>(['interactive', 'plan', 'autopilot']);
 const VALID_REASONING = new Set<ReasoningEffort>(['low', 'medium', 'high', 'xhigh']);
@@ -49,6 +52,7 @@ export interface SettingsStore {
   voiceInputEnabled: boolean;
   ttsEnabled: boolean;
   ttsRate: number;
+  remoteSession: NonNullable<PersistedSettings['remoteSession']>;
   load(): void;
   save(): void;
   syncFromServer(): Promise<void>;
@@ -72,6 +76,7 @@ export function createSettingsStore(): SettingsStore {
   let voiceInputEnabled = $state(DEFAULT_SETTINGS.voiceInputEnabled ?? true);
   let ttsEnabled = $state(DEFAULT_SETTINGS.ttsEnabled ?? true);
   let ttsRate = $state(DEFAULT_SETTINGS.ttsRate ?? 1.0);
+  let remoteSession = $state<NonNullable<PersistedSettings['remoteSession']>>(DEFAULT_SETTINGS.remoteSession ?? 'off');
 
   // Detect a usable browser localStorage. Node 25+ exposes a built-in
   // `localStorage` global as a stub when `--localstorage-file` is not set;
@@ -104,6 +109,7 @@ export function createSettingsStore(): SettingsStore {
       voiceInputEnabled,
       ttsEnabled,
       ttsRate,
+      remoteSession,
     };
   }
 
@@ -146,6 +152,9 @@ export function createSettingsStore(): SettingsStore {
     }
     if (typeof parsed.ttsRate === 'number') {
       ttsRate = Math.max(0.5, Math.min(2, parsed.ttsRate));
+    }
+    if (parsed.remoteSession && VALID_REMOTE_SESSION.has(parsed.remoteSession)) {
+      remoteSession = parsed.remoteSession;
     }
   }
 
@@ -287,6 +296,12 @@ export function createSettingsStore(): SettingsStore {
 
     get ttsRate() { return ttsRate; },
     set ttsRate(v: number) { ttsRate = Math.max(0.5, Math.min(2, v)); save(); },
+
+    get remoteSession() { return remoteSession; },
+    set remoteSession(v: NonNullable<PersistedSettings['remoteSession']>) {
+      remoteSession = VALID_REMOTE_SESSION.has(v) ? v : 'off';
+      save();
+    },
 
     load,
     save,

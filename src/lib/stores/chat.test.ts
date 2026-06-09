@@ -36,6 +36,8 @@ function createWsStoreMock(options: {
     send: vi.fn(),
     sendMessage: vi.fn(),
     newSession: vi.fn(),
+    newCloudSession: vi.fn(),
+    remoteToggle: vi.fn(),
     resumeSession: vi.fn(),
     setMode: vi.fn(),
     setModel: vi.fn(),

@@ -11,6 +11,7 @@
   import SettingsModal from '$lib/components/settings/SettingsModal.svelte';
   import SessionsSheet from '$lib/components/sessions/SessionsSheet.svelte';
   import TopBar from '$lib/components/layout/TopBar.svelte';
+  import RemoteBanner from '$lib/components/layout/RemoteBanner.svelte';
   import ModelSheet from '$lib/components/model/ModelSheet.svelte';
   import { createWsStore } from '$lib/stores/ws.svelte.js';
   import { createChatStore } from '$lib/stores/chat.svelte.js';
@@ -35,6 +36,8 @@
   let modelSheetOpen = $state(false);
   let sessionsLoading = $state(false);
   let sessionLoading = $state(true);
+  let dismissedRemoteUrl = $state<string | null>(null);
+  const showRemoteBanner = $derived(!!chatStore.remoteUrl && chatStore.remoteUrl !== dismissedRemoteUrl);
 
   // Use the confirmed model from the active session; fall back to the user's saved preference
   // so the TopBar/ModelSheet show the correct model immediately before session_created arrives.
@@ -199,6 +202,7 @@
       ...(isReasoning && { reasoningEffort: settings.reasoningEffort }),
       ...(settings.additionalInstructions.trim() && { customInstructions: settings.additionalInstructions.trim() }),
       ...(settings.excludedTools.length > 0 && { excludedTools: settings.excludedTools }),
+      ...(settings.remoteSession !== 'off' && { remoteSession: settings.remoteSession }),
       infiniteSessions: settings.infiniteSessions,
     });
   }
@@ -370,6 +374,14 @@
         onOpenModelSheet={() => modelSheetOpen = true}
       />
 
+      {#if showRemoteBanner && chatStore.remoteUrl}
+        <RemoteBanner
+          url={chatStore.remoteUrl}
+          steerable={settings.remoteSession === 'on'}
+          onDismiss={() => { dismissedRemoteUrl = chatStore.remoteUrl; }}
+        />
+      {/if}
+
     <div class="terminal">
       {#if sessionLoading}
         <div class="session-loading">
@@ -533,6 +545,10 @@
       onToggleMcpServer={(name, enabled) => wsStore.send({ type: 'toggle_mcp_rpc', name, enabled })}
       notificationsEnabled={settings.notificationsEnabled}
       onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
+      remoteSessionMode={settings.remoteSession}
+      onSetRemoteSessionMode={(mode) => { settings.remoteSession = mode; }}
+      remoteSessionActive={wsStore.sessionReady}
+      onApplyRemoteToSession={(mode) => wsStore.remoteToggle(mode)}
       voiceInputEnabled={settings.voiceInputEnabled}
       onToggleVoiceInput={(v) => { settings.voiceInputEnabled = v; }}
       ttsEnabled={settings.ttsEnabled}

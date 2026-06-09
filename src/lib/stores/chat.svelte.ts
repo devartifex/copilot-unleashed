@@ -45,6 +45,10 @@ export interface ChatStore {
   readonly fleetActive: boolean;
   readonly fleetAgents: Array<{ agentId: string; agentType: string; status: 'running' | 'completed' | 'failed'; error?: string }>;
   readonly sessionTitle: string | null;
+  /** github.com URL when the session is exported/steerable remotely */
+  readonly remoteUrl: string | null;
+  /** True when the active session runs on GitHub's cloud agent */
+  readonly isCloudSession: boolean;
   readonly pendingUserInput: UserInputState | null;
   readonly pendingElicitation: ElicitationState | null;
   readonly pendingPermissions: PermissionRequestState[];
@@ -111,6 +115,9 @@ export function createChatStore(wsStore: WsStore): ChatStore {
   let fleetAgents = $state<Array<{ agentId: string; agentType: string; status: 'running' | 'completed' | 'failed'; error?: string }>>([]);
   let sessionTitle = $state<string | null>(null);
   let currentSessionId = $state<string | null>(null);
+  // Remote/cloud session state
+  let remoteUrl = $state<string | null>(null);
+  let isCloudSession = $state(false);
   let pendingUserInput = $state<UserInputState | null>(null);
   let pendingElicitation = $state<ElicitationState | null>(null);
   let pendingPermissions = $state<PermissionRequestState[]>([]);
@@ -250,8 +257,35 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         currentModel = msg.model;
         if (msg.sessionId) currentSessionId = msg.sessionId;
         plan = { exists: false, content: '' };
+        isCloudSession = false;
+        remoteUrl = null;
         wsStore.getQuota();
         wsStore.listSessions();
+        break;
+
+      case 'cloud_session_created': {
+        if (msg.model) currentModel = msg.model;
+        if (msg.sessionId) currentSessionId = msg.sessionId;
+        plan = { exists: false, content: '' };
+        isCloudSession = true;
+        remoteUrl = null;
+        const repo = msg.repository ? ` for ${msg.repository.owner}/${msg.repository.name}${msg.repository.branch ? `@${msg.repository.branch}` : ''}` : '';
+        addInfoMessage(`Cloud session created${repo} — running on GitHub's cloud agent`);
+        wsStore.getQuota();
+        wsStore.listSessions();
+        break;
+      }
+
+      case 'remote_session_url':
+        remoteUrl = msg.url;
+        addInfoMessage(msg.message || `Session available on GitHub: ${msg.url}`);
+        break;
+
+      case 'remote_toggled':
+        if (!msg.enabled) {
+          remoteUrl = null;
+          addInfoMessage('Remote session disabled');
+        }
         break;
 
       case 'session_reconnected':
@@ -925,6 +959,8 @@ export function createChatStore(wsStore: WsStore): ChatStore {
     get fleetActive() { return fleetActive; },
     get fleetAgents() { return fleetAgents; },
     get sessionTitle() { return sessionTitle; },
+    get remoteUrl() { return remoteUrl; },
+    get isCloudSession() { return isCloudSession; },
     get pendingUserInput() { return pendingUserInput; },
     get pendingElicitation() { return pendingElicitation; },
     get pendingPermissions() { return pendingPermissions; },

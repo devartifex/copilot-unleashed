@@ -19,8 +19,10 @@
   import NotificationsPanel from './NotificationsPanel.svelte';
   import CompactionPanel from './CompactionPanel.svelte';
   import ByokPanel from './ByokPanel.svelte';
+  import RemoteSessionPanel from './RemoteSessionPanel.svelte';
+  import type { RemoteSessionMode } from '$lib/types/index.js';
 
-  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'extensions' | 'quota' | 'notifications' | 'compact' | 'prompts' | 'byok' | null;
+  type AccordionSection = 'instructions' | 'tools' | 'mcp' | 'agents' | 'skills' | 'extensions' | 'quota' | 'notifications' | 'remote' | 'compact' | 'prompts' | 'byok' | null;
 
   interface Props {
     open: boolean;
@@ -55,6 +57,10 @@
     onToggleMcpServer: (name: string, enabled: boolean) => void;
     notificationsEnabled: boolean;
     onToggleNotifications: (enabled: boolean) => void;
+    remoteSessionMode?: RemoteSessionMode;
+    onSetRemoteSessionMode?: (mode: RemoteSessionMode) => void;
+    remoteSessionActive?: boolean;
+    onApplyRemoteToSession?: (mode: RemoteSessionMode) => void;
     voiceInputEnabled: boolean;
     onToggleVoiceInput: (enabled: boolean) => void;
     ttsEnabled: boolean;
@@ -98,6 +104,10 @@
     onToggleMcpServer,
     notificationsEnabled,
     onToggleNotifications,
+    remoteSessionMode = 'off',
+    onSetRemoteSessionMode,
+    remoteSessionActive = false,
+    onApplyRemoteToSession,
     voiceInputEnabled,
     onToggleVoiceInput,
     ttsEnabled,
@@ -378,6 +388,30 @@
             </div>
           {/if}
         </div>
+
+        <!-- Remote Sessions -->
+        {#if onSetRemoteSessionMode}
+          <div class="settings-accordion">
+            <button
+              class="settings-accordion-btn"
+              class:open={activeSection === 'remote'}
+              onclick={() => toggleSection('remote')}
+            >
+              Remote Sessions
+              <span class="accordion-chevron"><ChevronRight size={16} /></span>
+            </button>
+            {#if activeSection === 'remote'}
+              <div class="settings-accordion-body">
+                <RemoteSessionPanel
+                  {remoteSessionMode}
+                  {onSetRemoteSessionMode}
+                  sessionActive={remoteSessionActive}
+                  onApplyToSession={onApplyRemoteToSession}
+                />
+              </div>
+            {/if}
+          </div>
+        {/if}
 
         <!-- Voice Input -->
         <div class="settings-accordion">

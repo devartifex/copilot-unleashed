@@ -6,6 +6,7 @@ import type {
   ClientMessage,
   ServerMessage,
   NewSessionConfig,
+  CloudSessionConfig,
   MessageDeliveryMode,
 } from '$lib/types/index.js';
 import { notify } from '$lib/utils/notifications.js';
@@ -57,6 +58,8 @@ export interface WsStore {
     mode?: MessageDeliveryMode,
   ): void;
   newSession(config: NewSessionConfig): void;
+  newCloudSession(config: CloudSessionConfig): void;
+  remoteToggle(mode?: 'off' | 'export' | 'on'): void;
   resumeSession(sessionId: string): void;
   setMode(mode: SessionMode): void;
   setModel(model: string): void;
@@ -403,8 +406,24 @@ export function createWsStore(): WsStore {
       ...(config.customInstructions?.trim() && { customInstructions: config.customInstructions.trim() }),
       ...(config.excludedTools?.length && { excludedTools: config.excludedTools }),
       ...(config.infiniteSessions && { infiniteSessions: config.infiniteSessions }),
+      ...(config.remoteSession && config.remoteSession !== 'off' && { remoteSession: config.remoteSession }),
     };
     send(msg);
+  }
+
+  function newCloudSession(config: CloudSessionConfig): void {
+    sessionReady = false;
+    send({
+      type: 'new_cloud_session',
+      ...(config.model && { model: config.model }),
+      ...(config.mode && { mode: config.mode }),
+      ...(config.reasoningEffort && { reasoningEffort: config.reasoningEffort }),
+      ...(config.repository && { repository: config.repository }),
+    });
+  }
+
+  function remoteToggle(mode?: 'off' | 'export' | 'on'): void {
+    send({ type: 'remote_toggle', ...(mode ? { mode } : {}) });
   }
 
   function resumeSession(sessionId: string): void {
@@ -508,6 +527,8 @@ export function createWsStore(): WsStore {
     send,
     sendMessage,
     newSession,
+    newCloudSession,
+    remoteToggle,
     resumeSession,
     setMode,
     setModel,

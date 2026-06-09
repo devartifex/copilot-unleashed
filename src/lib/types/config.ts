@@ -15,6 +15,9 @@ export interface SystemPromptSectionInput {
   content?: string;
 }
 
+/** "off" local only, "export" publish events to GitHub, "on" export + remote steering */
+export type RemoteSessionMode = 'off' | 'export' | 'on';
+
 export interface NewSessionConfig {
   model: string;
   mode?: SessionMode;
@@ -25,6 +28,15 @@ export interface NewSessionConfig {
   systemPromptSections?: Record<string, SystemPromptSectionInput>;
   modelCapabilities?: ModelCapabilitiesOverride;
   enableConfigDiscovery?: boolean;
+  /** "off" local only, "export" publish events to GitHub, "on" export + remote steering */
+  remoteSession?: RemoteSessionMode;
+}
+
+export interface CloudSessionConfig {
+  model?: string;
+  mode?: SessionMode;
+  reasoningEffort?: ReasoningEffort;
+  repository?: { owner: string; name: string; branch?: string };
 }
 
 export interface PersistedSettings {
@@ -49,7 +61,7 @@ export interface PersistedSettings {
    * - "on": full remote monitor + steer via github.com/Mobile.
    * The active client only honors this when ENABLE_REMOTE_SESSIONS is enabled server-side.
    */
-  remoteSession?: 'off' | 'export' | 'on';
+  remoteSession?: RemoteSessionMode;
 }
 
 export interface CustomAgentDefinition {

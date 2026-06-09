@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-import { MOCK_USER } from './helpers';
+import { MOCK_USER, openSidebar } from './helpers';
 
 const DEFAULT_DEVICE_FLOW = {
   user_code: 'ABCD-1234',
@@ -16,35 +16,24 @@ const AUTHORIZED_USER = {
 };
 
 function buildLayoutData(authenticated: boolean) {
-  if (authenticated) {
-    return {
-      type: 'data',
-      nodes: [
-        {
-          type: 'data',
-          data: [
-            { authenticated: 1, user: 2 },
-            true,
-            { login: 3, name: 4 },
-            MOCK_USER.login,
-            MOCK_USER.name,
-          ],
-          uses: {},
-        },
-        { type: 'skip' },
-      ],
-    };
-  }
-
   return {
     type: 'data',
     nodes: [
       {
         type: 'data',
-        data: [{ authenticated: 1, user: 2 }, false, null],
+        data: authenticated
+          ? [
+              { authenticated: 1, user: 2, byokEnabled: 5 },
+              true,
+              { login: 3, name: 4 },
+              MOCK_USER.login,
+              MOCK_USER.name,
+              false,
+            ]
+          : [{ authenticated: 1, user: 2, byokEnabled: 1 }, false, null],
         uses: {},
       },
-      { type: 'skip' },
+      null,
     ],
   };
 }
@@ -107,14 +96,14 @@ async function mockAuthReloadState(
   page: Page,
   authState: { authenticated: boolean },
 ): Promise<void> {
-  await page.route('/', async (route) => {
+  await page.route((url) => url.pathname === '/', async (route) => {
     const response = await route.fetch();
     let html = await response.text();
 
     if (authState.authenticated) {
       html = html.replace(
-        /data:\{authenticated:false,user:null\}/g,
-        `data:{authenticated:true,user:{login:"${MOCK_USER.login}",name:"${MOCK_USER.name}"}}`,
+        /data:\{authenticated:false,user:null,byokEnabled:false\}/g,
+        `data:{authenticated:true,user:{login:"${MOCK_USER.login}",name:"${MOCK_USER.name}"},byokEnabled:false}`,
       );
     }
 
@@ -142,7 +131,12 @@ async function mockAuthReloadState(
 }
 
 test.describe('Device flow authentication', () => {
-  test('completes the full device flow journey and opens the chat screen', async ({ page }) => {
+  test('completes the full device flow journey and opens the chat screen', async ({ browser }) => {
+    const context = await browser.newContext({
+      baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL ?? 'http://localhost:3001',
+      serviceWorkers: 'block',
+    });
+    const page = await context.newPage();
     const authState = { authenticated: false };
     let pollCount = 0;
 
@@ -174,8 +168,13 @@ test.describe('Device flow authentication', () => {
     await expect(page.locator('.login-status')).toContainText('Waiting for authorization');
 
     await expect(page.locator('.terminal')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.hamburger-btn')).toBeVisible({ timeout: 15000 });
+    if (await page.getByRole('button', { name: 'Open menu' }).isVisible().catch(() => false)) {
+      await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible();
+    } else {
+      await expect(page.getByLabel('Sidebar navigation')).toBeVisible({ timeout: 15000 });
+    }
     await expect(page.locator('.login-screen')).toBeHidden();
+    await context.close();
   });
 
   test('shows an error state when the device flow cannot start', async ({ page }) => {
@@ -284,7 +283,12 @@ test.describe('Device flow authentication', () => {
 });
 
 test.describe('Authenticated session actions', () => {
-  test('signing out returns the user to the login screen', async ({ page }) => {
+  test('signing out returns the user to the login screen', async ({ browser }) => {
+    const context = await browser.newContext({
+      baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL ?? 'http://localhost:3001',
+      serviceWorkers: 'block',
+    });
+    const page = await context.newPage();
     const authState = { authenticated: true };
 
     await mockAuthReloadState(page, authState);
@@ -298,13 +302,14 @@ test.describe('Authenticated session actions', () => {
     await page.goto('/');
     await expect(page.locator('.terminal')).toBeVisible({ timeout: 10000 });
 
-    await page.locator('button.hamburger-btn').click();
-    const signOutButton = page.locator('button.sidebar-action.sidebar-action-danger');
+    await openSidebar(page);
+    const signOutButton = page.getByRole('button', { name: 'Sign Out' });
     await expect(signOutButton).toBeVisible();
 
     await signOutButton.click();
 
     await expect(page.locator('.login-screen')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.terminal')).toBeHidden();
+    await context.close();
   });
 });

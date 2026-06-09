@@ -7,7 +7,7 @@
  * - MOCK_MODELS, MOCK_USER — shared test data
  */
 
-import type { Browser, Page, BrowserContext } from '@playwright/test';
+import { expect, type Browser, type Page, type BrowserContext } from '@playwright/test';
 
 // ── Shared test data ──────────────────────────────────────────────────────────
 
@@ -28,8 +28,8 @@ export const MOCK_TOOLS = [
 ];
 
 export const MOCK_AGENTS = [
-  { slug: 'copilot', name: 'Copilot', description: 'Default assistant', current: true },
-  { slug: 'reviewer', name: 'Code Reviewer', description: 'Reviews code changes', current: false },
+  { slug: 'copilot', name: 'Copilot', description: 'Default assistant', source: 'user', isSelected: true },
+  { slug: 'reviewer', name: 'Code Reviewer', description: 'Reviews code changes', source: 'user', isSelected: false },
 ];
 
 export const MOCK_SESSIONS = [
@@ -206,6 +206,25 @@ export async function goToChat(page: Page) {
 
   await page.waitForSelector('.terminal', { state: 'visible', timeout: 30000 });
   await page.waitForSelector('textarea:not([disabled])', { state: 'visible', timeout: 30000 });
+}
+
+/**
+ * Opens the sidebar when needed and waits for its primary actions to be usable.
+ * The desktop layout keeps the sidebar visible; mobile uses the hamburger.
+ */
+export async function openSidebar(page: Page) {
+  const sidebar = page.getByLabel('Sidebar navigation');
+  const hamburger = page.getByRole('button', { name: 'Open menu' });
+
+  if (await hamburger.isVisible().catch(() => false)) {
+    await hamburger.click();
+    await expect(sidebar).toHaveClass(/open/);
+  }
+
+  await expect(sidebar).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New Chat' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sessions' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible();
 }
 
 /**

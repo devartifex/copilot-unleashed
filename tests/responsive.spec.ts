@@ -1,7 +1,7 @@
 import { test, expect, type Browser } from '@playwright/test';
 
 async function openLoginPage(browser: Browser, viewport: { width: number; height: number }) {
-  const context = await browser.newContext({ viewport });
+  const context = await browser.newContext({ viewport, serviceWorkers: 'block' });
   const page = await context.newPage();
 
   await page.route('**/auth/device/start', (route) =>
@@ -23,6 +23,10 @@ async function openLoginPage(browser: Browser, viewport: { width: number; height
   return { page, context };
 }
 
+async function expectNoHorizontalOverflow(page: Awaited<ReturnType<typeof openLoginPage>>['page'], width: number) {
+  await expect.poll(() => page.evaluate(() => document.body.scrollWidth)).toBeLessThanOrEqual(width);
+}
+
 test.describe('Responsive — Login screen', () => {
   test('login screen renders on small phone (320x568)', async ({ browser }) => {
     const { page, context } = await openLoginPage(browser, { width: 320, height: 568 });
@@ -31,8 +35,7 @@ test.describe('Responsive — Login screen', () => {
     await expect(page.locator('.device-code-text').first()).toBeVisible();
 
     // No horizontal overflow
-    const bodyWidth = await page.locator('body').evaluate((el) => el.scrollWidth);
-    expect(bodyWidth).toBeLessThanOrEqual(320);
+    await expectNoHorizontalOverflow(page, 320);
 
     await context.close();
   });
@@ -59,8 +62,7 @@ test.describe('Responsive — general', () => {
   test('no horizontal overflow at 320px', async ({ browser }) => {
     const { page, context } = await openLoginPage(browser, { width: 320, height: 568 });
 
-    const bodyWidth = await page.locator('body').evaluate((el) => el.scrollWidth);
-    expect(bodyWidth).toBeLessThanOrEqual(320);
+    await expectNoHorizontalOverflow(page, 320);
 
     await context.close();
   });
@@ -68,8 +70,7 @@ test.describe('Responsive — general', () => {
   test('page content fits within viewport at 375px', async ({ browser }) => {
     const { page, context } = await openLoginPage(browser, { width: 375, height: 667 });
 
-    const bodyWidth = await page.locator('body').evaluate((el) => el.scrollWidth);
-    expect(bodyWidth).toBeLessThanOrEqual(375);
+    await expectNoHorizontalOverflow(page, 375);
 
     await context.close();
   });

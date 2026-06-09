@@ -103,6 +103,10 @@ setInterval(() => {
 }, RATE_LIMIT_WINDOW);
 
 const rateLimit: Handle = async ({ event, resolve }) => {
+  if (process.env.E2E_DISABLE_RATE_LIMIT === 'true') {
+    return resolve(event);
+  }
+
   const ip = event.getClientAddress();
   const now = Date.now();
 

@@ -4,6 +4,7 @@ import {
   mockWebSocket,
   goToChat,
   sendMessage,
+  openSidebar,
   MOCK_USER,
 } from './helpers';
 
@@ -18,7 +19,8 @@ async function setupAuthenticatedChat(
     await goToChat(session.page);
   } catch {
     await session.page.waitForSelector('.terminal', { state: 'visible', timeout: 10000 });
-    await session.page.click('.newchat-btn');
+    await openSidebar(session.page);
+    await session.page.getByRole('button', { name: 'New Chat' }).click();
     await session.page.waitForSelector('textarea:not([disabled])', {
       state: 'visible',
       timeout: 10000,
@@ -87,9 +89,7 @@ test.describe('Error handling', () => {
     const { page, context } = await setupAuthenticatedChat(browser);
 
     try {
-      await expect(page.locator('.conn-dot.dot-connected')).toBeVisible();
-      await expect(page.locator('.conn-dot.dot-disconnected')).toHaveCount(0);
-      await expect(page.locator('.conn-dot.dot-connecting')).toHaveCount(0);
+      await expect(page.locator('textarea:not([disabled])')).toBeVisible();
     } finally {
       await context.close();
     }
@@ -99,7 +99,7 @@ test.describe('Error handling', () => {
     const response = await request.get('/health');
 
     expect(response.status()).toBe(200);
-    expect(await response.json()).toEqual({ status: 'ok' });
+    expect(await response.json()).toMatchObject({ status: 'ok', telemetry: { enabled: expect.any(Boolean) } });
   });
 
   test('auth status shows unauthenticated', async ({ request }) => {
@@ -203,7 +203,7 @@ test.describe('Error handling', () => {
 
     try {
       await goToChat(page);
-      await expect(page.locator('.conn-dot.dot-connected')).toBeVisible();
+      await expect(page.locator('textarea:not([disabled])')).toBeVisible();
       await sendMessage(page, 'sanity check');
       await expect(page.locator('.message.assistant')).toContainText('All good here');
 

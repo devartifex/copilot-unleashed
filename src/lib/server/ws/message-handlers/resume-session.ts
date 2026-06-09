@@ -61,7 +61,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
         streaming: true,
         onUserInputRequest: makeUserInputHandler(connectionEntry, ctx.userLogin),
         hooks: buildSessionHooks((message) => poolSend(connectionEntry, message)),
-        configDir: resolvedConfigDir,
+        configDirectory: resolvedConfigDir,
         mcpServers: mcpServersConfig as any,
         onEvent,
         ...(msg.modelCapabilities ? { modelCapabilities: msg.modelCapabilities } : {}),

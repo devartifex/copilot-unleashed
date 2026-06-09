@@ -63,7 +63,7 @@ describe('createCopilotSession', () => {
       clientName: 'copilot-unleashed',
       model: 'gpt-4.1',
       streaming: true,
-      configDir: '/copilot-config',
+      configDirectory: '/copilot-config',
     });
 
     const mcpServers = sessionConfig.mcpServers as Record<string, Record<string, unknown>>;
@@ -124,7 +124,7 @@ describe('createCopilotSession', () => {
       excludedTools: ['bash'],
       availableTools: ['read'],
       onUserInputRequest,
-      configDir: '/custom-config',
+      configDirectory: '/custom-config',
       systemMessage: {
         mode: 'append',
         content: 'Stay concise.',

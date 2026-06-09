@@ -439,7 +439,7 @@ export async function createCopilotSession(
     model: options.model || 'gpt-4.1',
     streaming: true,
     onPermissionRequest: permissionHandler,
-    ...(config.copilotConfigDir && { configDir: config.copilotConfigDir }),
+    ...(config.copilotConfigDir && { configDirectory: config.copilotConfigDir }),
     mcpServers: await buildSessionMcpServers(githubToken, options.configDir),
   };
 
@@ -486,7 +486,7 @@ export async function createCopilotSession(
   }
 
   if (options.configDir) {
-    sessionConfig.configDir = options.configDir;
+    sessionConfig.configDirectory = options.configDir;
   }
 
   if (options.skillDirectories && options.skillDirectories.length > 0) {

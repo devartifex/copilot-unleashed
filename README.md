@@ -37,7 +37,8 @@
 
 - **Every Copilot model** — Claude Opus 4.6, GPT-5.4, Gemini 3 Pro, Claude Sonnet 4.6, and more — switch mid-conversation, keep full history
 - **Autopilot agents** — plan, code, run tests, and open PRs autonomously with live tool execution
-- **Remote session publishing** — opt sessions into being visible on github.com / Mobile via `remoteSession: "export" | "on"` (powered by SDK 1.0.0-beta.8); the browser app stays the steering surface, GitHub gets monitor visibility. Server-side toggle: `ENABLE_REMOTE_SESSIONS` (default on); per-session opt-in still required.
+- **Remote session publishing** — opt sessions into being visible on github.com / Mobile via the Remote Sessions setting (Off / Export / Full remote); a banner links to the live session on GitHub. Server-side toggle: `ENABLE_REMOTE_SESSIONS` (default on); per-session opt-in still required.
+- **Cloud sessions** — create sessions that run on GitHub's cloud agent against any repository (owner/repo/branch form in the Sessions panel)
 - **Resume last session** — `GET /api/sessions/last` returns metadata for the user's most recent local session for one-tap continue-on-any-device flows
 - **Extended thinking** — live reasoning traces with collapsible "Thinking…" blocks
 - **Voice input** — speech-to-text via Web Speech API; mic button replaces send when input is empty (ChatGPT-style UX) — toggle in Settings
@@ -140,7 +141,8 @@ Open [localhost:3000](http://localhost:3000). Log in with GitHub. Done.
 | `VAPID_PRIVATE_KEY` | — | Push notifications (base64url) |
 | `VAPID_SUBJECT` | — | Push subject (`mailto:` or `https:`) |
 | `PUSH_STORE_PATH` | `/data/push-subscriptions` | Push subscription storage |
-| `ENABLE_REMOTE_SESSIONS` | `true` | Allow sessions to opt into cloud publishing (`remoteSession: "export"\|"on"`). Set to `false` to hard-disable. |
+| `ENABLE_REMOTE_SESSIONS` | `true` | Allow sessions to opt into cloud publishing (`remoteSession: "export"\|"on"`) and cloud-agent sessions. Set to `false` to hard-disable. |
+| `COPILOT_CLIENT_MODE` | `empty` | SDK client mode. `empty` (recommended for servers) starts with all ambient capabilities off and re-enables only what the app needs. Set to `copilot-cli` to restore full CLI-equivalent behavior. |
 
 </details>
 
@@ -209,9 +211,9 @@ The Sessions panel auto-refreshes every 30 seconds. Use `COPILOT_CONFIG_DIR` to 
 
 </details>
 
-### Remote session publishing (SDK 1.0.0-beta.8)
+### Remote session publishing
 
-A chat can opt into being **published** to github.com / Copilot Mobile by passing one of these values when the session is created:
+A chat can opt into being **published** to github.com / Copilot Mobile. Pick the default in **Settings → Remote Sessions** (applies to new sessions, or hit "Apply to current session"):
 
 | Mode | Effect |
 |---|---|
@@ -219,7 +221,11 @@ A chat can opt into being **published** to github.com / Copilot Mobile by passin
 | `"export"` | Read-only mirror — session events stream to GitHub so it shows up on github.com/copilot and Mobile in monitor mode. |
 | `"on"` | Full remote-steerable — the session is steerable from github.com / Mobile as well as from this app. |
 
-This is sent over WebSocket as `{ type: "new_session", remoteSession: "on", ... }` and threaded through to the SDK's `sessionConfig.remoteSession`. The server-wide kill switch is `ENABLE_REMOTE_SESSIONS=false`.
+This is sent over WebSocket as `{ type: "new_session", remoteSession: "on", ... }` and threaded through to the SDK's `sessionConfig.remoteSession`; runtime toggling uses `{ type: "remote_toggle", mode }` (SDK `session.rpc.remote`). When GitHub returns the session URL, the app shows a banner with an "Open on GitHub" link. The server-wide kill switch is `ENABLE_REMOTE_SESSIONS=false`.
+
+### Cloud sessions (GitHub cloud agent)
+
+From the Sessions panel, **New cloud session** creates a session that runs on GitHub's cloud agent infrastructure instead of locally — give it a repository (`owner` / `name` / optional `branch`) and the agent works against that repo. Sent as `{ type: "new_cloud_session", repository }`; the session ID is assigned by GitHub. Requires `ENABLE_REMOTE_SESSIONS` and cloud-agent entitlements on your account.
 
 > **What's not in this release:** the app does **not** include an in-app browser for *other* remote sessions (the ones running elsewhere on your account) and does **not** let you steer arbitrary remote sessions from this UI — the SDK exposes no public REST endpoint for listing them, and the github.com remote-sessions view talks to an internal API that requires a Copilot bearer integrators can't currently mint. To view all your remote sessions, use github.com or the Copilot Mobile app. PRs welcome once the SDK surfaces a public list API.
 
@@ -334,7 +340,7 @@ Device Flow OAuth (same as GitHub CLI). Tokens are server-side only, never sent 
 
 ## Built With
 
-SvelteKit 5 · Svelte 5 runes · TypeScript 5.7 · Node.js 24 · [`@github/copilot-sdk`](https://github.com/github/copilot-sdk) v1.0.0-beta.8 · Vite · `ws` · Web Speech API · Vitest · Playwright · Docker · Bicep
+SvelteKit 5 · Svelte 5 runes · TypeScript 5.7 · Node.js 24 · [`@github/copilot-sdk`](https://github.com/github/copilot-sdk) v1.0.0 · Vite · `ws` · Web Speech API · Vitest · Playwright · Docker · Bicep
 
 ## Contributing
 

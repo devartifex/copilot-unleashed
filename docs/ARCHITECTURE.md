@@ -25,7 +25,7 @@ Browser (Svelte 5 SPA)
 | Language | TypeScript 5.7 (strict mode, ES2022) |
 | Framework | SvelteKit 5 with `adapter-node` |
 | Reactivity | Svelte 5 runes ($state, $derived, $effect, $props) |
-| AI Engine | `@github/copilot-sdk` ^0.2.0 |
+| AI Engine | `@github/copilot-sdk` ^1.0.0 (client `mode: "empty"` by default) |
 | Real-time | WebSocket (`ws` ^8.18) via custom `server.js` entry |
 | Markdown | `marked` + `dompurify` + `highlight.js` |
 | Security | Custom CSP/HSTS headers in hooks.server.ts, rate limiting, DOMPurify |
@@ -363,6 +363,17 @@ All push API endpoints require GitHub authentication.
 | `CHAT_STATE_PATH` | — | `.chat-state` (dev) / `/data/chat-state` (prod) | Persisted chat state directory |
 | `PUSH_STORE_PATH` | — | `/data/push-subscriptions` | Push subscription storage |
 | `COPILOT_CONFIG_DIR` | — | `~/.copilot` | SDK config/session directory (Azure: `/data/copilot-home`) |
+| `COPILOT_CLIENT_MODE` | — | `empty` | SDK client mode — `empty` (multi-user safe; app re-enables features per session) or `copilot-cli` (full CLI-equivalent ambient capabilities) |
+| `ENABLE_REMOTE_SESSIONS` | — | `true` | Allow remote publishing (`remoteSession`) and cloud-agent sessions; `false` hard-disables |
+
+### SDK client mode
+
+The server creates each per-user `CopilotClient` with `mode: "empty"` (SDK 1.0.0): sessions start with no ambient capabilities, and `buildEmptyModeSessionDefaults()` in `src/lib/server/copilot/session.ts` explicitly re-enables what the app needs — all built-in/MCP/custom tools via `ToolSet`, skills, config discovery, host git operations, the session store, on-demand instruction discovery, persistent MCP OAuth tokens, and embedding cache. File hooks, telemetry, and plugins stay off. Set `COPILOT_CLIENT_MODE=copilot-cli` to restore the old behavior.
+
+### Remote & cloud sessions
+
+- **Remote publishing** — `new_session` accepts `remoteSession: "off"|"export"|"on"`; `remote_toggle` flips it at runtime via `session.rpc.remote.enable()/disable()`. The remote URL arrives via the SDK `session.info` event (`infoType: "remote"`) and is forwarded as `remote_session_url`; the UI renders a banner linking to github.com.
+- **Cloud sessions** — `new_cloud_session` (validated `repository: { owner, name, branch? }`) creates a session with `cloud: { repository }` running on GitHub's cloud agent; the session ID is server-assigned. Handlers: `src/lib/server/ws/message-handlers/cloud-session.ts` and `remote.ts`.
 
 ## Deployment
 

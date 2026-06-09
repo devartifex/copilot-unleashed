@@ -119,6 +119,8 @@ export interface ListSessionsMessage {
 export interface ResumeSessionMessage {
   type: 'resume_session';
   sessionId: string;
+  /** Suppress the SDK resume event for silent re-attach (auto cold-resume) */
+  silent?: boolean;
 }
 
 export interface DeleteSessionMessage {

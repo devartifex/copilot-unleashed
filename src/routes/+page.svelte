@@ -93,7 +93,7 @@
           if (msg.sdkSessionId) {
             // Session will be restored — keep sessionLoading true until cold_resume/session_resumed
             console.log('[PAGE] connected with sdkSessionId, resuming', msg.sdkSessionId);
-            wsStore.resumeSession(msg.sdkSessionId);
+            wsStore.resumeSession(msg.sdkSessionId, { silent: true });
           } else {
             // No previous session — show new chat immediately
             sessionLoading = false;

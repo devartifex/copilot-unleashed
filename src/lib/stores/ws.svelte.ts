@@ -60,7 +60,7 @@ export interface WsStore {
   newSession(config: NewSessionConfig): void;
   newCloudSession(config: CloudSessionConfig): void;
   remoteToggle(mode?: 'off' | 'export' | 'on'): void;
-  resumeSession(sessionId: string): void;
+  resumeSession(sessionId: string, options?: { silent?: boolean }): void;
   setMode(mode: SessionMode): void;
   setModel(model: string): void;
   setReasoning(effort: ReasoningEffort): void;
@@ -426,9 +426,9 @@ export function createWsStore(): WsStore {
     send({ type: 'remote_toggle', ...(mode ? { mode } : {}) });
   }
 
-  function resumeSession(sessionId: string): void {
+  function resumeSession(sessionId: string, options?: { silent?: boolean }): void {
     sessionReady = false;
-    send({ type: 'resume_session', sessionId });
+    send({ type: 'resume_session', sessionId, ...(options?.silent ? { silent: true } : {}) });
   }
 
   function setMode(mode: SessionMode): void {

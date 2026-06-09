@@ -63,6 +63,8 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
         // Re-prompt any permission requests that were pending when the
         // session was last suspended instead of dropping them.
         continuePendingWork: true,
+        // Don't emit a visible resume event when silently re-attaching after reconnect
+        ...(msg.silent === true ? { suppressResumeEvent: true } : {}),
         onUserInputRequest: makeUserInputHandler(connectionEntry, ctx.userLogin),
         hooks: buildSessionHooks((message) => poolSend(connectionEntry, message)),
         configDirectory: resolvedConfigDir,

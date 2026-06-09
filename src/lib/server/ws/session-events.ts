@@ -108,8 +108,13 @@ export function wireSessionEvents(
     poolSend(entry, { type: 'tool_start', toolCallId: event.data.toolCallId, toolName: event.data.toolName, mcpServerName: event.data.mcpServerName, mcpToolName: event.data.mcpToolName });
   });
   session.on('tool.execution_complete', (event: any) => {
-    debug('[TOOL] execution_complete:', event.data.toolCallId);
-    poolSend(entry, { type: 'tool_end', toolCallId: event.data.toolCallId });
+    debug('[TOOL] execution_complete:', event.data.toolCallId, 'success:', event.data.success);
+    poolSend(entry, {
+      type: 'tool_end',
+      toolCallId: event.data.toolCallId,
+      success: event.data.success !== false,
+      ...(event.data.error?.message ? { error: event.data.error.message } : {}),
+    });
   });
   session.on('tool.execution_progress', (event: any) => {
     debug('[TOOL] execution_progress:', event.data.toolCallId, event.data.message);
@@ -177,7 +182,14 @@ export function wireSessionEvents(
     poolSend(entry, { type: 'subagent_end', agentName: event.data.agentName });
   });
   session.on('session.info', (event: any) => {
-    poolSend(entry, { type: 'info', message: event.data?.message || event.data });
+    const infoType = event.data?.infoType;
+    const url = event.data?.url;
+    // Remote session export publishes a github.com URL for monitoring/steering
+    if (infoType === 'remote' && typeof url === 'string') {
+      poolSend(entry, { type: 'remote_session_url', url, message: event.data?.message });
+      return;
+    }
+    poolSend(entry, { type: 'info', message: event.data?.message || event.data, ...(infoType ? { infoType } : {}), ...(url ? { url } : {}) });
   });
   session.on('session.plan_changed', (event: any) => {
     poolSend(entry, { type: 'plan_changed', content: event.data?.content, path: event.data?.path });

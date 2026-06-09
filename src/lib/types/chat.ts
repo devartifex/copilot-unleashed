@@ -31,6 +31,7 @@ export interface ChatMessage {
   toolCallId?: string;
   toolName?: string;
   toolStatus?: ToolCallStatus;
+  toolError?: string;
   toolProgressMessage?: string;
   toolProgressMessages?: string[];
   mcpServerName?: string;
@@ -59,5 +60,7 @@ export interface ToolCallState {
   mcpToolName?: string;
   status: ToolCallStatus;
   message?: string;
+  /** Error message when status is "failed" */
+  error?: string;
   progressMessages?: string[];
 }

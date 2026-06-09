@@ -4,6 +4,7 @@ import type {
   ChatMessageRole,
   CopilotUsageItem,
   ToolCallState,
+  ToolCallStatus,
   ServerMessage,
   SessionMode,
   ReasoningEffort,
@@ -319,7 +320,13 @@ export function createChatStore(wsStore: WsStore): ChatStore {
 
       case 'tool_end':
         messages = messages.map(m =>
-          m.toolCallId === msg.toolCallId ? { ...m, toolStatus: 'complete' as const } : m,
+          m.toolCallId === msg.toolCallId
+            ? {
+                ...m,
+                toolStatus: (msg.success === false ? 'failed' : 'complete') as ToolCallStatus,
+                ...(msg.success === false && msg.error ? { toolError: msg.error } : {}),
+              }
+            : m,
         );
         break;
 

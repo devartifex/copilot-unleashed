@@ -26,7 +26,6 @@
     if (tool.status === 'failed') return 'failed';
     return '';
   });
-
   function toggle() {
     if (hasProgress) expanded = !expanded;
   }
@@ -77,6 +76,9 @@
         <span class="tool-status">{statusText}</span>
       {/if}
     </div>
+  {/if}
+  {#if tool.status === 'failed' && tool.error}
+    <div class="tool-error" role="alert">{tool.error}</div>
   {/if}
 </div>
 
@@ -179,6 +181,15 @@
     font-size: 0.78em;
     line-height: 1.5;
     padding: 1px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .tool-error {
+    color: var(--red);
+    font-size: 0.78em;
+    line-height: 1.5;
+    padding: 1px 0 1px calc(var(--sp-3) + 1.4em);
     white-space: pre-wrap;
     word-break: break-word;
   }

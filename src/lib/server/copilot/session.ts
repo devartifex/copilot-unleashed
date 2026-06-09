@@ -2,8 +2,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
-import { CopilotClient } from '@github/copilot-sdk';
-import type { SessionConfig, SystemMessageSection, SectionOverride, MCPServerConfig, ModelCapabilitiesOverride, RemoteSessionMode } from '@github/copilot-sdk';
+import { CopilotClient, ToolSet } from '@github/copilot-sdk';
+import type { SessionConfig, SystemMessageSection, SectionOverride, MCPServerConfig, ModelCapabilitiesOverride, RemoteSessionMode, CloudSessionOptions } from '@github/copilot-sdk';
 
 export type HookEventCallback = (message: Record<string, unknown>) => void;
 import { isIP } from 'node:net';
@@ -46,6 +46,8 @@ export interface CreateSessionOptions {
   provider?: SessionConfig['provider'];
   onElicitationRequest?: SessionConfig['onElicitationRequest'];
   remoteSession?: RemoteSessionMode;
+  /** Create the session on GitHub's cloud agent infrastructure instead of locally */
+  cloud?: CloudSessionOptions;
 }
 
 function isPrivateIpv4(hostname: string): boolean {
@@ -386,13 +388,50 @@ export async function buildSessionMcpServers(
   };
 }
 
-export function buildSessionHooks(onHookEvent: HookEventCallback): SessionConfig['hooks'] {
+/**
+ * Explicit re-enables for the SDK's "empty" client mode.
+ *
+ * Empty mode disables the CLI's ambient capabilities by default (safe for
+ * multi-user servers). This app opts back into exactly the features it uses,
+ * keeping behavior parity with the previous "copilot-cli" mode while every
+ * capability stays an explicit, auditable choice.
+ */
+export function buildEmptyModeSessionDefaults(): Partial<SessionConfig> {
+  if (config.copilotClientMode !== 'empty') return {};
   return {
+    // Empty mode requires every session to opt into its tools explicitly.
+    availableTools: new ToolSet().addBuiltIn('*').addMcp('*').addCustom('*').toArray(),
+    enableSkills: true,
+    enableConfigDiscovery: true,
+    enableHostGitOperations: true,
+    enableSessionStore: true,
+    enableOnDemandInstructionDiscovery: true,
+    // Keep MCP OAuth tokens on disk so the Copilot CLI stays in sync
+    mcpOAuthTokenStorage: 'persistent',
+    embeddingCacheStorage: 'persistent',
+    skipEmbeddingRetrieval: false,
+    skipCustomInstructions: false,
+    coauthorEnabled: true,
+    // Deliberately left at empty-mode defaults (off): enableFileHooks
+    // (hooks are wired via SDK callbacks), enableSessionTelemetry,
+    // customAgentsLocalOnly stays true, installedPlugins stays [].
+  };
+}
+
+export function buildSessionHooks(onHookEvent: HookEventCallback): SessionConfig['hooks'] {  return {
     onPreToolUse: (input) => {
       onHookEvent({ type: 'hook_pre_tool', toolName: input.toolName, toolArgs: input.toolArgs });
     },
     onPostToolUse: (input) => {
       onHookEvent({ type: 'hook_post_tool', toolName: input.toolName, toolArgs: input.toolArgs });
+    },
+    onPostToolUseFailure: (input) => {
+      onHookEvent({
+        type: 'hook_tool_failure',
+        toolName: input.toolName,
+        toolArgs: input.toolArgs,
+        error: input.error,
+      });
     },
     onUserPromptSubmitted: (input) => {
       onHookEvent({ type: 'hook_user_prompt', prompt: input.prompt });
@@ -435,6 +474,7 @@ export async function createCopilotSession(
   console.log('[SESSION] Creating session with permissionMode:', options.permissionMode || 'approve_all (default)');
 
   const sessionConfig: SessionConfig = {
+    ...buildEmptyModeSessionDefaults(),
     clientName: 'copilot-unleashed',
     model: options.model || 'gpt-4.1',
     streaming: true,
@@ -527,6 +567,10 @@ export async function createCopilotSession(
 
   if (options.remoteSession && options.remoteSession !== 'off') {
     sessionConfig.remoteSession = options.remoteSession;
+  }
+
+  if (options.cloud) {
+    sessionConfig.cloud = options.cloud;
   }
 
   // The SDK 1.0.0-beta runtime writes session state directly to

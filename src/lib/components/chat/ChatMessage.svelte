@@ -81,6 +81,7 @@
       mcpToolName: message.mcpToolName,
       status: message.toolStatus ?? 'running',
       message: message.toolProgressMessage,
+      error: message.toolError,
       progressMessages: message.toolProgressMessages,
     };
   });

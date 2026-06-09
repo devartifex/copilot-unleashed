@@ -89,6 +89,10 @@ export interface ToolProgressMessage {
 export interface ToolEndMessage {
   type: 'tool_end';
   toolCallId: string;
+  /** False when the tool execution failed */
+  success?: boolean;
+  /** Human-readable error message when success is false */
+  error?: string;
 }
 
 export interface ModelsMessage {
@@ -277,6 +281,29 @@ export interface SubagentDeselectedMessage {
 export interface InfoMessage {
   type: 'info';
   message: string;
+  infoType?: string;
+  url?: string;
+}
+
+/** Published when a remote-enabled session receives its github.com monitoring URL */
+export interface RemoteSessionUrlMessage {
+  type: 'remote_session_url';
+  url: string;
+  message?: string;
+}
+
+/** Result of toggling remote steering on the active session */
+export interface RemoteToggledMessage {
+  type: 'remote_toggled';
+  enabled: boolean;
+}
+
+/** Confirmation that a cloud session was created on GitHub's infrastructure */
+export interface CloudSessionCreatedMessage {
+  type: 'cloud_session_created';
+  sessionId?: string;
+  model?: string;
+  repository?: { owner: string; name: string; branch?: string };
 }
 
 export interface ElicitationRequestedMessage {
@@ -393,6 +420,13 @@ export interface HookPostToolMessage {
   toolArgs?: unknown;
 }
 
+export interface HookToolFailureMessage {
+  type: 'hook_tool_failure';
+  toolName: string;
+  toolArgs?: unknown;
+  error: string;
+}
+
 export interface HookSessionStartMessage {
   type: 'hook_session_start';
   source: string;
@@ -418,6 +452,7 @@ export interface HookErrorMessage {
 export type HookMessage =
   | HookPreToolMessage
   | HookPostToolMessage
+  | HookToolFailureMessage
   | HookUserPromptMessage
   | HookSessionStartMessage
   | HookSessionEndMessage
@@ -615,6 +650,9 @@ export type ServerMessage =
   | SubagentSelectedMessage
   | SubagentDeselectedMessage
   | InfoMessage
+  | RemoteSessionUrlMessage
+  | RemoteToggledMessage
+  | CloudSessionCreatedMessage
   | ElicitationRequestedMessage
   | ElicitationCompletedMessage
   | ExitPlanModeRequestedMessage
@@ -633,6 +671,7 @@ export type ServerMessage =
   | SystemNotificationMessage
   | HookPreToolMessage
   | HookPostToolMessage
+  | HookToolFailureMessage
   | HookUserPromptMessage
   | HookSessionStartMessage
   | HookSessionEndMessage

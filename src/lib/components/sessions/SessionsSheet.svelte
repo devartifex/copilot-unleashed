@@ -314,18 +314,18 @@
       </span>
       <span class="session-item-indicators">
         {#if session.checkpointCount && session.checkpointCount > 0}
-          <span class="indicator" title="{session.checkpointCount} checkpoint{session.checkpointCount > 1 ? 's' : ''}">
+          <span class="indicator" role="img" aria-label="{session.checkpointCount} checkpoint{session.checkpointCount > 1 ? 's' : ''}" title="{session.checkpointCount} checkpoint{session.checkpointCount > 1 ? 's' : ''}">
             <Bookmark size={12} /> {session.checkpointCount}
           </span>
         {/if}
         {#if session.hasPlan}
-          <span class="indicator" title="Has plan"><ClipboardList size={12} /></span>
+          <span class="indicator" role="img" aria-label="Has plan" title="Has plan"><ClipboardList size={12} /></span>
         {/if}
         {#if session.isRemote}
-          <span class="indicator" title="Remote session"><Cloud size={12} /></span>
+          <span class="indicator indicator-remote" role="img" aria-label="Remote session" title="Remote session"><Cloud size={12} /> remote</span>
         {/if}
         {#if session.source === 'filesystem'}
-          <span class="indicator" title="Bundled session — will resume with context"><Package size={12} /></span>
+          <span class="indicator" role="img" aria-label="Bundled session — will resume with context" title="Bundled session — will resume with context"><Package size={12} /></span>
         {/if}
       </span>
     </span>
@@ -742,6 +742,10 @@
     display: inline-flex;
     align-items: center;
     gap: 2px;
+  }
+
+  .indicator-remote {
+    color: var(--purple, #a78bfa);
   }
 
   .session-delete-btn {

@@ -60,6 +60,12 @@
             <span class="meta-value" title={detail.cwd}>{formatPath(detail.cwd)}</span>
           </div>
         {/if}
+        {#if detail.isRemote}
+          <div class="meta-row">
+            <span class="meta-label">Source</span>
+            <span class="meta-value remote">Remote / cloud</span>
+          </div>
+        {/if}
         {#if detail.createdAt || detail.updatedAt}
           <div class="meta-row">
             <span class="meta-label">Last active</span>
@@ -168,6 +174,10 @@
 
   .meta-value.accent {
     color: var(--accent);
+  }
+
+  .meta-value.remote {
+    color: var(--purple, #a78bfa);
   }
 
   .preview-section {

@@ -567,6 +567,14 @@
       onResume={handleResumeSession}
       onDelete={(id) => wsStore.deleteSession(id)}
       onRequestDetail={(id) => wsStore.getSessionDetail(id)}
+      onNewCloudSession={(repository) => {
+        chatStore.clearMessages();
+        wsStore.newCloudSession({
+          model: settings.selectedModel || 'gpt-4.1',
+          mode: settings.selectedMode,
+          repository,
+        });
+      }}
     />
   </div>
 {:else}

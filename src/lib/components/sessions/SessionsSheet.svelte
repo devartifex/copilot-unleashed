@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SessionSummary, SessionDetail } from '$lib/types/index.js';
   import SessionPreview from './SessionPreview.svelte';
-  import { X, Bookmark, ClipboardList, Cloud, Package } from 'lucide-svelte';
+  import { X, Bookmark, ClipboardList, Cloud, Package, Plus } from 'lucide-svelte';
 
   interface Props {
     open: boolean;
@@ -12,12 +12,40 @@
     onResume: (sessionId: string) => void;
     onDelete?: (sessionId: string) => void;
     onRequestDetail?: (sessionId: string) => void;
+    /** Create a session on GitHub's cloud agent for a repository */
+    onNewCloudSession?: (repository: { owner: string; name: string; branch?: string }) => void;
   }
 
-  const { open, sessions, sessionDetail = null, loading = false, onClose, onResume, onDelete, onRequestDetail }: Props = $props();
+  const { open, sessions, sessionDetail = null, loading = false, onClose, onResume, onDelete, onRequestDetail, onNewCloudSession }: Props = $props();
 
   let searchQuery = $state('');
   let selectedSessionId = $state<string | null>(null);
+  let cloudFormOpen = $state(false);
+  let cloudOwner = $state('');
+  let cloudRepo = $state('');
+  let cloudBranch = $state('');
+  let cloudError = $state<string | null>(null);
+
+  // Mirror server-side validation (cloud-session.ts)
+  const OWNER_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
+  const REPO_RE = /^[a-zA-Z0-9._-]{1,100}$/;
+  const BRANCH_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9._/-]{0,254})$/;
+
+  function handleCloudSubmit(e: SubmitEvent) {
+    e.preventDefault();
+    const owner = cloudOwner.trim();
+    const name = cloudRepo.trim();
+    const branch = cloudBranch.trim();
+
+    if (!OWNER_RE.test(owner)) { cloudError = 'Invalid repository owner'; return; }
+    if (!REPO_RE.test(name)) { cloudError = 'Invalid repository name'; return; }
+    if (branch && !BRANCH_RE.test(branch)) { cloudError = 'Invalid branch name'; return; }
+
+    cloudError = null;
+    onNewCloudSession?.({ owner, name, ...(branch && { branch }) });
+    cloudFormOpen = false;
+    handleClose();
+  }
 
   function sessionTime(s: SessionSummary): number {
     return s.updatedAt ? new Date(s.updatedAt).getTime() : 0;
@@ -83,6 +111,8 @@
   function handleClose() {
     selectedSessionId = null;
     searchQuery = '';
+    cloudFormOpen = false;
+    cloudError = null;
     onClose();
   }
 
@@ -176,6 +206,41 @@
         </div>
       {:else}
         <div class="sheet-body">
+          {#if onNewCloudSession}
+            <div class="cloud-section">
+              <button
+                class="cloud-new-btn"
+                onclick={() => { cloudFormOpen = !cloudFormOpen; cloudError = null; }}
+                aria-expanded={cloudFormOpen}
+              >
+                <Cloud size={14} /> New cloud session <Plus size={14} />
+              </button>
+              {#if cloudFormOpen}
+                <form class="cloud-form" onsubmit={handleCloudSubmit}>
+                  <p class="cloud-hint">Runs on GitHub's cloud agent against a repository.</p>
+                  <div class="cloud-fields">
+                    <label class="cloud-field">
+                      <span>Owner</span>
+                      <input type="text" bind:value={cloudOwner} placeholder="octocat" required autocomplete="off" autocapitalize="off" spellcheck="false" />
+                    </label>
+                    <label class="cloud-field">
+                      <span>Repository</span>
+                      <input type="text" bind:value={cloudRepo} placeholder="hello-world" required autocomplete="off" autocapitalize="off" spellcheck="false" />
+                    </label>
+                    <label class="cloud-field">
+                      <span>Branch <em>(optional)</em></span>
+                      <input type="text" bind:value={cloudBranch} placeholder="main" autocomplete="off" autocapitalize="off" spellcheck="false" />
+                    </label>
+                  </div>
+                  {#if cloudError}
+                    <p class="cloud-error" role="alert">{cloudError}</p>
+                  {/if}
+                  <button class="cloud-submit" type="submit">Create cloud session</button>
+                </form>
+              {/if}
+            </div>
+          {/if}
+
           {#if !loading && sessions.length > 5}
             <div class="search-bar">
               <input
@@ -460,6 +525,107 @@
 
   .search-input:focus {
     border-color: var(--accent);
+  }
+
+  /* ── Cloud session form ──────────────────────────────────────── */
+  .cloud-section {
+    padding: var(--sp-2) 0;
+  }
+
+  .cloud-new-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg-muted);
+    font-size: 0.8em;
+    padding: var(--sp-2) var(--sp-3);
+    cursor: pointer;
+    width: 100%;
+    justify-content: center;
+    min-height: 40px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .cloud-new-btn:hover,
+  .cloud-new-btn[aria-expanded="true"] {
+    color: var(--fg);
+    border-color: var(--accent);
+  }
+
+  .cloud-form {
+    margin-top: var(--sp-2);
+    padding: var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .cloud-hint {
+    font-size: 0.75em;
+    color: var(--fg-dim);
+    margin: 0;
+  }
+
+  .cloud-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .cloud-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.75em;
+    color: var(--fg-muted);
+  }
+
+  .cloud-field em {
+    color: var(--fg-dim);
+    font-style: normal;
+  }
+
+  .cloud-field input {
+    background: var(--bg-secondary, var(--border));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-size: 1.05em;
+    padding: var(--sp-2);
+    outline: none;
+    min-height: 38px;
+  }
+
+  .cloud-field input:focus {
+    border-color: var(--accent);
+  }
+
+  .cloud-error {
+    font-size: 0.78em;
+    color: var(--red, #f85149);
+    margin: 0;
+  }
+
+  .cloud-submit {
+    background: var(--blue);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.82em;
+    font-weight: 600;
+    padding: var(--sp-2) var(--sp-3);
+    min-height: 40px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .cloud-submit:active {
+    opacity: 0.85;
   }
 
   /* ── Session groups ──────────────────────────────────────────── */

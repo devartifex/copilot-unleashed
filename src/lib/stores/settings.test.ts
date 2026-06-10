@@ -155,6 +155,7 @@ describe('createSettingsStore', () => {
           voiceInputEnabled: true,
           ttsEnabled: true,
           ttsRate: 1,
+          remoteSession: 'off',
         },
       }),
     });

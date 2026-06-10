@@ -34,6 +34,7 @@ export default defineConfig({
       GITHUB_CLIENT_ID: 'test-client-id',
       SESSION_SECRET: 'test-secret-for-playwright',
       NODE_ENV: 'development',
+      E2E_DISABLE_RATE_LIMIT: 'true',
     },
   },
 });

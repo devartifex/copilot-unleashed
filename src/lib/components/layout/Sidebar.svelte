@@ -185,7 +185,7 @@
               <span class="totals-line">{(sessionTotals.totalDurationMs / 1000).toFixed(1)}s total API time</span>
             {/if}
             {#if sessionTotals.premiumRequests > 0}
-              <span class="totals-line">{sessionTotals.premiumRequests} premium requests</span>
+              <span class="totals-line">{sessionTotals.premiumRequests} AI Credits (AIC)</span>
             {/if}
           </div>
         </div>

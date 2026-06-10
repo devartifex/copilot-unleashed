@@ -11,6 +11,7 @@
   import SettingsModal from '$lib/components/settings/SettingsModal.svelte';
   import SessionsSheet from '$lib/components/sessions/SessionsSheet.svelte';
   import TopBar from '$lib/components/layout/TopBar.svelte';
+  import RemoteBanner from '$lib/components/layout/RemoteBanner.svelte';
   import ModelSheet from '$lib/components/model/ModelSheet.svelte';
   import { createWsStore } from '$lib/stores/ws.svelte.js';
   import { createChatStore } from '$lib/stores/chat.svelte.js';
@@ -35,10 +36,12 @@
   let modelSheetOpen = $state(false);
   let sessionsLoading = $state(false);
   let sessionLoading = $state(true);
+  let dismissedRemoteUrl = $state<string | null>(null);
+  const showRemoteBanner = $derived(!!chatStore.remoteUrl && chatStore.remoteUrl !== dismissedRemoteUrl);
 
-  // Use the confirmed model from the active session; fall back to the user's saved preference
-  // so the TopBar/ModelSheet show the correct model immediately before session_created arrives.
-  const effectiveModel = $derived(chatStore.currentModel || settings.selectedModel || 'gpt-4.1');
+  // Use the confirmed model from the active session; fall back to the user's saved preference.
+  // No hardcoded model — when empty the TopBar shows "Select model" and the SDK default is used.
+  const effectiveModel = $derived(chatStore.currentModel || settings.selectedModel || '');
 
   const modelCount = $derived(chatStore.models.size);
   const toolCount = $derived(chatStore.tools.length);
@@ -47,7 +50,8 @@
   );
 
   const supportsVision = $derived.by(() => {
-    const model = settings.selectedModel || 'gpt-4.1';
+    const model = effectiveModel;
+    if (!model) return false;
     const info = chatStore.models.get(model);
     return info?.capabilities?.supports?.vision === true;
   });
@@ -90,7 +94,7 @@
           if (msg.sdkSessionId) {
             // Session will be restored — keep sessionLoading true until cold_resume/session_resumed
             console.log('[PAGE] connected with sdkSessionId, resuming', msg.sdkSessionId);
-            wsStore.resumeSession(msg.sdkSessionId);
+            wsStore.resumeSession(msg.sdkSessionId, { silent: true });
           } else {
             // No previous session — show new chat immediately
             sessionLoading = false;
@@ -133,6 +137,14 @@
         // Sync mode from SDK to settings on mode_changed (covers resumed sessions)
         if (msg.type === 'mode_changed') {
           settings.selectedMode = msg.mode;
+        }
+
+        // Drop a stale saved model preference when it's no longer offered
+        // (e.g. deprecated) — the SDK default takes over on the next session.
+        if (msg.type === 'models' && settings.selectedModel && chatStore.models.size > 0
+          && !chatStore.models.has(settings.selectedModel)) {
+          console.warn(`[PAGE] Saved model "${settings.selectedModel}" no longer available — resetting to default`);
+          settings.selectedModel = '';
         }
 
         // Route customization list messages to settings store
@@ -189,16 +201,20 @@
 
   // ── Helpers ────────────────────────────────────────────────────────────
   function requestNewSession(): void {
-    const model = settings.selectedModel || 'gpt-4.1';
-    const modelInfo = chatStore.models.get(model);
+    // Only send a model if the user actually picked one — otherwise let the
+    // SDK choose its default (a hardcoded fallback breaks when that model
+    // disappears from the user's available model list).
+    const model = settings.selectedModel || undefined;
+    const modelInfo = model ? chatStore.models.get(model) : undefined;
     const isReasoning = modelInfo?.capabilities?.supports?.reasoningEffort;
 
     wsStore.newSession({
-      model,
+      ...(model && { model }),
       mode: settings.selectedMode,
       ...(isReasoning && { reasoningEffort: settings.reasoningEffort }),
       ...(settings.additionalInstructions.trim() && { customInstructions: settings.additionalInstructions.trim() }),
       ...(settings.excludedTools.length > 0 && { excludedTools: settings.excludedTools }),
+      ...(settings.remoteSession !== 'off' && { remoteSession: settings.remoteSession }),
       infiniteSessions: settings.infiniteSessions,
     });
   }
@@ -370,6 +386,14 @@
         onOpenModelSheet={() => modelSheetOpen = true}
       />
 
+      {#if showRemoteBanner && chatStore.remoteUrl}
+        <RemoteBanner
+          url={chatStore.remoteUrl}
+          steerable={settings.remoteSession === 'on'}
+          onDismiss={() => { dismissedRemoteUrl = chatStore.remoteUrl; }}
+        />
+      {/if}
+
     <div class="terminal">
       {#if sessionLoading}
         <div class="session-loading">
@@ -533,6 +557,10 @@
       onToggleMcpServer={(name, enabled) => wsStore.send({ type: 'toggle_mcp_rpc', name, enabled })}
       notificationsEnabled={settings.notificationsEnabled}
       onToggleNotifications={(v) => { settings.notificationsEnabled = v; }}
+      remoteSessionMode={settings.remoteSession}
+      onSetRemoteSessionMode={(mode) => { settings.remoteSession = mode; }}
+      remoteSessionActive={wsStore.sessionReady}
+      onApplyRemoteToSession={(mode) => wsStore.remoteToggle(mode)}
       voiceInputEnabled={settings.voiceInputEnabled}
       onToggleVoiceInput={(v) => { settings.voiceInputEnabled = v; }}
       ttsEnabled={settings.ttsEnabled}
@@ -551,6 +579,14 @@
       onResume={handleResumeSession}
       onDelete={(id) => wsStore.deleteSession(id)}
       onRequestDetail={(id) => wsStore.getSessionDetail(id)}
+      onNewCloudSession={(repository) => {
+        chatStore.clearMessages();
+        wsStore.newCloudSession({
+          ...(settings.selectedModel && { model: settings.selectedModel }),
+          mode: settings.selectedMode,
+          repository,
+        });
+      }}
     />
   </div>
 {:else}

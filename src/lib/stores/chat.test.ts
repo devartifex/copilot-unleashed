@@ -36,6 +36,8 @@ function createWsStoreMock(options: {
     send: vi.fn(),
     sendMessage: vi.fn(),
     newSession: vi.fn(),
+    newCloudSession: vi.fn(),
+    remoteToggle: vi.fn(),
     resumeSession: vi.fn(),
     setMode: vi.fn(),
     setModel: vi.fn(),
@@ -577,7 +579,7 @@ describe('createChatStore', () => {
     expect(store.messages).toEqual([
       expect.objectContaining({ role: 'assistant', content: 'Response' }),
       expect.objectContaining({ role: 'usage' }),
-      expect.objectContaining({ role: 'info', content: 'Session ended · 5 premium requests · 3.2s total API time' }),
+      expect.objectContaining({ role: 'info', content: 'Session ended · 5 AIC · 3.2s total API time' }),
     ]);
   });
 

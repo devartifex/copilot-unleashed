@@ -118,7 +118,7 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
 
     const onEvent = createCatchAllHandler(connectionEntry, HANDLED_EVENT_TYPES);
 
-    connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, {
+    const sessionOptions = {
       model: msg.model,
       reasoningEffort: msg.reasoningEffort,
       customInstructions,
@@ -139,8 +139,31 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       ...(msg.enableConfigDiscovery != null ? { enableConfigDiscovery: msg.enableConfigDiscovery } : {}),
       ...(provider ? { provider } : {}),
       ...(remoteSession ? { remoteSession } : {}),
-      onHookEvent: (message) => poolSend(connectionEntry, message),
-    });
+      onHookEvent: (message: Record<string, unknown>) => poolSend(connectionEntry, message),
+    };
+
+    let resolvedModel: string | undefined = msg.model;
+    try {
+      connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, sessionOptions);
+    } catch (createErr: any) {
+      // Stale/unavailable model (e.g. persisted default no longer offered) —
+      // retry once letting the SDK pick its own default model.
+      if (msg.model && /not available/i.test(createErr?.message ?? '')) {
+        console.warn(`[SESSION] Model "${msg.model}" unavailable — retrying with SDK default`);
+        resolvedModel = undefined;
+        connectionEntry.session = await createCopilotSession(connectionEntry.client, githubToken, {
+          ...sessionOptions,
+          model: undefined,
+          reasoningEffort: undefined,
+        });
+        poolSend(connectionEntry, {
+          type: 'info',
+          message: `Model "${msg.model}" is no longer available — switched to the default model.`,
+        });
+      } else {
+        throw createErr;
+      }
+    }
 
     wireSessionEvents(connectionEntry.session, connectionEntry, connectionEntry.session?.sessionId, ctx.userLogin, rawTabId(ctx));
 
@@ -155,13 +178,13 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
 
     poolSend(connectionEntry, {
       type: 'session_created',
-      model: msg.model,
+      model: resolvedModel,
       sessionId: connectionEntry.session?.sessionId,
     });
 
     // Store metadata for resume
     connectionEntry.sdkSessionId = connectionEntry.session?.sessionId ?? null;
-    connectionEntry.model = msg.model ?? null;
+    connectionEntry.model = resolvedModel ?? null;
     connectionEntry.mode = msg.mode ?? 'interactive';
 
     // Persist initial state (fire-and-forget)
@@ -169,7 +192,7 @@ export async function handleNewSession(msg: any, ctx: MessageContext): Promise<v
       userId: ctx.userLogin,
       tabId: rawTabId(ctx),
       sdkSessionId: connectionEntry.session?.sessionId ?? null,
-      model: msg.model ?? 'gpt-4.1',
+      model: resolvedModel ?? '',
       mode: msg.mode ?? 'interactive',
       messages: [],
       createdAt: Date.now(),

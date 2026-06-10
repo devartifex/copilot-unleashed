@@ -6,7 +6,8 @@ export type MessageDeliveryMode = 'immediate' | 'enqueue';
 
 export interface NewSessionMessage {
   type: 'new_session';
-  model: string;
+  /** Omitted → the SDK picks its default model */
+  model?: string;
   mode?: SessionMode;
   reasoningEffort?: ReasoningEffort;
   customInstructions?: string;
@@ -15,6 +16,23 @@ export interface NewSessionMessage {
   systemPromptSections?: Record<string, SystemPromptSectionInput>;
   modelCapabilities?: ModelCapabilitiesOverride;
   enableConfigDiscovery?: boolean;
+  /** "off" local only, "export" publish events to GitHub, "on" export + remote steering */
+  remoteSession?: 'off' | 'export' | 'on';
+}
+
+/** Creates a session running on GitHub's cloud agent infrastructure */
+export interface NewCloudSessionMessage {
+  type: 'new_cloud_session';
+  model?: string;
+  mode?: SessionMode;
+  reasoningEffort?: ReasoningEffort;
+  repository?: { owner: string; name: string; branch?: string };
+}
+
+/** Toggles remote export/steering on the active session */
+export interface RemoteToggleMessage {
+  type: 'remote_toggle';
+  mode?: 'off' | 'export' | 'on';
 }
 
 export interface SendMessage {
@@ -102,6 +120,8 @@ export interface ListSessionsMessage {
 export interface ResumeSessionMessage {
   type: 'resume_session';
   sessionId: string;
+  /** Suppress the SDK resume event for silent re-attach (auto cold-resume) */
+  silent?: boolean;
 }
 
 export interface DeleteSessionMessage {
@@ -227,6 +247,8 @@ export interface WorkspaceCreateFileMessage {
 
 export type ClientMessage =
   | NewSessionMessage
+  | NewCloudSessionMessage
+  | RemoteToggleMessage
   | SendMessage
   | ListModelsMessage
   | SetModeMessage

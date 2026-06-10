@@ -140,7 +140,7 @@ export async function handleGetSessionHistory(msg: any, ctx: MessageContext): Pr
   }
 
   try {
-    const events = await session.getMessages();
+    const events = await session.getEvents();
     const eventList = Array.isArray(events) ? events : [];
     debug('[SESSION_HISTORY] Got', eventList.length, 'events');
 

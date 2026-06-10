@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { approveAll } from '@github/copilot-sdk';
-import { createCopilotSession, buildSessionHooks, buildSessionMcpServers } from '../../copilot/session.js';
+import { createCopilotSession, buildSessionHooks, buildSessionMcpServers, buildEmptyModeSessionDefaults } from '../../copilot/session.js';
 import { getSessionDetail, buildSessionContext, isValidSessionId } from '../../copilot/session-metadata.js';
 import { loadSessionTurns } from '../../copilot/session-store-db.js';
 import { chatStateStore } from '../../chat-state-singleton.js';
@@ -57,11 +57,17 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
     // Try native SDK resume first
     try {
       connectionEntry.session = await connectionEntry.client.resumeSession(sessionId, {
+        ...buildEmptyModeSessionDefaults(),
         onPermissionRequest: (await import('@github/copilot-sdk')).approveAll,
         streaming: true,
+        // Re-prompt any permission requests that were pending when the
+        // session was last suspended instead of dropping them.
+        continuePendingWork: true,
+        // Don't emit a visible resume event when silently re-attaching after reconnect
+        ...(msg.silent === true ? { suppressResumeEvent: true } : {}),
         onUserInputRequest: makeUserInputHandler(connectionEntry, ctx.userLogin),
         hooks: buildSessionHooks((message) => poolSend(connectionEntry, message)),
-        configDir: resolvedConfigDir,
+        configDirectory: resolvedConfigDir,
         mcpServers: mcpServersConfig as any,
         onEvent,
         ...(msg.modelCapabilities ? { modelCapabilities: msg.modelCapabilities } : {}),
@@ -142,7 +148,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
       const turns = loadSessionTurns(sessionId);
       if (turns.length > 0) {
         debug(`[RESUME] Loaded ${turns.length} messages from session-store.db for ${sessionId}`);
-        const resolvedModel = msg.model || 'gpt-4.1';
+        const resolvedModel = msg.model || '';
         poolSend(connectionEntry, {
           type: 'cold_resume',
           messages: turns,

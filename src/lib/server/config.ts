@@ -41,6 +41,11 @@ function getConfig() {
     otelCaptureContent: process.env.OTEL_CAPTURE_CONTENT === 'true',
     otelSourceName: env('OTEL_SOURCE_NAME', 'copilot-unleashed'),
     enableRemoteSessions: process.env.ENABLE_REMOTE_SESSIONS?.trim().toLowerCase() !== 'false',
+    // SDK client mode: "empty" (safe, explicit opt-in — default) or "copilot-cli"
+    // (legacy escape hatch giving the agent CLI-equivalent ambient capabilities).
+    copilotClientMode: (process.env.COPILOT_CLIENT_MODE?.trim().toLowerCase() === 'copilot-cli'
+      ? 'copilot-cli'
+      : 'empty') as 'empty' | 'copilot-cli',
   };
 }
 

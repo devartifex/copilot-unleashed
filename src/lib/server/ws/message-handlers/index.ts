@@ -7,6 +7,8 @@ import { handleListTools, handleListAgents, handleSelectAgent, handleDeselectAge
 import { handleGetQuota, handleCompact } from './quota-compact.js';
 import { handleListSessions, handleDeleteSession, handleGetSessionDetail, handleListModels, handleGetSessionHistory, handleSessionLog } from './session-management.js';
 import { handleResumeSession } from './resume-session.js';
+import { handleNewCloudSession } from './cloud-session.js';
+import { handleRemoteToggle } from './remote.js';
 import { handleGetPlan, handleUpdatePlan, handleDeletePlan } from './plans.js';
 import { handleStartFleet } from './fleet.js';
 import { handleListSkillsRpc, handleToggleSkillRpc, handleReloadSkills, handleListMcpRpc, handleToggleMcpRpc, handleListInstructions, handleListPrompts, handleUsePrompt } from './rpc-discovery.js';
@@ -17,6 +19,8 @@ import { chatStateStore } from '../../chat-state-singleton.js';
 
 export const messageHandlers: Record<string, (msg: any, ctx: MessageContext) => Promise<void>> = {
   new_session: handleNewSession,
+  new_cloud_session: handleNewCloudSession,
+  remote_toggle: handleRemoteToggle,
   message: handleChat,
   list_models: handleListModels,
   set_mode: handleSetMode,

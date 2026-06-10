@@ -34,7 +34,7 @@
     <div class="quota-text">
       Unlimited
       {#if primaryQuota.snapshot.usedRequests != null}
-        · {primaryQuota.snapshot.usedRequests} requests used
+        · {primaryQuota.snapshot.usedRequests} credits used
       {/if}
       {#if primaryQuota.snapshot.resetDate}
         · Resets {formatResetDate(primaryQuota.snapshot.resetDate)}
@@ -49,7 +49,7 @@
     </div>
     <div class="quota-text">
       {#if primaryQuota.snapshot.usedRequests != null && primaryQuota.snapshot.entitlementRequests != null}
-        {primaryQuota.snapshot.usedRequests} / {primaryQuota.snapshot.entitlementRequests} requests used
+        {primaryQuota.snapshot.usedRequests} / {primaryQuota.snapshot.entitlementRequests} credits used
       {:else}
         {quotaPercentUsed.toFixed(1)}% used
       {/if}
@@ -59,7 +59,7 @@
     </div>
     {#if primaryQuota.snapshot.overage != null && primaryQuota.snapshot.overage > 0}
       <div class="quota-text" style="color: var(--red); margin-top: var(--sp-1);">
-        ⚠ {primaryQuota.snapshot.overage} overage requests
+        ⚠ {primaryQuota.snapshot.overage} overage credits
       </div>
     {/if}
   {/if}

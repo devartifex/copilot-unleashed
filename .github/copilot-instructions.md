@@ -29,7 +29,7 @@ Self-hosted multi-model AI chat platform powered by the official `@github/copilo
 | Language | TypeScript 5.7 (strict mode, ES2022) |
 | Framework | SvelteKit 5 with `adapter-node` |
 | Reactivity | Svelte 5 runes ($state, $derived, $effect, $props) |
-| AI Engine | `@github/copilot-sdk` ^0.1.32 |
+| AI Engine | `@github/copilot-sdk` ^1.0.0 (client `mode: "empty"`) |
 | WebSocket | `ws` ^8.18 via custom server.js |
 | Markdown | `marked` + `dompurify` + `highlight.js` (npm, bundled by Vite) |
 | Security | Custom CSP/HSTS in hooks.server.ts, rate limiting, DOMPurify |
@@ -180,6 +180,7 @@ src/
 | `VAPID_SUBJECT` | No | — | VAPID subject (mailto: or https: URL) |
 | `PUSH_STORE_PATH` | No | ./data/push-subscriptions | Directory for push subscription storage |
 | `ENABLE_REMOTE_SESSIONS` | No | true | Enable cloud/remote session publishing on the SDK client. Sessions still need per-session `remoteSession: "export"|"on"` opt-in. Set to `false` to hard-disable. |
+| `COPILOT_CLIENT_MODE` | No | empty | SDK client mode: `empty` (multi-user safe; features re-enabled per session via `buildEmptyModeSessionDefaults()`) or `copilot-cli` (full ambient capabilities) |
 
 ## Build & Run
 

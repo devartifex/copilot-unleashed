@@ -148,7 +148,7 @@ export async function handleResumeSession(msg: any, ctx: MessageContext): Promis
       const turns = loadSessionTurns(sessionId);
       if (turns.length > 0) {
         debug(`[RESUME] Loaded ${turns.length} messages from session-store.db for ${sessionId}`);
-        const resolvedModel = msg.model || 'gpt-4.1';
+        const resolvedModel = msg.model || '';
         poolSend(connectionEntry, {
           type: 'cold_resume',
           messages: turns,

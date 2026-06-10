@@ -39,9 +39,9 @@
   let dismissedRemoteUrl = $state<string | null>(null);
   const showRemoteBanner = $derived(!!chatStore.remoteUrl && chatStore.remoteUrl !== dismissedRemoteUrl);
 
-  // Use the confirmed model from the active session; fall back to the user's saved preference
-  // so the TopBar/ModelSheet show the correct model immediately before session_created arrives.
-  const effectiveModel = $derived(chatStore.currentModel || settings.selectedModel || 'gpt-4.1');
+  // Use the confirmed model from the active session; fall back to the user's saved preference.
+  // No hardcoded model — when empty the TopBar shows "Select model" and the SDK default is used.
+  const effectiveModel = $derived(chatStore.currentModel || settings.selectedModel || '');
 
   const modelCount = $derived(chatStore.models.size);
   const toolCount = $derived(chatStore.tools.length);
@@ -50,7 +50,8 @@
   );
 
   const supportsVision = $derived.by(() => {
-    const model = settings.selectedModel || 'gpt-4.1';
+    const model = effectiveModel;
+    if (!model) return false;
     const info = chatStore.models.get(model);
     return info?.capabilities?.supports?.vision === true;
   });
@@ -138,6 +139,14 @@
           settings.selectedMode = msg.mode;
         }
 
+        // Drop a stale saved model preference when it's no longer offered
+        // (e.g. deprecated) — the SDK default takes over on the next session.
+        if (msg.type === 'models' && settings.selectedModel && chatStore.models.size > 0
+          && !chatStore.models.has(settings.selectedModel)) {
+          console.warn(`[PAGE] Saved model "${settings.selectedModel}" no longer available — resetting to default`);
+          settings.selectedModel = '';
+        }
+
         // Route customization list messages to settings store
         if (msg.type === 'skills_list') {
           settings.availableSkills = msg.skills;
@@ -192,12 +201,15 @@
 
   // ── Helpers ────────────────────────────────────────────────────────────
   function requestNewSession(): void {
-    const model = settings.selectedModel || 'gpt-4.1';
-    const modelInfo = chatStore.models.get(model);
+    // Only send a model if the user actually picked one — otherwise let the
+    // SDK choose its default (a hardcoded fallback breaks when that model
+    // disappears from the user's available model list).
+    const model = settings.selectedModel || undefined;
+    const modelInfo = model ? chatStore.models.get(model) : undefined;
     const isReasoning = modelInfo?.capabilities?.supports?.reasoningEffort;
 
     wsStore.newSession({
-      model,
+      ...(model && { model }),
       mode: settings.selectedMode,
       ...(isReasoning && { reasoningEffort: settings.reasoningEffort }),
       ...(settings.additionalInstructions.trim() && { customInstructions: settings.additionalInstructions.trim() }),
@@ -570,7 +582,7 @@
       onNewCloudSession={(repository) => {
         chatStore.clearMessages();
         wsStore.newCloudSession({
-          model: settings.selectedModel || 'gpt-4.1',
+          ...(settings.selectedModel && { model: settings.selectedModel }),
           mode: settings.selectedMode,
           repository,
         });

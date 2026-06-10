@@ -476,7 +476,9 @@ export async function createCopilotSession(
   const sessionConfig: SessionConfig = {
     ...buildEmptyModeSessionDefaults(),
     clientName: 'copilot-unleashed',
-    model: options.model || 'gpt-4.1',
+    // Omit model when unset so the SDK picks its own default — hardcoding a
+    // model breaks when it's no longer in the user's available model list.
+    ...(options.model ? { model: options.model } : {}),
     streaming: true,
     onPermissionRequest: permissionHandler,
     ...(config.copilotConfigDir && { configDirectory: config.copilotConfigDir }),

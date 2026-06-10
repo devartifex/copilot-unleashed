@@ -117,7 +117,7 @@ export async function handleNewCloudSession(msg: any, ctx: MessageContext): Prom
       userId: ctx.userLogin,
       tabId: rawTabId(ctx),
       sdkSessionId: sessionId ?? null,
-      model: msg.model ?? 'gpt-4.1',
+      model: msg.model ?? '',
       mode: msg.mode ?? 'interactive',
       messages: [],
       createdAt: Date.now(),

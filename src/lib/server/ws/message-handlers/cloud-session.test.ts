@@ -5,7 +5,7 @@ const { configMock, poolSendMock, createCopilotSessionMock, chatStateDeleteMock,
   poolSendMock: vi.fn(),
   createCopilotSessionMock: vi.fn(),
   chatStateDeleteMock: vi.fn(),
-  chatStateSaveMock: vi.fn(async () => {}),
+  chatStateSaveMock: vi.fn(async (..._args: unknown[]) => {}),
 }));
 
 vi.mock('../../config.js', () => ({ config: configMock }));

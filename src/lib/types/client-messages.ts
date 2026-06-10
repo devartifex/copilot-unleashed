@@ -6,7 +6,8 @@ export type MessageDeliveryMode = 'immediate' | 'enqueue';
 
 export interface NewSessionMessage {
   type: 'new_session';
-  model: string;
+  /** Omitted → the SDK picks its default model */
+  model?: string;
   mode?: SessionMode;
   reasoningEffort?: ReasoningEffort;
   customInstructions?: string;

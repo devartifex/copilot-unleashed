@@ -61,10 +61,11 @@ describe('createCopilotSession', () => {
     const sessionConfig = getSessionConfig(client);
     expect(sessionConfig).toMatchObject({
       clientName: 'copilot-unleashed',
-      model: 'gpt-4.1',
       streaming: true,
       configDirectory: '/copilot-config',
     });
+    // No hardcoded model — the SDK picks its default when none is given
+    expect(sessionConfig).not.toHaveProperty('model');
 
     const mcpServers = sessionConfig.mcpServers as Record<string, Record<string, unknown>>;
     expect(mcpServers.github).toEqual({

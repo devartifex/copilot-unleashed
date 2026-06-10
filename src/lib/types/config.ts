@@ -19,7 +19,8 @@ export interface SystemPromptSectionInput {
 export type RemoteSessionMode = 'off' | 'export' | 'on';
 
 export interface NewSessionConfig {
-  model: string;
+  /** Omitted → the SDK picks its default model */
+  model?: string;
   mode?: SessionMode;
   reasoningEffort?: ReasoningEffort;
   customInstructions?: string;

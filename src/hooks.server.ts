@@ -103,7 +103,8 @@ setInterval(() => {
 }, RATE_LIMIT_WINDOW);
 
 const rateLimit: Handle = async ({ event, resolve }) => {
-  if (process.env.E2E_DISABLE_RATE_LIMIT === 'true') {
+  // Never allow test-only rate-limit bypass in production.
+  if (process.env.E2E_DISABLE_RATE_LIMIT === 'true' && process.env.NODE_ENV !== 'production') {
     return resolve(event);
   }
 

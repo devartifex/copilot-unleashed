@@ -83,6 +83,8 @@ describe('handleNewCloudSession', () => {
     [{ owner: '-bad-', name: 'repo' }, 'Invalid repository owner'],
     [{ owner: 'octocat', name: 'bad repo!' }, 'Invalid repository name'],
     [{ owner: 'octocat', name: 'repo', branch: '-bad' }, 'Invalid branch name'],
+    [{ owner: 'octocat', name: 'repo', branch: 'main/' }, 'Invalid branch name'],
+    [{ owner: 'octocat', name: 'repo', branch: 'feature..bad' }, 'Invalid branch name'],
   ])('rejects invalid repository input %j', async (repository, expected) => {
     await handleNewCloudSession({ type: 'new_cloud_session', repository }, makeContext());
 

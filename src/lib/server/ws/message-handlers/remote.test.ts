@@ -69,13 +69,13 @@ describe('handleRemoteToggle', () => {
     ]);
   });
 
-  it('defaults invalid modes to "on"', async () => {
+  it('defaults invalid modes to "export"', async () => {
     const enable = vi.fn(async () => ({}));
     const session = { rpc: { remote: { enable, disable: vi.fn() } } };
 
     await handleRemoteToggle({ type: 'remote_toggle', mode: 'bogus' }, makeContext(session));
 
-    expect(enable).toHaveBeenCalledWith({ mode: 'on' });
+    expect(enable).toHaveBeenCalledWith({ mode: 'export' });
     expect(sentMessages()).toEqual([{ type: 'remote_toggled', enabled: true }]);
   });
 

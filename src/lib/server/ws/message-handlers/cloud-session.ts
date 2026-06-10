@@ -13,7 +13,7 @@ const OWNER_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
 // GitHub repo name: alphanumeric, hyphen, underscore, dot; max 100 chars.
 const REPO_RE = /^[a-zA-Z0-9._-]{1,100}$/;
 // Git branch: conservative allowlist (no control chars, spaces, or git-invalid sequences).
-const BRANCH_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9._\/-]{0,254})$/;
+const BRANCH_RE = /^(?!.*\.\.)(?!.*\/$)[a-zA-Z0-9](?:[a-zA-Z0-9._\/-]{0,254})$/;
 
 function rawTabId(ctx: MessageContext): string {
   return ctx.poolKey.split(':').slice(1).join(':');

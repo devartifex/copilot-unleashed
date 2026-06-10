@@ -26,7 +26,8 @@ export async function handleRemoteToggle(msg: any, ctx: MessageContext): Promise
     return;
   }
 
-  const mode = typeof msg.mode === 'string' && VALID_REMOTE_MODES.has(msg.mode) ? msg.mode : 'on';
+  // Fail-safe default for malformed input: export-only (non-steerable).
+  const mode = typeof msg.mode === 'string' && VALID_REMOTE_MODES.has(msg.mode) ? msg.mode : 'export';
 
   try {
     if (mode === 'off') {

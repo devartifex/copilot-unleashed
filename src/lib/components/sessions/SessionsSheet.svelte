@@ -29,7 +29,7 @@
   // Mirror server-side validation (cloud-session.ts)
   const OWNER_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
   const REPO_RE = /^[a-zA-Z0-9._-]{1,100}$/;
-  const BRANCH_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9._/-]{0,254})$/;
+  const BRANCH_RE = /^(?!.*\.\.)(?!.*\/$)[a-zA-Z0-9](?:[a-zA-Z0-9._/-]{0,254})$/;
 
   function handleCloudSubmit(e: SubmitEvent) {
     e.preventDefault();

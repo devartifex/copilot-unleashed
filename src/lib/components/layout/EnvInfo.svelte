@@ -64,7 +64,7 @@
     </div>
   {/if}
   {#if sessionTotals.premiumRequests > 0}
-    <div class="env-line"><span class="dot orange"></span> {sessionTotals.premiumRequests} premium requests this session</div>
+    <div class="env-line"><span class="dot orange"></span> {sessionTotals.premiumRequests} AI Credits (AIC) used this session</div>
   {/if}
 </div>
 

@@ -801,7 +801,7 @@ export function createChatStore(wsStore: WsStore): ChatStore {
         }
         addInfoMessage(
           'Session ended' +
-          (msg.totalPremiumRequests != null ? ` · ${msg.totalPremiumRequests} premium requests` : '') +
+          (msg.totalPremiumRequests != null ? ` · ${msg.totalPremiumRequests} AIC` : '') +
           (msg.totalApiDurationMs != null ? ` · ${(msg.totalApiDurationMs / 1000).toFixed(1)}s total API time` : ''),
         );
         break;

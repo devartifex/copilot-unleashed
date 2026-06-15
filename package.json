@@ -61,21 +61,21 @@
     "cookie": "^0.7.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0",
+    "@playwright/test": "^1.61.0",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@types/express-session": "^1.19.0",
-    "@types/node": "^25.7.0",
+    "@types/node": "^25.9.3",
     "@types/session-file-store": "^1.2.6",
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.5.13",
-    "@vitest/coverage-v8": "^4.1.6",
+    "@vitest/coverage-v8": "^4.1.9",
     "dotenv": "^17.4.2",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
-    "lint-staged": "^17.0.4",
-    "sharp": "^0.34.5",
-    "svelte-check": "^4.4.8",
+    "lint-staged": "^17.0.7",
+    "sharp": "^0.35.1",
+    "svelte-check": "^4.6.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.3"
   }

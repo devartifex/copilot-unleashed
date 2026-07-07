@@ -1,29 +1,38 @@
 const SUPPORTED = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
+/**
+ * Remove angle brackets entirely so no HTML tag can survive or be re-formed
+ * from adjacent fragments (fixes incomplete multi-character sanitization —
+ * a single-pass tag-stripping regex can be bypassed with nested markers).
+ */
+function stripHtmlTags(text: string): string {
+  return text.replace(/[<>]/g, '');
+}
+
 /** Strip markdown/HTML to plain text suitable for speech synthesis. */
 function stripToPlainText(markdown: string): string {
-  return markdown
-    // Remove code blocks (``` ... ```)
-    .replace(/```[\s\S]*?```/g, ' code block omitted ')
-    // Remove inline code
-    .replace(/`([^`]+)`/g, '$1')
-    // Remove images
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-    // Remove links — keep text
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Remove headings markers
-    .replace(/^#{1,6}\s+/gm, '')
-    // Remove bold/italic markers
-    .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
-    .replace(/_{1,3}([^_]+)_{1,3}/g, '$1')
-    // Remove strikethrough
-    .replace(/~~([^~]+)~~/g, '$1')
-    // Remove blockquotes
-    .replace(/^>\s+/gm, '')
-    // Remove horizontal rules
-    .replace(/^[-*_]{3,}\s*$/gm, '')
-    // Remove HTML tags
-    .replace(/<[^>]+>/g, '')
+  return stripHtmlTags(
+    markdown
+      // Remove code blocks (``` ... ```)
+      .replace(/```[\s\S]*?```/g, ' code block omitted ')
+      // Remove inline code
+      .replace(/`([^`]+)`/g, '$1')
+      // Remove images
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+      // Remove links — keep text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      // Remove headings markers
+      .replace(/^#{1,6}\s+/gm, '')
+      // Remove bold/italic markers
+      .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
+      .replace(/_{1,3}([^_]+)_{1,3}/g, '$1')
+      // Remove strikethrough
+      .replace(/~~([^~]+)~~/g, '$1')
+      // Remove blockquotes
+      .replace(/^>\s+/gm, '')
+      // Remove horizontal rules
+      .replace(/^[-*_]{3,}\s*$/gm, '')
+  )
     // Collapse multiple newlines/spaces
     .replace(/\n{2,}/g, '. ')
     .replace(/\n/g, ' ')

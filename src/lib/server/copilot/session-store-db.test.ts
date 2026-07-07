@@ -31,7 +31,12 @@ async function getRealDb(): Promise<{ dbPath: string; DatabaseSync: typeof impor
   if (!realExists(dbPath)) return null;
 
   try {
-    const { DatabaseSync } = await import('node:sqlite');
+    // Rolldown (Vite 8.1+) refuses to bundle Node built-ins referenced via
+    // import() in the test pipeline — load node:sqlite through createRequire
+    // instead, mirroring what session-store-db.ts itself does.
+    const { createRequire } = await vi.importActual<typeof import('node:module')>('node:module');
+    const esmRequire = createRequire(import.meta.url);
+    const { DatabaseSync } = esmRequire('node:sqlite') as typeof import('node:sqlite');
     return { dbPath, DatabaseSync };
   } catch {
     return null;

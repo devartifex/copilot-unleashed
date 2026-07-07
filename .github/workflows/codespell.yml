@@ -13,7 +13,7 @@ jobs:
   codespell:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Check spelling with codespell
         uses: codespell-project/actions-codespell@v2

@@ -62,10 +62,10 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.0",
-    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@sveltejs/vite-plugin-svelte": "^7.2.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@types/express-session": "^1.19.0",
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.1.1",
     "@types/session-file-store": "^1.2.6",
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.5.13",
@@ -76,7 +76,7 @@
     "lint-staged": "^17.0.7",
     "sharp": "^0.35.1",
     "svelte-check": "^4.6.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.3"
   }
 }

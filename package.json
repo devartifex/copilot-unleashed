@@ -38,7 +38,7 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@github/copilot-sdk": "^1.0.5",
+    "@github/copilot-sdk": "^1.0.7",
     "@sveltejs/adapter-node": "^5.5.7",
     "@sveltejs/kit": "^2.68.0",
     "dompurify": "^3.4.11",

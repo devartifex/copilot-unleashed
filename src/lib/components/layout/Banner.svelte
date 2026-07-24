@@ -1,9 +1,17 @@
 <script lang="ts">
   interface Props {
     username?: string;
+    onSuggestion?: (text: string) => void;
   }
 
-  const { username }: Props = $props();
+  const { username, onSuggestion }: Props = $props();
+
+  const suggestions = [
+    'Explain this codebase',
+    'Review my latest changes',
+    'Write tests for a module',
+    'Fix a failing build',
+  ];
 </script>
 
 <div class="banner-box">
@@ -17,6 +25,19 @@
       {/if}
     </h2>
     <p class="banner-sub">Describe a task to get started.</p>
+    {#if onSuggestion}
+      <div class="suggestions" aria-label="Suggested prompts">
+        {#each suggestions as suggestion (suggestion)}
+          <button
+            type="button"
+            class="suggestion-chip"
+            onclick={() => onSuggestion(suggestion)}
+          >
+            {suggestion}
+          </button>
+        {/each}
+      </div>
+    {/if}
     <div class="banner-hints">
       <span class="hint">Switch modes or models from the top bar</span>
       <span class="hint-sep">·</span>
@@ -61,6 +82,41 @@
     color: var(--fg-muted);
     font-size: 0.88em;
     margin: 0;
+  }
+
+  .suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--sp-2);
+    margin-top: var(--sp-2);
+  }
+
+  .suggestion-chip {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--fg-muted);
+    font-size: 0.8em;
+    font-family: inherit;
+    padding: 6px 14px;
+    min-height: 32px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      border-color var(--duration-normal) var(--ease-default),
+      color var(--duration-normal) var(--ease-default),
+      background var(--duration-normal) var(--ease-default);
+  }
+
+  .suggestion-chip:hover {
+    border-color: var(--border-accent);
+    color: var(--fg);
+    background: var(--bg-overlay);
+  }
+
+  .suggestion-chip:active {
+    transform: scale(0.97);
   }
 
   .banner-hints {

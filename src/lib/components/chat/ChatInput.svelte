@@ -108,6 +108,13 @@
     voiceComp?.toggle();
   }
 
+  /** Prefill the input with text (e.g. from a suggested prompt) and focus it. */
+  export function prefill(text: string) {
+    inputValue = text;
+    requestAnimationFrame(autoResize);
+    textareaEl?.focus();
+  }
+
   const isDisabled = $derived(
     !pendingUserInput && (connectionState !== 'connected' || !sessionReady || isUploading),
   );

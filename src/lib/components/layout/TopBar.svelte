@@ -15,12 +15,20 @@
 
   const {
     currentModel,
+    connectionState,
     sessionTitle,
     quotaSnapshots,
     modelSheetOpen = false,
     onToggleSidebar,
     onOpenModelSheet,
   }: Props = $props();
+
+  // Only surface degraded states — 'connecting' at startup and 'connected' stay silent.
+  const connectionIssue = $derived.by(() => {
+    if (connectionState === 'reconnecting') return { label: 'Reconnecting…', kind: 'warn' as const };
+    if (connectionState === 'disconnected' || connectionState === 'error') return { label: 'Offline', kind: 'error' as const };
+    return null;
+  });
 
   const modelFamilyColor = $derived.by(() => {
     if (!currentModel) return 'var(--fg-dim)';
@@ -44,6 +52,13 @@
     <span class="brand-group" aria-label="Copilot Unleashed">
       <img src="/img/logo-no-bg.svg" alt="" class="brand-icon" width="22" height="22" aria-hidden="true" />
       <span class="brand-name">Copilot <span class="brand-accent">Unleashed</span></span>
+    </span>
+  {/if}
+
+  {#if connectionIssue}
+    <span class="conn-pill" class:conn-warn={connectionIssue.kind === 'warn'} class:conn-error={connectionIssue.kind === 'error'} role="status">
+      <span class="conn-dot"></span>
+      {connectionIssue.label}
     </span>
   {/if}
 
@@ -149,6 +164,50 @@
     .brand-name {
       display: none;
     }
+  }
+
+  /* ── Connection status pill ────────────────────────────────────── */
+  .conn-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72em;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    animation: conn-fade-in 0.2s ease;
+  }
+
+  .conn-pill.conn-warn {
+    color: var(--color-warning);
+    background: rgba(227, 179, 65, 0.12);
+    border: 1px solid rgba(227, 179, 65, 0.3);
+  }
+
+  .conn-pill.conn-error {
+    color: var(--color-error);
+    background: rgba(248, 81, 73, 0.12);
+    border: 1px solid rgba(248, 81, 73, 0.3);
+  }
+
+  .conn-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: conn-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes conn-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  @keyframes conn-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
   /* ── Model pill ────────────────────────────────────────────────── */

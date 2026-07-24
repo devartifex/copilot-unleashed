@@ -37,6 +37,7 @@
   let sessionsLoading = $state(false);
   let sessionLoading = $state(true);
   let dismissedRemoteUrl = $state<string | null>(null);
+  let chatInputComp = $state<ChatInput>();
   const showRemoteBanner = $derived(!!chatStore.remoteUrl && chatStore.remoteUrl !== dismissedRemoteUrl);
 
   // Use the confirmed model from the active session; fall back to the user's saved preference.
@@ -415,7 +416,7 @@
 
         <MessageList {chatStore} tts={settings.ttsEnabled ? ttsStore : undefined} username={data.user?.login} onSendQueued={handleSendQueued} onCancelQueued={handleCancelQueued}>
           {#if chatStore.messages.length === 0}
-            <Banner username={data.user?.login} />
+            <Banner username={data.user?.login} onSuggestion={(text) => chatInputComp?.prefill(text)} />
           {/if}
           <EnvInfo
             modelCount={modelCount}
@@ -454,6 +455,7 @@
         {/if}
 
         <ChatInput
+        bind:this={chatInputComp}
         connectionState={wsStore.connectionState}
         sessionReady={wsStore.sessionReady}
         isStreaming={chatStore.isStreaming}
